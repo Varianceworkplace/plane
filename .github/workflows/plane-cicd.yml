@@ -1,4 +1,3 @@
-
 name: Plane CI/CD
 
 on:
@@ -12,7 +11,7 @@ permissions:
   packages: write
 
 concurrency:
-  group: plane-develop-deployment
+  group: plane-production-deploy
   cancel-in-progress: false
 
 jobs:
@@ -45,8 +44,8 @@ jobs:
       - name: Build and push backend
         uses: docker/build-push-action@v6
         with:
-          context: ./apps/api
-          file: ./apps/api/Dockerfile.api
+          context: .
+          file: apps/api/Dockerfile.api
           push: true
           tags: ghcr.io/varianceworkplace/plane-backend:${{ github.sha }}
 
@@ -75,17 +74,17 @@ jobs:
           tags: ghcr.io/varianceworkplace/plane-live:${{ github.sha }}
 
   deploy:
-    name: Deploy Plane
+    name: Deploy and Verify Release
     needs: build
     if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
-    environment: production
 
     steps:
       - name: Configure SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        shell: bash
         run: |
           set -euo pipefail
 
@@ -98,113 +97,110 @@ jobs:
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Deploy and verify release
+      - name: Deploy Plane
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
-          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
           RELEASE: ${{ github.sha }}
           IMAGE_PREFIX: ghcr.io/varianceworkplace
+        shell: bash
         run: |
           set -euo pipefail
 
-          if [ -z "$GHCR_USERNAME" ] || [ -z "$GHCR_READ_TOKEN" ]; then
-            echo "ERROR: GHCR_USERNAME or GHCR_READ_TOKEN is missing."
-            exit 1
-          fi
-
-          TOKEN_B64="$(printf '%s' "$GHCR_READ_TOKEN" | base64 -w 0)"
+          echo "Target GitHub commit: $RELEASE"
+          echo "Target server: $DEPLOY_HOST"
 
           ssh \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "APP_RELEASE='$RELEASE' \
-             PLANE_IMAGE_PREFIX='$IMAGE_PREFIX' \
-             GHCR_USERNAME='$GHCR_USERNAME' \
-             GHCR_TOKEN_B64='$TOKEN_B64' bash -s" <<'REMOTE'
+            "APP_RELEASE='$RELEASE' PLANE_IMAGE_PREFIX='$IMAGE_PREFIX' bash -s" <<'REMOTE'
           set -Eeuo pipefail
 
           cd /opt/plane-selfhost
 
-          cleanup() {
-            docker logout ghcr.io >/dev/null 2>&1 || true
+          export APP_RELEASE
+          export PLANE_IMAGE_PREFIX
+
+          compose() {
+            docker compose --env-file plane.env "$@"
           }
-          trap cleanup EXIT
 
-          echo "Deploying commit: $APP_RELEASE"
+          echo "=== Deployment target ==="
+          echo "Release: $APP_RELEASE"
+          echo "Image prefix: $PLANE_IMAGE_PREFIX"
 
-          echo "Validating Docker Compose configuration..."
-          docker compose --env-file plane.env config --quiet
+          echo "=== Validate Compose configuration ==="
+          compose config --quiet
 
-          echo "Logging in to GitHub Container Registry..."
-          printf '%s' "$GHCR_TOKEN_B64" \
-            | base64 --decode \
-            | docker login ghcr.io \
-                --username "$GHCR_USERNAME" \
-                --password-stdin
+          echo "=== Pull target release images ==="
+          compose pull \
+            web admin space live \
+            api worker beat-worker migrator
 
-          echo "Pulling application images..."
-          docker compose --env-file plane.env pull \
-            web admin space live api worker beat-worker migrator
+          echo "=== Run database migrations ==="
+          compose run --rm migrator
 
-          echo "Running database migrations..."
-          docker compose --env-file plane.env run --rm migrator
-
-          echo "Recreating application services..."
-          docker compose --env-file plane.env up \
-            -d --no-deps --force-recreate \
+          echo "=== Recreate application containers ==="
+          compose up -d --no-deps --force-recreate \
             api worker beat-worker web admin space live
 
-          echo "Verifying deployed image tags..."
+          echo "=== Wait for application startup ==="
+          sleep 20
+
+          echo "=== Verify deployed image tags ==="
 
           for service in api worker beat-worker web admin space live; do
-            case "$service" in
-              api|worker|beat-worker)
-                expected="$PLANE_IMAGE_PREFIX/plane-backend:$APP_RELEASE"
-                ;;
-              web)
-                expected="$PLANE_IMAGE_PREFIX/plane-frontend:$APP_RELEASE"
-                ;;
-              admin)
-                expected="$PLANE_IMAGE_PREFIX/plane-admin:$APP_RELEASE"
-                ;;
-              space)
-                expected="$PLANE_IMAGE_PREFIX/plane-space:$APP_RELEASE"
-                ;;
-              live)
-                expected="$PLANE_IMAGE_PREFIX/plane-live:$APP_RELEASE"
-                ;;
-            esac
-
-            container_id="$(docker compose --env-file plane.env ps -q "$service")"
+            container_id="$(compose ps -q "$service")"
 
             if [ -z "$container_id" ]; then
               echo "ERROR: No container found for $service"
               exit 1
             fi
 
-            actual="$(docker inspect --format '{{.Config.Image}}' "$container_id")"
+            actual_image="$(docker inspect \
+              --format '{{.Config.Image}}' "$container_id")"
 
-            echo "$service -> $actual"
+            expected_image=""
 
-            if [ "$actual" != "$expected" ]; then
-              echo "ERROR: Image mismatch for $service"
-              echo "Expected: $expected"
-              echo "Actual:   $actual"
+            case "$service" in
+              api|worker|beat-worker)
+                expected_image="$PLANE_IMAGE_PREFIX/plane-backend:$APP_RELEASE"
+                ;;
+              web)
+                expected_image="$PLANE_IMAGE_PREFIX/plane-frontend:$APP_RELEASE"
+                ;;
+              admin)
+                expected_image="$PLANE_IMAGE_PREFIX/plane-admin:$APP_RELEASE"
+                ;;
+              space)
+                expected_image="$PLANE_IMAGE_PREFIX/plane-space:$APP_RELEASE"
+                ;;
+              live)
+                expected_image="$PLANE_IMAGE_PREFIX/plane-live:$APP_RELEASE"
+                ;;
+            esac
+
+            echo "$service -> $actual_image"
+
+            if [ "$actual_image" != "$expected_image" ]; then
+              echo "ERROR: Release mismatch for $service"
+              echo "Expected: $expected_image"
+              echo "Actual:   $actual_image"
               exit 1
             fi
 
-            state="$(docker inspect --format '{{.State.Status}}' "$container_id")"
+            running="$(docker inspect \
+              --format '{{.State.Running}}' "$container_id")"
 
-            if [ "$state" != "running" ]; then
-              echo "ERROR: $service is not running; state: $state"
+            if [ "$running" != "true" ]; then
+              echo "ERROR: $service is not running"
               exit 1
             fi
           done
 
-          echo "All seven application services use commit $APP_RELEASE"
+          echo "=== Final service status ==="
+          compose ps
 
-          docker compose --env-file plane.env ps
+          echo "SUCCESS: All seven application containers use $APP_RELEASE"
           REMOTE
