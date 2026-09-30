@@ -1,3 +1,4 @@
+
 name: Plane CI/CD
 
 on:
@@ -107,8 +108,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "Target GitHub commit: $RELEASE"
-          echo "Target server: $DEPLOY_HOST"
+          echo "Target release: $RELEASE"
+          echo "Deployment server: $DEPLOY_HOST"
 
           ssh \
             -o BatchMode=yes \
@@ -126,14 +127,13 @@ jobs:
             docker compose --env-file plane.env "$@"
           }
 
-          echo "=== Deployment target ==="
-          echo "Release: $APP_RELEASE"
-          echo "Image prefix: $PLANE_IMAGE_PREFIX"
-
           echo "=== Validate Compose configuration ==="
           compose config --quiet
 
-          echo "=== Pull target release images ==="
+          echo "=== Confirm target image tags ==="
+          compose config --images
+
+          echo "=== Pull images ==="
           compose pull \
             web admin space live \
             api worker beat-worker migrator
@@ -145,10 +145,10 @@ jobs:
           compose up -d --no-deps --force-recreate \
             api worker beat-worker web admin space live
 
-          echo "=== Wait for application startup ==="
+          echo "=== Wait for startup ==="
           sleep 20
 
-          echo "=== Verify deployed image tags ==="
+          echo "=== Verify deployed release ==="
 
           for service in api worker beat-worker web admin space live; do
             container_id="$(compose ps -q "$service")"
@@ -160,8 +160,6 @@ jobs:
 
             actual_image="$(docker inspect \
               --format '{{.Config.Image}}' "$container_id")"
-
-            expected_image=""
 
             case "$service" in
               api|worker|beat-worker)
@@ -184,9 +182,8 @@ jobs:
             echo "$service -> $actual_image"
 
             if [ "$actual_image" != "$expected_image" ]; then
-              echo "ERROR: Release mismatch for $service"
+              echo "ERROR: Image mismatch for $service"
               echo "Expected: $expected_image"
-              echo "Actual:   $actual_image"
               exit 1
             fi
 
@@ -199,7 +196,7 @@ jobs:
             fi
           done
 
-          echo "=== Final service status ==="
+          echo "=== Final container status ==="
           compose ps
 
           echo "SUCCESS: All seven application containers use $APP_RELEASE"
