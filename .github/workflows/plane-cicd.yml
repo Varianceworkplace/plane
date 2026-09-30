@@ -187,7 +187,7 @@ jobs:
           export PLANE_IMAGE_PREFIX
 
           compose() {
-            docker compose --env-file plane.env "$@"
+            APP_RELEASE="$APP_RELEASE" PLANE_IMAGE_PREFIX="$PLANE_IMAGE_PREFIX" docker compose --env-file plane.env "$@"
           }
 
           echo "=== Validate Compose configuration ==="
@@ -205,7 +205,7 @@ jobs:
           compose run --rm migrator
 
           echo "=== Recreate application services ==="
-          compose up -d --no-deps --force-recreate \
+          compose up -d --force-recreate \
             api worker beat-worker web admin space live
 
           echo "=== Wait for startup ==="
@@ -262,6 +262,9 @@ jobs:
               exit 1
             fi
           done
+
+          echo "=== Clean up old images ==="
+          docker image prune -f
 
           echo "=== Final service status ==="
           compose ps
