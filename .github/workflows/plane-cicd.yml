@@ -24,6 +24,27 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Verify repository and backend files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Workspace: $GITHUB_WORKSPACE"
+          echo "Current commit: $GITHUB_SHA"
+
+          test -f "$GITHUB_WORKSPACE/apps/api/Dockerfile.api"
+          test -f "$GITHUB_WORKSPACE/apps/api/manage.py"
+          test -d "$GITHUB_WORKSPACE/apps/api/plane"
+          test -d "$GITHUB_WORKSPACE/apps/api/templates"
+          test -f "$GITHUB_WORKSPACE/apps/api/package.json"
+          test -d "$GITHUB_WORKSPACE/apps/api/bin"
+          test -f "$GITHUB_WORKSPACE/apps/api/bin/docker-entrypoint-api.sh"
+          test -f "$GITHUB_WORKSPACE/apps/api/bin/docker-entrypoint-worker.sh"
+          test -f "$GITHUB_WORKSPACE/apps/api/bin/docker-entrypoint-migrator.sh"
+          test -f "$GITHUB_WORKSPACE/apps/api/bin/docker-entrypoint-beat.sh"
+
+          echo "Backend files verified successfully."
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -31,25 +52,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify backend build files
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          test -f apps/api/Dockerfile.api
-          test -f apps/api/manage.py
-          test -d apps/api/plane
-          test -d apps/api/templates
-          test -f apps/api/package.json
-          test -f apps/api/bin/docker-entrypoint-api.sh
-          test -f apps/api/bin/docker-entrypoint-worker.sh
-          test -f apps/api/bin/docker-entrypoint-migrator.sh
-          test -f apps/api/bin/docker-entrypoint-beat.sh
-
-          echo "Backend Dockerfile and required files are present."
+          username: ${{ secrets.GHR_USERNAME }}
+          password: ${{ secrets.GHR_READ_TOKEN }}
 
       - name: Build and push frontend
         uses: docker/build-push-action@v6
@@ -62,8 +66,8 @@ jobs:
       - name: Build and push backend
         uses: docker/build-push-action@v6
         with:
-          context: ./apps/api
-          file: Dockerfile.api
+          context: ${{ github.workspace }}/apps/api
+          file: ${{ github.workspace }}/apps/api/Dockerfile.api
           push: true
           tags: ghcr.io/varianceworkplace/plane-backend:${{ github.sha }}
 
@@ -118,34 +122,28 @@ jobs:
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Authenticate server to GHCR
+      - name: Authenticate deployment server to GHCR
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          GHCR_USERNAME: ${{ secrets.GCHR_USERNAME }}
-          GHCR_PULL_TOKEN: ${{ secrets.GCHR_READ_TOKEN }}
+          GHR_USERNAME: ${{ secrets.GHR_USERNAME }}
+          GHR_READ_TOKEN: ${{ secrets.GHR_READ_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
 
           test -n "$DEPLOY_HOST"
           test -n "$DEPLOY_USER"
-          test -n "$GHCR_USERNAME"
-          test -n "$GHCR_PULL_TOKEN"
+          test -n "$GHR_USERNAME"
+          test -n "$GHR_READ_TOKEN"
 
-          if [[ ! "$GHCR_USERNAME" =~ ^[A-Za-z0-9-]+$ ]]; then
-            echo "ERROR: Invalid GHCR username format."
-            exit 1
-          fi
-
-          printf '%s' "$GHCR_PULL_TOKEN" | ssh \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            -o ConnectTimeout=15 \
-            "$DEPLOY_USER@$DEPLOY_HOST" \
-            "docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin"
-
-          echo "Server authenticated to GHCR successfully."
+          printf '%s' "$GHR_READ_TOKEN" |
+            ssh \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -o ConnectTimeout=15 \
+              "$DEPLOY_USER@$DEPLOY_HOST" \
+              "docker login ghcr.io -u '$GHR_USERNAME' --password-stdin"
 
       - name: Deploy Plane
         env:
@@ -160,7 +158,7 @@ jobs:
           test -n "$DEPLOY_HOST"
           test -n "$DEPLOY_USER"
 
-          echo "Target release: $RELEASE"
+          echo "Deploying release: $RELEASE"
           echo "Deployment host: $DEPLOY_HOST"
 
           ssh \
@@ -180,10 +178,10 @@ jobs:
             docker compose --env-file plane.env "$@"
           }
 
-          echo "=== Validate deployment configuration ==="
+          echo "=== Validate Compose configuration ==="
           compose config --quiet
 
-          echo "=== Confirm configured release images ==="
+          echo "=== Verify release image configuration ==="
           compose config --images
 
           echo "=== Pull release images ==="
@@ -198,10 +196,10 @@ jobs:
           compose up -d --no-deps --force-recreate \
             api worker beat-worker web admin space live
 
-          echo "=== Wait for application startup ==="
+          echo "=== Wait for startup ==="
           sleep 20
 
-          echo "=== Verify deployed image tags ==="
+          echo "=== Verify deployed release ==="
 
           for service in api worker beat-worker web admin space live; do
             container_id="$(compose ps -q "$service")"
@@ -231,7 +229,7 @@ jobs:
                 expected_image="$PLANE_IMAGE_PREFIX/plane-live:$APP_RELEASE"
                 ;;
               *)
-                echo "ERROR: Unknown service: $service"
+                echo "ERROR: Unknown service $service"
                 exit 1
                 ;;
             esac
