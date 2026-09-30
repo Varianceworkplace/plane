@@ -1,3 +1,4 @@
+
 name: Plane CI/CD
 
 on:
@@ -45,7 +46,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./apps/api
-          file: Dockerfile.api
+          file: ./apps/api/Dockerfile.api
           push: true
           tags: ghcr.io/varianceworkplace/plane-backend:${{ github.sha }}
 
@@ -108,8 +109,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Encode the registry token so special characters are
-          # not interpreted by the remote shell.
+          if [ -z "$GHCR_USERNAME" ] || [ -z "$GHCR_READ_TOKEN" ]; then
+            echo "ERROR: GHCR_USERNAME or GHCR_READ_TOKEN is missing."
+            exit 1
+          fi
+
           TOKEN_B64="$(printf '%s' "$GHCR_READ_TOKEN" | base64 -w 0)"
 
           ssh \
@@ -129,12 +133,12 @@ jobs:
           }
           trap cleanup EXIT
 
-          echo "Deploying release: $APP_RELEASE"
+          echo "Deploying commit: $APP_RELEASE"
 
-          echo "Validating Compose configuration..."
+          echo "Validating Docker Compose configuration..."
           docker compose --env-file plane.env config --quiet
 
-          echo "Authenticating with GitHub Container Registry..."
+          echo "Logging in to GitHub Container Registry..."
           printf '%s' "$GHCR_TOKEN_B64" \
             | base64 --decode \
             | docker login ghcr.io \
@@ -186,7 +190,7 @@ jobs:
             echo "$service -> $actual"
 
             if [ "$actual" != "$expected" ]; then
-              echo "ERROR: $service is not running the expected release."
+              echo "ERROR: Image mismatch for $service"
               echo "Expected: $expected"
               echo "Actual:   $actual"
               exit 1
@@ -195,13 +199,12 @@ jobs:
             state="$(docker inspect --format '{{.State.Status}}' "$container_id")"
 
             if [ "$state" != "running" ]; then
-              echo "ERROR: $service is not running. State: $state"
+              echo "ERROR: $service is not running; state: $state"
               exit 1
             fi
           done
 
-          echo "All application services use release $APP_RELEASE"
+          echo "All seven application services use commit $APP_RELEASE"
 
-          echo "Current service status:"
           docker compose --env-file plane.env ps
           REMOTE
