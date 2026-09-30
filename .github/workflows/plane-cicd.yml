@@ -10,8 +10,12 @@ permissions:
   contents: read
   packages: write
 
+env:
+  IMAGE_PREFIX: ghcr.io/varianceworkplace
+
 jobs:
   build:
+    name: Build and Push Plane Images
     runs-on: ubuntu-latest
 
     steps:
@@ -69,6 +73,7 @@ jobs:
           tags: ghcr.io/varianceworkplace/plane-live:${{ github.sha }}
 
   deploy:
+    name: Deploy Plane to Server
     needs: build
     if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
@@ -80,6 +85,7 @@ jobs:
           SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
@@ -98,6 +104,8 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "Deploying Plane release: $RELEASE"
+
           ssh \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
@@ -107,20 +115,72 @@ jobs:
 
           cd /opt/plane-selfhost
 
-          echo "Validating Docker Compose configuration..."
+          echo "1. Validating Docker Compose configuration..."
           docker compose --env-file plane.env config --quiet
 
-          echo "Pulling application images for release: $APP_RELEASE"
+          echo "2. Checking resolved application images..."
+          IMAGES="$(docker compose --env-file plane.env config --images)"
+          printf '%s\n' "$IMAGES"
+
+          for image in \
+            "plane-frontend" \
+            "plane-backend" \
+            "plane-admin" \
+            "plane-space" \
+            "plane-live"
+          do
+            if ! printf '%s\n' "$IMAGES" |
+              grep -Fq "ghcr.io/varianceworkplace/${image}:${APP_RELEASE}"; then
+              echo "ERROR: Expected GHCR image not found: ${image}:${APP_RELEASE}"
+              exit 1
+            fi
+          done
+
+          echo "3. Pulling application images..."
           docker compose --env-file plane.env pull \
             web admin space live api worker beat-worker migrator
 
-          echo "Running database migrations..."
+          echo "4. Running database migrations..."
           docker compose --env-file plane.env run --rm migrator
 
-          echo "Updating application services..."
+          echo "5. Updating application services..."
           docker compose --env-file plane.env up -d --no-deps \
             api worker beat-worker web admin space live
 
-          echo "Current service status:"
+          echo "6. Waiting briefly for services to start..."
+          sleep 20
+
+          echo "7. Current service status..."
           docker compose --env-file plane.env ps
+
+          echo "8. Verifying deployed application images..."
+          for service in api worker beat-worker web admin space live; do
+            container="plane-selfhost-${service}-1"
+
+            if ! docker inspect "$container" >/dev/null 2>&1; then
+              echo "ERROR: Container not found: $container"
+              exit 1
+            fi
+
+            image="$(docker inspect --format '{{.Config.Image}}' "$container")"
+            echo "$service -> $image"
+
+            case "$image" in
+              "ghcr.io/varianceworkplace/"*":${APP_RELEASE}")
+                ;;
+              *)
+                echo "ERROR: Unexpected image for $service: $image"
+                exit 1
+                ;;
+            esac
+
+            status="$(docker inspect --format '{{.State.Status}}' "$container")"
+
+            if [ "$status" != "running" ]; then
+              echo "ERROR: $service is not running; status: $status"
+              exit 1
+            fi
+          done
+
+          echo "SUCCESS: All application containers are running the expected GHCR release."
           REMOTE
