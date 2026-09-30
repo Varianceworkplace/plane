@@ -1,4 +1,3 @@
-
 name: Plane CI/CD
 
 on:
@@ -42,11 +41,28 @@ jobs:
           push: true
           tags: ghcr.io/varianceworkplace/plane-frontend:${{ github.sha }}
 
+      - name: Verify backend build files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f apps/api/Dockerfile.api
+          test -f apps/api/manage.py
+          test -d apps/api/plane
+          test -d apps/api/templates
+          test -f apps/api/package.json
+          test -f apps/api/bin/docker-entrypoint-api.sh
+          test -f apps/api/bin/docker-entrypoint-worker.sh
+          test -f apps/api/bin/docker-entrypoint-migrator.sh
+          test -f apps/api/bin/docker-entrypoint-beat.sh
+
+          echo "Backend Dockerfile and required files are present."
+
       - name: Build and push backend
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: apps/api/Dockerfile.api
+          context: ./apps/api
+          file: Dockerfile.api
           push: true
           tags: ghcr.io/varianceworkplace/plane-backend:${{ github.sha }}
 
@@ -89,6 +105,9 @@ jobs:
         run: |
           set -euo pipefail
 
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
@@ -108,12 +127,16 @@ jobs:
         run: |
           set -euo pipefail
 
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+
           echo "Target release: $RELEASE"
-          echo "Deployment server: $DEPLOY_HOST"
+          echo "Deployment host: $DEPLOY_HOST"
 
           ssh \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
             "$DEPLOY_USER@$DEPLOY_HOST" \
             "APP_RELEASE='$RELEASE' PLANE_IMAGE_PREFIX='$IMAGE_PREFIX' bash -s" <<'REMOTE'
           set -Eeuo pipefail
@@ -127,13 +150,13 @@ jobs:
             docker compose --env-file plane.env "$@"
           }
 
-          echo "=== Validate Compose configuration ==="
+          echo "=== Validate deployment configuration ==="
           compose config --quiet
 
-          echo "=== Confirm target image tags ==="
+          echo "=== Confirm configured release images ==="
           compose config --images
 
-          echo "=== Pull images ==="
+          echo "=== Pull release images ==="
           compose pull \
             web admin space live \
             api worker beat-worker migrator
@@ -141,14 +164,14 @@ jobs:
           echo "=== Run database migrations ==="
           compose run --rm migrator
 
-          echo "=== Recreate application containers ==="
+          echo "=== Recreate application services ==="
           compose up -d --no-deps --force-recreate \
             api worker beat-worker web admin space live
 
-          echo "=== Wait for startup ==="
+          echo "=== Wait for application startup ==="
           sleep 20
 
-          echo "=== Verify deployed release ==="
+          echo "=== Verify deployed image tags ==="
 
           for service in api worker beat-worker web admin space live; do
             container_id="$(compose ps -q "$service")"
@@ -177,6 +200,10 @@ jobs:
               live)
                 expected_image="$PLANE_IMAGE_PREFIX/plane-live:$APP_RELEASE"
                 ;;
+              *)
+                echo "ERROR: Unknown service: $service"
+                exit 1
+                ;;
             esac
 
             echo "$service -> $actual_image"
@@ -196,8 +223,8 @@ jobs:
             fi
           done
 
-          echo "=== Final container status ==="
+          echo "=== Final service status ==="
           compose ps
 
-          echo "SUCCESS: All seven application containers use $APP_RELEASE"
+          echo "SUCCESS: All seven application containers use release $APP_RELEASE"
           REMOTE
