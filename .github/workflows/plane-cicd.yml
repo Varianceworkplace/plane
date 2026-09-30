@@ -169,6 +169,19 @@ jobs:
           set -Eeuo pipefail
 
           cd /opt/plane-selfhost
+         
+          echo "=== Deployment diagnostics ==="
+          echo "Server hostname: $(hostname -f)"
+          echo "Server time UTC: $(date -u)"
+          echo "Requested release: $APP_RELEASE"
+          echo "Compose directory: $PWD"
+
+          echo "=== Existing application containers ==="
+          docker ps --filter "name=plane-selfhost-web-1" \
+            --format 'table {{.Names}}\t{{.Image}}\t{{.CreatedAt}}'
+
+          docker ps --filter "name=plane-selfhost-api-1" \
+            --format 'table {{.Names}}\t{{.Image}}\t{{.CreatedAt}}'
 
           export APP_RELEASE
           export PLANE_IMAGE_PREFIX
