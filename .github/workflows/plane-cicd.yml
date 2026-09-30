@@ -126,8 +126,8 @@ jobs:
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          GHR_USERNAME: ${{ secrets.GHR_USERNAME }}
-          GHR_READ_TOKEN: ${{ secrets.GHR_READ_TOKEN }}
+          GHR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
