@@ -1,3 +1,4 @@
+
 name: Plane CI/CD
 
 on:
@@ -33,14 +34,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push frontend
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: apps/web/Dockerfile.web
-          push: true
-          tags: ghcr.io/varianceworkplace/plane-frontend:${{ github.sha }}
-
       - name: Verify backend build files
         shell: bash
         run: |
@@ -58,11 +51,19 @@ jobs:
 
           echo "Backend Dockerfile and required files are present."
 
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile.web
+          push: true
+          tags: ghcr.io/varianceworkplace/plane-frontend:${{ github.sha }}
+
       - name: Build and push backend
         uses: docker/build-push-action@v6
         with:
           context: ./apps/api
-          file: ./apps/api/Dockerfile.api
+          file: Dockerfile.api
           push: true
           tags: ghcr.io/varianceworkplace/plane-backend:${{ github.sha }}
 
@@ -116,6 +117,35 @@ jobs:
 
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
+
+      - name: Authenticate server to GHCR
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          GHCR_USERNAME: ${{ secrets.GCHR_USERNAME }}
+          GHCR_PULL_TOKEN: ${{ secrets.GCHR_READ_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$GHCR_USERNAME"
+          test -n "$GHCR_PULL_TOKEN"
+
+          if [[ ! "$GHCR_USERNAME" =~ ^[A-Za-z0-9-]+$ ]]; then
+            echo "ERROR: Invalid GHCR username format."
+            exit 1
+          fi
+
+          printf '%s' "$GHCR_PULL_TOKEN" | ssh \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "docker login ghcr.io --username '$GHCR_USERNAME' --password-stdin"
+
+          echo "Server authenticated to GHCR successfully."
 
       - name: Deploy Plane
         env:
