@@ -40,7 +40,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./apps/api
-          file: Dockerfile.api
+          file: ./apps/api/Dockerfile.api
           push: true
           tags: ghcr.io/varianceworkplace/plane-backend:${{ github.sha }}
 
