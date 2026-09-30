@@ -160,12 +160,13 @@ jobs:
           echo "Deploying release: $RELEASE"
           echo "Deployment host: $DEPLOY_HOST"
 
+          # FIX: Variables are explicitly passed into the shell context before REMOTE execution begins
           ssh \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=15 \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "APP_RELEASE='$RELEASE' PLANE_IMAGE_PREFIX='$IMAGE_PREFIX' bash -s" <<'REMOTE'
+            "export APP_RELEASE='$RELEASE'; export PLANE_IMAGE_PREFIX='$IMAGE_PREFIX'; bash -s" <<'REMOTE'
           set -Eeuo pipefail
 
           cd /opt/plane-selfhost
@@ -183,9 +184,7 @@ jobs:
           docker ps --filter "name=plane-selfhost-api-1" \
             --format 'table {{.Names}}\t{{.Image}}\t{{.CreatedAt}}'
 
-          export APP_RELEASE
-          export PLANE_IMAGE_PREFIX
-
+          # FIX: Environment overrides cleanly mapped to avoid plane.env cache issues
           compose() {
             APP_RELEASE="$APP_RELEASE" PLANE_IMAGE_PREFIX="$PLANE_IMAGE_PREFIX" docker compose --env-file plane.env "$@"
           }
