@@ -14,9 +14,21 @@ from django.db import models
 from django.db.models import Q
 
 # Module imports
-from plane.db.mixins import AuditModel
+from plane.db.mixins import AuditModel, SoftDeletionManager
 
 from .base import BaseModel
+
+
+class ProjectManager(SoftDeletionManager):
+    """Default manager: hides the workspace ticket project from all generic project code."""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(is_ticket_project=False)
+
+
+class TicketProjectManager(SoftDeletionManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_ticket_project=True)
 
 ROLE_CHOICES = ((20, "Admin"), (15, "Member"), (5, "Guest"))
 
@@ -98,6 +110,8 @@ class Project(BaseModel):
     is_time_tracking_enabled = models.BooleanField(default=False)
     is_issue_type_enabled = models.BooleanField(default=False)
     guest_view_all_features = models.BooleanField(default=False)
+    # Hidden per-workspace project that stores helpdesk tickets (see db/models/ticket.py)
+    is_ticket_project = models.BooleanField(default=False)
     cover_image = models.TextField(blank=True, null=True)
     cover_image_asset = models.ForeignKey(
         "db.FileAsset",
@@ -142,7 +156,11 @@ class Project(BaseModel):
 
     FORBIDDEN_IDENTIFIER_CHARS_PATTERN = r"^.*[&+,:;$^}{*=?@#|'<>.()%!-].*$"
 
+    objects = ProjectManager()
+    ticket_projects = TicketProjectManager()
+
     class Meta:
+        default_manager_name = "objects"
         unique_together = [
             ["identifier", "workspace", "deleted_at"],
             ["name", "workspace", "deleted_at"],

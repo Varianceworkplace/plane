@@ -98,7 +98,27 @@ class IssueManager(SoftDeletionManager):
             .exclude(archived_at__isnull=False)
             .exclude(project__archived_at__isnull=False)
             .exclude(is_draft=True)
+            .exclude(project__is_ticket_project=True)
         )
+
+
+class NonTicketIssueManager(SoftDeletionManager):
+    """Default manager: helpdesk tickets are only reachable through Issue.ticket_objects."""
+
+    def get_queryset(self):
+        return super().get_queryset().exclude(project__is_ticket_project=True)
+
+
+class NonTicketProjectManager(SoftDeletionManager):
+    """Default manager for issue child tables that are listed outside a project URL."""
+
+    def get_queryset(self):
+        return super().get_queryset().exclude(project__is_ticket_project=True)
+
+
+class TicketIssueManager(SoftDeletionManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(project__is_ticket_project=True)
 
 
 class Issue(ChangeTrackerMixin, ProjectBaseModel):
@@ -169,9 +189,12 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
         blank=True,
     )
 
+    objects = NonTicketIssueManager()
     issue_objects = IssueManager()
+    ticket_objects = TicketIssueManager()
 
     class Meta:
+        default_manager_name = "objects"
         verbose_name = "Issue"
         verbose_name_plural = "Issues"
         db_table = "issues"
@@ -437,7 +460,10 @@ class IssueActivity(ProjectBaseModel):
     new_identifier = models.UUIDField(null=True)
     epoch = models.FloatField(null=True)
 
+    objects = NonTicketProjectManager()
+
     class Meta:
+        default_manager_name = "objects"
         verbose_name = "Issue Activity"
         verbose_name_plural = "Issue Activities"
         db_table = "issue_activities"

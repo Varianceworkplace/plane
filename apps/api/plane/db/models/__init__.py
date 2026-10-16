@@ -88,5 +88,6 @@ from .label import Label
 from .device import Device, DeviceSession
 
 from .sticky import Sticky
+from .ticket import Ticket, TicketCategory, TicketToolCategory, TicketTrialTested, TICKET_STATUSES, TICKET_PRIORITIES
 
 from .description import Description, DescriptionVersion
