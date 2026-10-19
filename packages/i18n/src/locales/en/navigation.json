@@ -8,6 +8,8 @@
   },
   "sidebar": {
     "stickies": "Stickies",
+    "tickets": "Tickets",
+    "milestones": "Milestones",
     "your_work": "Your work",
     "projects": "Projects",
     "pages": "Pages",

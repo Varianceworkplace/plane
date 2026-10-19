@@ -21,6 +21,7 @@ import {
   EstimatePropertyIcon,
   ParentPropertyIcon,
 } from "@plane/propel/icons";
+import { Diamond } from "lucide-react";
 import { cn, getDate, renderFormattedPayloadDate, shouldHighlightIssueDueDate } from "@plane/utils";
 // components
 import { DateDropdown } from "@/components/dropdowns/date";
@@ -30,6 +31,7 @@ import { MemberDropdown } from "@/components/dropdowns/member/dropdown";
 import { PriorityDropdown } from "@/components/dropdowns/priority";
 import { StateDropdown } from "@/components/dropdowns/state/dropdown";
 import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
+import { WorkItemMilestoneSelect } from "@/components/milestones/work-item-milestone-select";
 // helpers
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useMember } from "@/hooks/store/use-member";
@@ -224,6 +226,18 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
               projectId={projectId}
               issueId={issueId}
               issueOperations={issueOperations}
+              disabled={disabled}
+            />
+          </SidebarPropertyListItem>
+        )}
+
+        {projectDetails?.is_milestone_enabled && (
+          <SidebarPropertyListItem icon={Diamond} label="Milestone" appendElement={null}>
+            <WorkItemMilestoneSelect
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              issueId={issueId}
+              dueDate={issue.target_date}
               disabled={disabled}
             />
           </SidebarPropertyListItem>

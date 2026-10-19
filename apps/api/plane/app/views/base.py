@@ -25,6 +25,7 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
 # Module imports
+from plane.utils.ticket_isolation import TicketIsolationMixin
 from plane.authentication.session import BaseSessionAuthentication
 from plane.utils.exception_logger import log_exception
 from plane.utils.paginator import BasePaginator
@@ -45,7 +46,7 @@ class TimezoneMixin:
             timezone.deactivate()
 
 
-class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePaginator):
+class BaseViewSet(TicketIsolationMixin, TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePaginator):
     model = None
 
     permission_classes = [IsAuthenticated]
@@ -146,7 +147,7 @@ class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePagi
         return expand if expand else None
 
 
-class BaseAPIView(TimezoneMixin, ReadReplicaControlMixin, APIView, BasePaginator):
+class BaseAPIView(TicketIsolationMixin, TimezoneMixin, ReadReplicaControlMixin, APIView, BasePaginator):
     permission_classes = [IsAuthenticated]
 
     filter_backends = (DjangoFilterBackend, SearchFilter)
