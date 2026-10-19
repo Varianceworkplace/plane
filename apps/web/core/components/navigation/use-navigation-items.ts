@@ -8,6 +8,7 @@ import { useMemo, useCallback } from "react";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { CycleIcon, IntakeIcon, ModuleIcon, PageIcon, ViewsIcon, WorkItemsIcon } from "@plane/propel/icons";
+import { Diamond } from "lucide-react";
 import type { EUserProjectRoles, IPartialProject } from "@plane/types";
 import type { TNavigationItem } from "@/components/navigation/tab-navigation-root";
 
@@ -92,6 +93,16 @@ export const useNavigationItems = ({
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
         shouldRender: !!project?.inbox_view,
         sortOrder: 6,
+      },
+      {
+        i18n_key: "sidebar.milestones",
+        key: "milestones",
+        name: "Milestones",
+        href: `/${workspaceSlug}/projects/${projectId}/milestones`,
+        icon: Diamond,
+        access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
+        shouldRender: !!project?.is_milestone_enabled,
+        sortOrder: 7,
       },
     ],
     [project]

@@ -89,5 +89,7 @@ from .device import Device, DeviceSession
 
 from .sticky import Sticky
 from .ticket import Ticket, TicketCategory, TicketToolCategory, TicketTrialTested, TICKET_STATUSES, TICKET_PRIORITIES
+from .worklog import IssueWorkLog, IssueWorkLogTimer, MAX_WORKLOG_DURATION
+from .milestone import Milestone, MilestoneWorkItem
 
 from .description import Description, DescriptionVersion

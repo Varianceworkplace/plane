@@ -420,9 +420,9 @@
       "milestones": {
         "title": "Milestones",
         "short_title": "Milestones",
-        "description": "Milestones provide a layer to align work items toward shared completion dates.",
+        "description": "Set shared target dates and group work items under them.",
         "toggle_title": "Enable milestones",
-        "toggle_description": "Organize work items by milestone deadlines."
+        "toggle_description": "Let this project group work under milestone dates."
       },
       "toasts": {
         "loading": "Updating project feature...",

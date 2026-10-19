@@ -220,6 +220,15 @@ export const coreRoutes: RouteConfigEntry[] = [
               "./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/pages/(list)/page.tsx"
             ),
           ]),
+          // Milestones
+          route(
+            ":workspaceSlug/projects/:projectId/milestones",
+            "./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/milestones/(list)/page.tsx"
+          ),
+          route(
+            ":workspaceSlug/projects/:projectId/milestones/:milestoneId",
+            "./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/milestones/(detail)/[milestoneId]/page.tsx"
+          ),
           // Intake list
           layout("./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/intake/layout.tsx", [
             route(
@@ -286,6 +295,10 @@ export const coreRoutes: RouteConfigEntry[] = [
             "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/exports/page.tsx"
           ),
           route(
+            ":workspaceSlug/settings/worklogs",
+            "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/worklogs/page.tsx"
+          ),
+          route(
             ":workspaceSlug/settings/webhooks",
             "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/webhooks/page.tsx"
           ),
@@ -333,6 +346,14 @@ export const coreRoutes: RouteConfigEntry[] = [
             route(
               ":workspaceSlug/settings/projects/:projectId/features/intake",
               "./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/features/intake/page.tsx"
+            ),
+            route(
+              ":workspaceSlug/settings/projects/:projectId/features/time-tracking",
+              "./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/features/time-tracking/page.tsx"
+            ),
+            route(
+              ":workspaceSlug/settings/projects/:projectId/features/milestones",
+              "./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/features/milestones/page.tsx"
             ),
             // Project States
             route(
