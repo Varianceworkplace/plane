@@ -1,0 +1,272 @@
+name: Plane CI/CD
+
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: plane-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Verify repository and backend files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Workspace: $GITHUB_WORKSPACE"
+          echo "Current commit: $GITHUB_SHA"
+
+          test -f "$GITHUB_WORKSPACE/apps/api/Dockerfile.api"
+          test -f "$GITHUB_WORKSPACE/apps/api/manage.py"
+          test -d "$GITHUB_WORKSPACE/apps/api/plane"
+          test -d "$GITHUB_WORKSPACE/apps/api/templates"
+          test -f "$GITHUB_WORKSPACE/apps/api/package.json"
+          test -d "$GITHUB_WORKSPACE/apps/api/bin"
+          test -f "$GITHUB_WORKSPACE/apps/api/bin/docker-entrypoint-api.sh"
+          test -f "$GITHUB_WORKSPACE/apps/api/bin/docker-entrypoint-worker.sh"
+          test -f "$GITHUB_WORKSPACE/apps/api/bin/docker-entrypoint-migrator.sh"
+          test -f "$GITHUB_WORKSPACE/apps/api/bin/docker-entrypoint-beat.sh"
+
+          echo "Backend files verified successfully."
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile.web
+          push: true
+          tags: ghcr.io/varianceworkplace/plane-frontend:${{ github.sha }}
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ github.workspace }}/apps/api
+          file: ${{ github.workspace }}/apps/api/Dockerfile.api
+          push: true
+          tags: ghcr.io/varianceworkplace/plane-backend:${{ github.sha }}
+
+      - name: Build and push admin
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/admin/Dockerfile.admin
+          push: true
+          tags: ghcr.io/varianceworkplace/plane-admin:${{ github.sha }}
+
+      - name: Build and push space
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/space/Dockerfile.space
+          push: true
+          tags: ghcr.io/varianceworkplace/plane-space:${{ github.sha }}
+
+      - name: Build and push live
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/live/Dockerfile.live
+          push: true
+          tags: ghcr.io/varianceworkplace/plane-live:${{ github.sha }}
+
+  deploy:
+    name: Deploy and Verify Release
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Authenticate deployment server to GHCR
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          GHR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$GHR_USERNAME"
+          test -n "$GHR_READ_TOKEN"
+
+          printf '%s' "$GHR_READ_TOKEN" |
+            ssh \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -o ConnectTimeout=15 \
+              "$DEPLOY_USER@$DEPLOY_HOST" \
+              "docker login ghcr.io -u '$GHR_USERNAME' --password-stdin"
+
+      - name: Deploy Plane
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          RELEASE: ${{ github.sha }}
+          IMAGE_PREFIX: ghcr.io/varianceworkplace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+
+          echo "Deploying release: $RELEASE"
+          echo "Deployment host: $DEPLOY_HOST"
+
+          # FIX: Variables are explicitly passed into the shell context before REMOTE execution begins
+          ssh \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=15 \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "export APP_RELEASE='$RELEASE'; export PLANE_IMAGE_PREFIX='$IMAGE_PREFIX'; bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+
+          cd /opt/plane-selfhost
+         
+          echo "=== Deployment diagnostics ==="
+          echo "Server hostname: $(hostname -f)"
+          echo "Server time UTC: $(date -u)"
+          echo "Requested release: $APP_RELEASE"
+          echo "Compose directory: $PWD"
+
+          echo "=== Existing application containers ==="
+          docker ps --filter "name=plane-selfhost-web-1" \
+            --format 'table {{.Names}}\t{{.Image}}\t{{.CreatedAt}}'
+
+          docker ps --filter "name=plane-selfhost-api-1" \
+            --format 'table {{.Names}}\t{{.Image}}\t{{.CreatedAt}}'
+
+          # FIX: Environment overrides cleanly mapped to avoid plane.env cache issues
+          compose() {
+            APP_RELEASE="$APP_RELEASE" PLANE_IMAGE_PREFIX="$PLANE_IMAGE_PREFIX" docker compose --env-file plane.env "$@"
+          }
+
+          echo "=== Validate Compose configuration ==="
+          compose config --quiet
+
+          echo "=== Verify release image configuration ==="
+          compose config --images
+
+          echo "=== Pull release images ==="
+          compose pull \
+            web admin space live \
+            api worker beat-worker migrator
+
+          echo "=== Run database migrations ==="
+          compose run --rm migrator
+
+          echo "=== Recreate application services ==="
+          compose up -d --force-recreate \
+            api worker beat-worker web admin space live
+
+          echo "=== Wait for startup ==="
+          sleep 20
+
+          echo "=== Verify deployed release ==="
+
+          for service in api worker beat-worker web admin space live; do
+            container_id="$(compose ps -q "$service")"
+
+            if [ -z "$container_id" ]; then
+              echo "ERROR: No container found for $service"
+              exit 1
+            fi
+
+            actual_image="$(docker inspect \
+              --format '{{.Config.Image}}' "$container_id")"
+
+            case "$service" in
+              api|worker|beat-worker)
+                expected_image="$PLANE_IMAGE_PREFIX/plane-backend:$APP_RELEASE"
+                ;;
+              web)
+                expected_image="$PLANE_IMAGE_PREFIX/plane-frontend:$APP_RELEASE"
+                ;;
+              admin)
+                expected_image="$PLANE_IMAGE_PREFIX/plane-admin:$APP_RELEASE"
+                ;;
+              space)
+                expected_image="$PLANE_IMAGE_PREFIX/plane-space:$APP_RELEASE"
+                ;;
+              live)
+                expected_image="$PLANE_IMAGE_PREFIX/plane-live:$APP_RELEASE"
+                ;;
+              *)
+                echo "ERROR: Unknown service $service"
+                exit 1
+                ;;
+            esac
+
+            echo "$service -> $actual_image"
+
+            if [ "$actual_image" != "$expected_image" ]; then
+              echo "ERROR: Image mismatch for $service"
+              echo "Expected: $expected_image"
+              exit 1
+            fi
+
+            running="$(docker inspect \
+              --format '{{.State.Running}}' "$container_id")"
+
+            if [ "$running" != "true" ]; then
+              echo "ERROR: $service is not running"
+              exit 1
+            fi
+          done
+
+          echo "=== Clean up old images ==="
+          docker image prune -f
+
+          echo "=== Final service status ==="
+          compose ps
+
+          echo "SUCCESS: All seven application containers use release $APP_RELEASE"
+          REMOTE
