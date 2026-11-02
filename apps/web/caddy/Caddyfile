@@ -1,3 +1,4 @@
+
 {
 	servers {
 		trusted_proxies static private_ranges
@@ -10,7 +11,9 @@
 	root * /usr/share/caddy/html
 
 	# Per-client-IP rate limiting for static asset requests
-	rate_limit {
+	@static_assets path /assets/* /static/* /favicon.ico /robots.txt
+
+	rate_limit @static_assets {
 		zone static {
 			key {client_ip}
 			events 300
