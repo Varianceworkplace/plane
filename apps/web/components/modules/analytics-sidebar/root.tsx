@@ -245,12 +245,12 @@ export const ModuleAnalyticsSidebar = observer(function ModuleAnalyticsSidebar(p
 
   const issueCount =
     moduleDetails.total_issues === 0
-      ? "0 work items"
+      ? "0 project tasks"
       : `${moduleDetails.completed_issues}/${moduleDetails.total_issues}`;
 
   const issueEstimatePointCount =
     moduleDetails.total_estimate_points === 0
-      ? "0 work items"
+      ? "0 project tasks"
       : `${moduleDetails.completed_estimate_points}/${moduleDetails.total_estimate_points}`;
 
   const isEditingAllowed = allowPermissions(

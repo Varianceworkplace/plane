@@ -18,6 +18,9 @@
         "error": "Project could not be updated. Please try again."
       }
     },
+    "access": {
+      "label": "Access"
+    },
     "members": {
       "label": "Members",
       "project_lead": "Project lead",
@@ -27,8 +30,8 @@
       "project_subscribers": "Project subscribers",
       "project_subscribers_description": "Select members who will receive notifications for this project.",
       "guest_super_permissions": {
-        "title": "Grant view access to all work items for guest users:",
-        "sub_heading": "This will allow guests to have view access to all the project work items."
+        "title": "Grant view access to all project tasks for guest users:",
+        "sub_heading": "This will allow guests to have view access to all the project tasks."
       },
       "invite_members": {
         "title": "Invite members",
@@ -38,7 +41,7 @@
     },
     "states": {
       "heading": "States",
-      "description": "Define and customize workflow states to track the progress of your work items.",
+      "description": "Define and customize workflow states to track the progress of your project tasks.",
       "describe_this_state_for_your_members": "Describe this state for your members.",
       "empty_state": {
         "title": "No states available for the {groupKey} group",
@@ -47,7 +50,7 @@
     },
     "labels": {
       "heading": "Labels",
-      "description": "Create custom labels to categorize and organize your work items",
+      "description": "Create custom labels to categorize and organize your project tasks",
       "label_title": "Label title",
       "label_title_is_required": "Label title is required",
       "label_max_char": "Label name should not exceed 255 characters",
@@ -57,7 +60,7 @@
     },
     "estimates": {
       "heading": "Estimates",
-      "description": "Set up estimation systems to track and communicate the effort required for each work item.",
+      "description": "Set up estimation systems to track and communicate the effort required for each project task.",
       "label": "Estimates",
       "title": "Enable estimates for my project",
       "enable_description": "They help you in communicating complexity and workload of the team.",
@@ -181,14 +184,14 @@
       "heading": "Automations",
       "description": "Configure automated actions to streamline your project management workflow and reduce manual tasks.",
       "auto-archive": {
-        "title": "Auto-archive closed work items",
-        "description": "Plane will auto archive work items that have been completed or canceled.",
-        "duration": "Auto-archive work items that are closed for"
+        "title": "Auto-archive closed project tasks",
+        "description": "Plane will auto archive project tasks that have been completed or canceled.",
+        "duration": "Auto-archive project tasks that are closed for"
       },
       "auto-close": {
-        "title": "Auto-close work items",
-        "description": "Plane will automatically close work items that haven't been completed or canceled.",
-        "duration": "Auto-close work items that are inactive for",
+        "title": "Auto-close project tasks",
+        "description": "Plane will automatically close project tasks that haven't been completed or canceled.",
+        "duration": "Auto-close project tasks that are inactive for",
         "auto_close_status": "Auto-close status"
       },
       "auto-remind": {
@@ -200,25 +203,25 @@
     "empty_state": {
       "labels": {
         "title": "No labels yet",
-        "description": "Create labels to help organize and filter work items in you project."
+        "description": "Create labels to help organize and filter project tasks in you project."
       },
       "estimates": {
         "title": "No estimate systems yet",
-        "description": "Create a set of estimates to communicate the amount of work per work item.",
+        "description": "Create a set of estimates to communicate the amount of work per project task.",
         "primary_button": "Add estimate system"
       },
       "integrations": {
         "title": "No integrations configured",
-        "description": "Configure GitHub and other integrations to sync your project work items."
+        "description": "Configure GitHub and other integrations to sync your project tasks."
       }
     },
     "workflows": {
       "toggle": {
         "title": "Enable workflows",
-        "description": "Set workflows to control work item movement",
+        "description": "Set workflows to control project task movement",
         "no_states_tooltip": "No states are added to the workflow.",
-        "no_work_item_types_tooltip": "No work item types are added to the workflow.",
-        "no_states_or_work_item_types_tooltip": "No states or work item types are added to the workflow.",
+        "no_work_item_types_tooltip": "No project task types are added to the workflow.",
+        "no_states_or_work_item_types_tooltip": "No states or project task types are added to the workflow.",
         "toast": {
           "loading": {
             "enabling": "Enabling workflows",
@@ -235,7 +238,7 @@
         }
       },
       "heading": "Workflows",
-      "description": "Automate work item transitions and set rules to control how tasks move through your project pipeline.",
+      "description": "Automate project task transitions and set rules to control how tasks move through your project pipeline.",
       "add_button": "Add new workflow",
       "search": "Search workflows",
       "detail": {
@@ -243,10 +246,10 @@
         "add_states": "Add states",
         "unmapped_states": {
           "title": "Unmapped states detected",
-          "description": "Some work items for the selected types are currently in states that do not exist in this workflow.",
+          "description": "Some project tasks for the selected types are currently in states that do not exist in this workflow.",
           "note": "If you enable this workflow, these items will automatically move to the initial state for this workflow.",
           "label": "Missing states",
-          "tooltip": "Some work items are in states that are not mapped to this workflow. Open the workflow to review."
+          "tooltip": "Some project tasks are in states that are not mapped to this workflow. Open the workflow to review."
         }
       },
       "select_states": {
@@ -256,7 +259,7 @@
         }
       },
       "default_footer": {
-        "fallback_message": "This workflow applies to any work item type that is not assigned to a workflow."
+        "fallback_message": "This workflow applies to any project task type that is not assigned to a workflow."
       },
       "create": {
         "heading": "Create new workflow",
@@ -275,7 +278,7 @@
           }
         },
         "work_item_type": {
-          "label": "Work item type"
+          "label": "Project task type"
         },
         "success": {
           "title": "Success!",
@@ -319,8 +322,8 @@
       }
     },
     "work_item_types": {
-      "heading": "Work item Types",
-      "description": "Create and customize different types of work items with unique properties"
+      "heading": "Project task Types",
+      "description": "Create and customize different types of project tasks with unique properties"
     },
     "features": {
       "cycles": {
@@ -367,25 +370,25 @@
         },
         "in_app": {
           "title": "In-app",
-          "description": "Get new work items from Members and Guests in your workspace without disruption to your existing work items."
+          "description": "Get new project tasks from Members and Guests in your workspace without disruption to your existing project tasks."
         },
         "email": {
           "title": "Email",
-          "description": "Collect new work items from anyone who sends an email to a Plane email address.",
+          "description": "Collect new project tasks from anyone who sends an email to a Plane email address.",
           "fieldName": "Email ID"
         },
         "form": {
           "title": "Forms",
-          "description": "Let folks outside your workspace create potential new work items for you via a dedicated and secure form.",
+          "description": "Let folks outside your workspace create potential new project tasks for you via a dedicated and secure form.",
           "fieldName": "Default form URL",
-          "create_forms": "Create Forms using work item types",
+          "create_forms": "Create Forms using project task types",
           "manage_forms": "Manage forms",
           "manage_forms_tooltip": "Ask your Workspace Admin to manage this.",
           "create_form": "Create form",
           "edit_form": "Edit form details",
           "form_title": "Form title",
           "form_title_required": "Form title is required",
-          "work_item_type": "Work item type",
+          "work_item_type": "Project task type",
           "remove_property": "Remove property",
           "select_properties": "Select properties",
           "search_placeholder": "Search for properties",
@@ -413,16 +416,23 @@
       "time_tracking": {
         "title": "Time tracking",
         "short_title": "Time tracking",
-        "description": "Log time spent on work items and projects.",
+        "description": "Log time spent on project tasks and projects.",
         "toggle_title": "Enable time tracking",
         "toggle_description": "Project members will be able to log time worked."
       },
       "milestones": {
         "title": "Milestones",
         "short_title": "Milestones",
-        "description": "Milestones provide a layer to align work items toward shared completion dates.",
+        "description": "Set shared target dates and group project tasks under them.",
         "toggle_title": "Enable milestones",
-        "toggle_description": "Organize work items by milestone deadlines."
+        "toggle_description": "Let this project group work under milestone dates."
+      },
+      "task_details": {
+        "title": "Task details",
+        "short_title": "Task details",
+        "description": "Add the Workplace task fields to every project task: type, phase, technology, GIT URL, code review, bug details, progress and more.",
+        "toggle_title": "Enable task details",
+        "toggle_description": "Project tasks get the Workplace task fields, and each one has a single assignee."
       },
       "toasts": {
         "loading": "Updating project feature...",
@@ -436,7 +446,7 @@
     },
     "templates": {
       "heading": "Templates",
-      "description": "Save 80% time spent on creating projects, work items, and pages when you use templates."
+      "description": "Save 80% time spent on creating projects, project tasks, and pages when you use templates."
     },
     "cycles": {
       "auto_schedule": {
@@ -489,8 +499,8 @@
             }
           },
           "auto_rollover": {
-            "label": "Auto-rollover work items",
-            "tooltip": "On the day a cycle completes, move all unfinished work items into the next cycle."
+            "label": "Auto-rollover project tasks",
+            "tooltip": "On the day a cycle completes, move all unfinished project tasks into the next cycle."
           }
         },
         "toast": {

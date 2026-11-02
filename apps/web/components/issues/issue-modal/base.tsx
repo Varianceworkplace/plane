@@ -21,6 +21,7 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useIssues } from "@/hooks/store/use-issues";
 import { useModule } from "@/hooks/store/use-module";
 import { useProject } from "@/hooks/store/use-project";
+import { useUser } from "@/hooks/store/user";
 import { useIssueStoreType } from "@/hooks/use-issue-layout-store";
 import { useIssuesActions } from "@/hooks/use-issues-actions";
 // services
@@ -77,6 +78,7 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
   const { fetchIssue } = useIssueDetail();
   const { allowedProjectIds, handleCreateUpdatePropertyValues, handleCreateSubWorkItem } = useIssueModal();
   const { getProjectByIdentifier } = useProject();
+  const { data: currentUser } = useUser();
   // current store details
   const { createIssue, updateIssue } = useIssuesActions(storeType);
   // propel: toast actions cross the boundary as data, never as JSX
@@ -235,12 +237,18 @@ export const CreateUpdateIssueModalBase = observer(function CreateUpdateIssueMod
         });
       }
 
+      // Work items are private to their assignees: one created for someone else is theirs from now on
+      const handedOver =
+        !is_draft_issue && !!response.assignee_ids?.length && !response.assignee_ids.includes(currentUser?.id ?? "");
+      if (handedOver && "removeIssueFromList" in issues) issues.removeIssueFromList(response.id);
       setToast({
         type: "success",
         title: t("success"),
-        message: `${is_draft_issue ? t("draft_created") : t("issue_created_successfully")} `,
+        message: handedOver
+          ? "Project task created. It's assigned to someone else, so only they can see it now."
+          : `${is_draft_issue ? t("draft_created") : t("issue_created_successfully")} `,
         actionItems:
-          !is_draft_issue && response?.project_id
+          !is_draft_issue && !handedOver && response?.project_id
             ? buildCreateIssueToastActions({ workspaceSlug: workspaceSlug.toString(), issueId: response.id })
             : undefined,
       });

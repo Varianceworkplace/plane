@@ -142,11 +142,12 @@ export class ProfileIssues extends BaseIssuesStore implements IProfileIssues {
       params = {
         ...params,
         assignees: undefined,
+        assigned_to: undefined,
         created_by: undefined,
         subscriber: undefined,
       };
       // modify params based on view
-      if (this.currentView === "assigned") params = { ...params, assignees: userId };
+      if (this.currentView === "assigned") params = { ...params, assigned_to: userId };
       else if (this.currentView === "created") params = { ...params, created_by: userId };
       else if (this.currentView === "subscribed") params = { ...params, subscriber: userId };
 
@@ -194,10 +195,11 @@ export class ProfileIssues extends BaseIssuesStore implements IProfileIssues {
       params = {
         ...params,
         assignees: undefined,
+        assigned_to: undefined,
         created_by: undefined,
         subscriber: undefined,
       };
-      if (this.currentView === "assigned") params = { ...params, assignees: userId };
+      if (this.currentView === "assigned") params = { ...params, assigned_to: userId };
       else if (this.currentView === "created") params = { ...params, created_by: userId };
       else if (this.currentView === "subscribed") params = { ...params, subscriber: userId };
 

@@ -29,12 +29,12 @@
         "title": "Select to view details."
       },
       "all": {
-        "title": "No work items assigned",
-        "description": "Updates for work items assigned to you can be\n seen here"
+        "title": "No project tasks assigned",
+        "description": "Updates for project tasks assigned to you can be\n seen here"
       },
       "mentions": {
-        "title": "No work items assigned",
-        "description": "Updates for work items assigned to you can be\n seen here"
+        "title": "No project tasks assigned",
+        "description": "Updates for project tasks assigned to you can be\n seen here"
       }
     },
     "tabs": {

@@ -13,14 +13,16 @@ import { useTranslation } from "@plane/i18n";
 import {
   CyclesOutline,
   IntakeOutline,
+  MilestoneOutline,
+  TimeTrackingOutline,
   ModuleOutline,
-  PagesOutline,
   ViewsOutline,
   WorkItemsOutline,
 } from "@makeplane/propel/icons";
 import type { EUserProjectRoles } from "@plane/types";
 // plane ui
 // components
+import { RBAC_PROJECT_PAGE_MODULES } from "@/components/access-control/types";
 import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
@@ -52,7 +54,7 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
   const { t } = useTranslation();
   const { isExtendedProjectSidebarOpened, toggleExtendedProjectSidebar, toggleSidebar } = useAppTheme();
   const { getPartialProjectById } = useProject();
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canInProject } = useUserPermissions();
   const {
     issue: { getIssueIdByIdentifier, getIssueById },
   } = useIssueDetail();
@@ -80,7 +82,7 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
       {
         i18n_key: "sidebar.work_items",
         key: "work_items",
-        name: "Work items",
+        name: "Project tasks",
         href: `/${workspaceSlug}/projects/${projectId}/issues`,
         icon: WorkItemsOutline,
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
@@ -118,16 +120,6 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
         sortOrder: 4,
       },
       {
-        i18n_key: "sidebar.pages",
-        key: "pages",
-        name: "Pages",
-        href: `/${workspaceSlug}/projects/${projectId}/pages`,
-        icon: PagesOutline,
-        access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
-        shouldRender: project?.page_view ?? false,
-        sortOrder: 5,
-      },
-      {
         i18n_key: "sidebar.intake",
         key: "intake",
         name: "Intake",
@@ -136,6 +128,26 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
         shouldRender: project?.inbox_view ?? false,
         sortOrder: 6,
+      },
+      {
+        i18n_key: "sidebar.milestones",
+        key: "milestones",
+        name: "Milestones",
+        href: `/${workspaceSlug}/projects/${projectId}/milestones`,
+        icon: MilestoneOutline,
+        access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
+        shouldRender: project?.is_milestone_enabled ?? false,
+        sortOrder: 7,
+      },
+      {
+        i18n_key: "sidebar.worklogs",
+        key: "worklogs",
+        name: "Worklogs",
+        href: `/${workspaceSlug}/projects/${projectId}/worklogs`,
+        icon: TimeTrackingOutline,
+        access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
+        shouldRender: project?.is_time_tracking_enabled ?? false,
+        sortOrder: 8,
       },
     ],
     [project]
@@ -187,6 +199,8 @@ export const ProjectNavigation = observer(function ProjectNavigation(props: TPro
 
         const hasAccess = allowPermissions(item.access, EUserPermissionsLevel.PROJECT, workspaceSlug, project.id);
         if (!hasAccess) return null;
+        const rbacModule = RBAC_PROJECT_PAGE_MODULES[item.key];
+        if (rbacModule && !canInProject(rbacModule, "view", project.id, workspaceSlug)) return null;
 
         const shouldShowCount = item.key === "intake" && (project.intake_count ?? 0) > 0;
 

@@ -16,6 +16,7 @@ import type { IIssueDisplayProperties, TIssue } from "@plane/types";
 import { cn, getDate, renderFormattedPayloadDate, shouldHighlightIssueDueDate } from "@plane/utils";
 // components
 import { MemberSelect } from "@/components/dropdowns/member/member-select";
+import { assigneeGroupUpdate, assigneesUpdate } from "@/components/member-groups/helpers";
 import { PrioritySelect } from "@/components/dropdowns/priority/priority-select";
 import { StateSelect } from "@/components/dropdowns/state/state-select";
 // hooks
@@ -213,10 +214,20 @@ export const SubIssuesListItemProperties = observer(function SubIssuesListItemPr
           projectId={issue.project_id ?? undefined}
           onChange={(val) =>
             issue.project_id &&
-            updateSubIssue(workspaceSlug, issue.project_id, parentIssueId, issueId, {
-              assignee_ids: val,
-            })
+            updateSubIssue(
+              workspaceSlug,
+              issue.project_id,
+              parentIssueId,
+              issueId,
+              assigneesUpdate(val, issue.assignee_group_id)
+            )
           }
+          assigneeGroup={{
+            value: issue.assignee_group_id,
+            onChange: (groupId) =>
+              issue.project_id &&
+              updateSubIssue(workspaceSlug, issue.project_id, parentIssueId, issueId, assigneeGroupUpdate(groupId)),
+          }}
           disabled={!canEdit}
           multiple
           variant={issue.assignee_ids?.length ? "avatar-group-sm" : "pill-sm"}

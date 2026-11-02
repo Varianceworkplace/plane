@@ -137,7 +137,7 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
         displayPropertyKey="sub_issue_count"
         shouldRenderProperty={(properties) => !!properties.sub_issue_count && !!issue.sub_issues_count}
       >
-        <Tooltip label={`Sub-work items: ${issue.sub_issues_count}`}>
+        <Tooltip label={`Sub-tasks: ${issue.sub_issues_count}`}>
           <div
             className={cn(
               "flex h-5 flex-shrink-0 items-center justify-center gap-2 overflow-hidden rounded-sm border-[0.5px] border-strong px-2.5 py-1",

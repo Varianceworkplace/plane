@@ -45,10 +45,12 @@ import {
 } from "@/components/issues/issue-modal/components";
 // helpers
 // hooks
+import { TaskDetailsFormSection } from "@/components/task-details/form-section";
 import { useIssueModal } from "@/hooks/context/use-issue-modal";
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useProject } from "@/hooks/store/use-project";
 import { useProjectState } from "@/hooks/store/use-project-state";
+import { useUser } from "@/hooks/store/user";
 import { useWorkspaceDraftIssues } from "@/hooks/store/workspace-draft";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 import { useProjectIssueProperties } from "@/hooks/use-project-issue-properties";
@@ -136,10 +138,17 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
   } = useIssueDetail();
   const { fetchCycles } = useProjectIssueProperties();
   const { getStateById } = useProjectState();
+  const { data: currentUser } = useUser();
+
+  // a new work item starts assigned to the person creating it; they can pick someone else or clear it, and an
+  // assignee passed in (e.g. creating from an assignee's column) wins
+  const formDefaults: Partial<TIssue> = data?.id
+    ? DEFAULT_WORK_ITEM_FORM_VALUES
+    : { ...DEFAULT_WORK_ITEM_FORM_VALUES, assignee_ids: currentUser?.id ? [currentUser.id] : [] };
 
   // form info
   const methods = useForm<TIssue>({
-    defaultValues: { ...DEFAULT_WORK_ITEM_FORM_VALUES, project_id: defaultProjectId, ...data },
+    defaultValues: { ...formDefaults, project_id: defaultProjectId, ...data },
     reValidateMode: "onChange",
   });
   const {
@@ -165,10 +174,11 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
       if (workItemTemplateId) {
         // reset work item template id
         setWorkItemTemplateId(null);
-        reset({ ...DEFAULT_WORK_ITEM_FORM_VALUES, project_id: projectId });
+        reset({ ...formDefaults, project_id: projectId });
         editorRef.current?.clearEditor();
       } else {
-        reset(getUpdateFormDataForReset(projectId, getValues()));
+        // assignees are cleared for the other project, except the default (the person creating it)
+        reset({ ...getUpdateFormDataForReset(projectId, getValues()), assignee_ids: formDefaults.assignee_ids });
       }
     }
     if (projectId && routeProjectId !== projectId) fetchCycles(workspaceSlug?.toString(), projectId);
@@ -179,7 +189,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
   // Reset form when data prop changes
   useEffect(() => {
     if (data) {
-      reset({ ...DEFAULT_WORK_ITEM_FORM_VALUES, project_id: projectId, ...data });
+      reset({ ...formDefaults, project_id: projectId, ...data });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...dataResetProperties]);
@@ -226,6 +236,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
         projectId: projectId,
         workspaceSlug: workspaceSlug?.toString(),
         watch: watch,
+        isDraft: isDraft || is_draft_issue,
       })
     )
       return;
@@ -254,7 +265,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
           });
         } else {
           reset({
-            ...DEFAULT_WORK_ITEM_FORM_VALUES,
+            ...formDefaults,
             ...(isCreateMoreToggleEnabled ? { ...data } : {}),
             project_id: getValues<"project_id">("project_id"),
             type_id: getValues<"type_id">("type_id"),
@@ -288,7 +299,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
       setToast({
         type: "error",
         title: "Error!",
-        message: "Failed to move work item to project. Please try again.",
+        message: "Failed to move project task to project. Please try again.",
       });
     } finally {
       setIsMoving(false);
@@ -411,6 +422,13 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
                 onAssetUpload={onAssetUpload}
                 onClose={onClose}
               />
+              {!isDraft && workspaceSlug && (
+                <TaskDetailsFormSection
+                  workspaceSlug={workspaceSlug.toString()}
+                  projectId={projectId}
+                  issueId={data?.id}
+                />
+              )}
             </DialogBody>
             <div className="shrink-0">
               <IssueDefaultProperties

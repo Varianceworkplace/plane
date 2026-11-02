@@ -22,6 +22,8 @@ from rest_framework.exceptions import APIException, ParseError
 from rest_framework.generics import GenericAPIView
 
 # Module imports
+from plane.utils.ticket_isolation import TicketIsolationMixin
+from plane.utils.work_item_visibility import WorkItemVisibilityMixin
 from plane.api.middleware.api_authentication import APIKeyAuthentication
 from plane.api.rate_limit import ApiKeyRateThrottle
 from plane.utils.exception_logger import log_exception
@@ -49,7 +51,9 @@ class TimezoneMixin:
             timezone.deactivate()
 
 
-class BaseAPIView(TimezoneMixin, GenericAPIView, ReadReplicaControlMixin, BasePaginator):
+class BaseAPIView(
+    TicketIsolationMixin, WorkItemVisibilityMixin, TimezoneMixin, GenericAPIView, ReadReplicaControlMixin, BasePaginator
+):
     authentication_classes = [APIKeyAuthentication]
 
     permission_classes = [IsAuthenticated]
@@ -159,7 +163,9 @@ class BaseAPIView(TimezoneMixin, GenericAPIView, ReadReplicaControlMixin, BasePa
         return expand if expand else None
 
 
-class BaseViewSet(TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePaginator):
+class BaseViewSet(
+    TicketIsolationMixin, WorkItemVisibilityMixin, TimezoneMixin, ReadReplicaControlMixin, ModelViewSet, BasePaginator
+):
     model = None
 
     authentication_classes = [APIKeyAuthentication]

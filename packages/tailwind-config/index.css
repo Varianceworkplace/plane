@@ -239,3 +239,14 @@ body {
     @apply text-placeholder;
   }
 }
+
+/* Date picker arrows
+ * propel's Calendar pins its < > buttons to the top-right corner with
+ * `inset-e-0`, a Tailwind 4.2+ utility. We're on 4.1, which never generates it,
+ * so both arrows fell to the top-left on top of the month name. Restated for
+ * the calendar's <nav> only; the other propel parts that use the 4.2 logical
+ * insets are left as they are. Drop this once Tailwind is on 4.2+.
+ */
+nav.inset-e-0 {
+  inset-inline-end: 0;
+}

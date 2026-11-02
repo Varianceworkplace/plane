@@ -9,6 +9,7 @@ import { observer } from "mobx-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
+  ClockOutline,
   DeleteOutline,
   LinkOutline,
   LockOutline,
@@ -35,10 +36,11 @@ import { ContextMenu } from "@plane/blocks/context-menu";
 import { FavoriteStar } from "@plane/blocks/common";
 import { copyUrlToClipboard, cn, getFileURL, renderFormattedDate } from "@plane/utils";
 // components
+import { useProjectJoinRequests } from "@/components/access-control/helpers";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useProject } from "@/hooks/store/use-project";
-import { useUserPermissions } from "@/hooks/store/user";
+import { useUser, useUserPermissions } from "@/hooks/store/user";
 import { useAppRouter } from "@/hooks/use-app-router";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // local imports
@@ -65,7 +67,8 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
   // store hooks
   const { getUserDetails } = useMember();
   const { addProjectToFavorites, removeProjectFromFavorites } = useProject();
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canOnProject } = useUserPermissions();
+  const { data: currentUser } = useUser();
   // hooks
   const { isMobile } = usePlatformOS();
   // derived values
@@ -81,8 +84,18 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
   const isMemberOfProject = !!project.member_role;
   const hasAdminRole = project.member_role === EUserPermissions.ADMIN;
   const hasMemberRole = project.member_role === EUserPermissions.MEMBER;
+  // role-based access may allow less than the project role
+  const canRestore = hasAdminRole && canOnProject("edit", project.id);
+  const canDelete = hasAdminRole && canOnProject("delete", project.id);
   // archive
   const isArchived = !!project.archived_at;
+  // role-based access: people who can't manage the project ask their PM to let them join
+  const needsApproval = !isMemberOfProject && !isArchived && !canOnProject("edit", project.id);
+  const { joinRequests } = useProjectJoinRequests(needsApproval && workspaceSlug ? workspaceSlug.toString() : "");
+  const isRequested = !!joinRequests?.requests.some(
+    (request) =>
+      request.project_id === project.id && request.status === "pending" && request.member.id === currentUser?.id
+  );
   // local storage
   const { setValue: toggleFavoriteMenu, storedValue: isFavoriteMenuOpen } = useLocalStorage<boolean>(
     IS_FAVORITE_MENU_OPEN,
@@ -174,14 +187,14 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
       action: () => setRestoreProject(true),
       title: "Restore",
       icon: RestoreOutline,
-      shouldRender: isArchived && hasAdminRole,
+      shouldRender: isArchived && canRestore,
     },
     {
       key: "delete",
       action: () => setDeleteProjectModal(true),
       title: "Delete",
       icon: DeleteOutline,
-      shouldRender: isArchived && hasAdminRole,
+      shouldRender: isArchived && canDelete,
     },
   ];
 
@@ -323,31 +336,35 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
               {isArchived && <div className="text-11 font-medium text-placeholder">Archived</div>}
             </div>
             {isArchived ? (
-              hasAdminRole && (
+              (canRestore || canDelete) && (
                 <div className="flex items-center justify-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    stretch="auto"
-                    label="Restore"
-                    icon={<Icon icon={RestoreOutline} />}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setRestoreProject(true);
-                    }}
-                  />
-                  <IconButton
-                    variant="ghost"
-                    size="xs"
-                    aria-label="Delete"
-                    icon={<Icon icon={DeleteOutline} />}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setDeleteProjectModal(true);
-                    }}
-                  />
+                  {canRestore && (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      stretch="auto"
+                      label="Restore"
+                      icon={<Icon icon={RestoreOutline} />}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setRestoreProject(true);
+                      }}
+                    />
+                  )}
+                  {canDelete && (
+                    <IconButton
+                      variant="ghost"
+                      size="xs"
+                      aria-label="Delete"
+                      icon={<Icon icon={DeleteOutline} />}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDeleteProjectModal(true);
+                      }}
+                    />
+                  )}
                 </div>
               )
             ) : (
@@ -369,7 +386,13 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
                       Joined
                     </span>
                   ))}
-                {!isMemberOfProject && (
+                {!isMemberOfProject && isRequested && (
+                  <span className="flex items-center gap-1 text-13 text-placeholder">
+                    <ClockOutline className="h-3.5 w-3.5" />
+                    Requested
+                  </span>
+                )}
+                {!isMemberOfProject && !isRequested && (
                   <div className="flex items-center">
                     <Button
                       variant="ghost"

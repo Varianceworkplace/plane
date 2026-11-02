@@ -10,13 +10,16 @@ import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import {
   CyclesOutline,
   IntakeOutline,
+  MilestoneOutline,
+  TimeTrackingOutline,
   ModuleOutline,
-  PagesOutline,
   ViewsOutline,
   WorkItemsOutline,
 } from "@makeplane/propel/icons";
 import type { EUserProjectRoles, IPartialProject } from "@plane/types";
+import { RBAC_PROJECT_PAGE_MODULES } from "@/components/access-control/types";
 import type { TNavigationItem } from "@/components/navigation/tab-navigation-root";
+import { useUserPermissions } from "@/hooks/store/user";
 
 type UseNavigationItemsProps = {
   workspaceSlug: string;
@@ -36,6 +39,8 @@ export const useNavigationItems = ({
   project,
   allowPermissions,
 }: UseNavigationItemsProps): TNavigationItem[] => {
+  const { canInProject, workspaceAccess } = useUserPermissions();
+  const access = workspaceAccess[workspaceSlug];
   // Base navigation items
   const baseNavigation = useCallback(
     // oxlint-disable-next-line no-shadow
@@ -43,7 +48,7 @@ export const useNavigationItems = ({
       {
         i18n_key: "sidebar.work_items",
         key: "work_items",
-        name: "Work items",
+        name: "Project tasks",
         href: `/${workspaceSlug}/projects/${projectId}/issues`,
         icon: WorkItemsOutline,
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
@@ -81,16 +86,6 @@ export const useNavigationItems = ({
         sortOrder: 4,
       },
       {
-        i18n_key: "sidebar.pages",
-        key: "pages",
-        name: "Pages",
-        href: `/${workspaceSlug}/projects/${projectId}/pages`,
-        icon: PagesOutline,
-        access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
-        shouldRender: !!project?.page_view,
-        sortOrder: 5,
-      },
-      {
         i18n_key: "sidebar.intake",
         key: "intake",
         name: "Intake",
@@ -99,6 +94,26 @@ export const useNavigationItems = ({
         access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
         shouldRender: !!project?.inbox_view,
         sortOrder: 6,
+      },
+      {
+        i18n_key: "sidebar.milestones",
+        key: "milestones",
+        name: "Milestones",
+        href: `/${workspaceSlug}/projects/${projectId}/milestones`,
+        icon: MilestoneOutline,
+        access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
+        shouldRender: !!project?.is_milestone_enabled,
+        sortOrder: 7,
+      },
+      {
+        i18n_key: "sidebar.worklogs",
+        key: "worklogs",
+        name: "Worklogs",
+        href: `/${workspaceSlug}/projects/${projectId}/worklogs`,
+        icon: TimeTrackingOutline,
+        access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
+        shouldRender: !!project?.is_time_tracking_enabled,
+        sortOrder: 8,
       },
     ],
     [project]
@@ -112,13 +127,16 @@ export const useNavigationItems = ({
     const filteredItems = navItems.filter((item) => {
       if (!item.shouldRender) return false;
       const hasAccess = allowPermissions(item.access, EUserPermissionsLevel.PROJECT, workspaceSlug, project?.id ?? "");
-      return hasAccess;
+      const module = RBAC_PROJECT_PAGE_MODULES[item.key];
+      return hasAccess && (!module || canInProject(module, "view", projectId, workspaceSlug));
     });
 
     // Sort by sortOrder
     // oxlint-disable-next-line unicorn/no-array-sort
     return filteredItems.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
-  }, [workspaceSlug, projectId, baseNavigation, allowPermissions, project?.id]);
+    // `access`: recompute once the person's role-based access has loaded or changed
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceSlug, projectId, baseNavigation, allowPermissions, project?.id, canInProject, access]);
 
   return navigationItems;
 };

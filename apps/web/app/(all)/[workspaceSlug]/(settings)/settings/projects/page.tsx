@@ -15,11 +15,13 @@ import ProjectDarkEmptyState from "@/app/assets/empty-state/project-settings/no-
 import ProjectLightEmptyState from "@/app/assets/empty-state/project-settings/no-projects-light.png?url";
 // hooks
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
+import { useUserPermissions } from "@/hooks/store/user";
 
 function ProjectSettingsPage() {
   // store hooks
   const { resolvedTheme } = useTheme();
   const { toggleCreateProjectModal } = useCommandPalette();
+  const { canAccess } = useUserPermissions();
   // derived values
   const resolvedPath = resolvedTheme === "dark" ? ProjectDarkEmptyState : ProjectLightEmptyState;
   return (
@@ -39,13 +41,15 @@ function ProjectSettingsPage() {
         >
           Learn more about projects
         </ButtonElement>
-        <Button
-          variant="primary"
-          size="sm"
-          stretch="auto"
-          label="Start your first project"
-          onClick={() => toggleCreateProjectModal(true)}
-        />
+        {canAccess("projects", "create") && (
+          <Button
+            variant="primary"
+            size="sm"
+            stretch="auto"
+            label="Start your first project"
+            onClick={() => toggleCreateProjectModal(true)}
+          />
+        )}
       </div>
     </div>
   );

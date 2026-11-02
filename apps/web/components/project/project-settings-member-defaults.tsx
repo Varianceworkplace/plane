@@ -197,7 +197,7 @@ export const ProjectSettingsMemberDefaults = observer(function ProjectSettingsMe
       {currentProjectDetails && (
         <DefaultSettingItem
           title="Guest access"
-          description="This will allow guests to have view access to all the project work items."
+          description="This will allow guests to have view access to all the project tasks."
         >
           <div className="flex items-center justify-end">
             <Switch

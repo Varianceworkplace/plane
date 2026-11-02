@@ -25,6 +25,10 @@ from plane.app.permissions.base import allow_permission, ROLE
 
 
 class ProjectMemberViewSet(BaseViewSet):
+    # role-based access (plane.utils.work_item_visibility): the project action each change needs
+    # managing members is editing the project; leaving is not checked
+    rbac_project_actions = {"create": "edit", "partial_update": "edit", "destroy": "edit"}
+
     serializer_class = ProjectMemberAdminSerializer
     model = ProjectMember
 

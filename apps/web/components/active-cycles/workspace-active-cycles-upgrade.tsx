@@ -48,9 +48,9 @@ export const WORKSPACE_ACTIVE_CYCLES_DETAILS = [
   },
   {
     key: "quickly_see_make_or_break_issues",
-    title: "Quickly see make-or-break work items. ",
+    title: "Quickly see make-or-break project tasks. ",
     description:
-      "Preview high-priority work items for each cycle against due dates. See all of them per cycle in one click.",
+      "Preview high-priority project tasks for each cycle against due dates. See all of them per cycle in one click.",
     icon: AlertOctagonOutline,
   },
   {

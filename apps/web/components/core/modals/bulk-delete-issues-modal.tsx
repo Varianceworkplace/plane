@@ -104,7 +104,7 @@ export const BulkDeleteIssuesModal = observer(function BulkDeleteIssuesModal(pro
       setToast({
         type: "error",
         title: "Error!",
-        message: "Please select at least one work item.",
+        message: "Please select at least one project task.",
       });
       return;
     }
@@ -116,7 +116,7 @@ export const BulkDeleteIssuesModal = observer(function BulkDeleteIssuesModal(pro
         setToast({
           type: "success",
           title: "Success!",
-          message: "Work items deleted successfully!",
+          message: "Project tasks deleted successfully!",
         });
         handleClose();
       })
@@ -133,7 +133,7 @@ export const BulkDeleteIssuesModal = observer(function BulkDeleteIssuesModal(pro
     issues.length > 0 ? (
       <div className="p-2">
         {query === "" && (
-          <h2 className="mt-4 mb-2 px-3 text-11 font-semibold text-primary">Select work items to delete</h2>
+          <h2 className="mt-4 mb-2 px-3 text-11 font-semibold text-primary">Select project tasks to delete</h2>
         )}
         <ComboboxList aria-label={t("power_k.actions_commands.bulk_delete_work_items")}>
           {issues.map((issue) => (
@@ -211,7 +211,7 @@ export const BulkDeleteIssuesModal = observer(function BulkDeleteIssuesModal(pro
                 variant="danger"
                 size="md"
                 stretch="auto"
-                label={isSubmitting ? "Deleting..." : "Delete selected work items"}
+                label={isSubmitting ? "Deleting..." : "Delete selected project tasks"}
                 onClick={() => void handleSubmit(handleDelete)()}
                 loading={isSubmitting}
               />

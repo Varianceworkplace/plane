@@ -14,6 +14,7 @@ import { EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { joinUrlPath } from "@plane/utils";
 // components
+import { RBAC_SIDEBAR_MODULES } from "@/components/access-control/types";
 import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
@@ -36,7 +37,7 @@ export const SidebarItemBase = observer(function SidebarItemBase({
   const { t } = useTranslation();
   const pathname = usePathname();
   const { workspaceSlug } = useParams();
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canAccess } = useUserPermissions();
   const { isWorkspaceItemPinned } = useWorkspaceNavigationPreferences();
   const { data } = useUser();
 
@@ -51,6 +52,9 @@ export const SidebarItemBase = observer(function SidebarItemBase({
     "home",
     "pi_chat",
     "projects",
+    "project_milestones",
+    "tickets",
+    "reports",
     "your_work",
     "stickies",
     "drafts",
@@ -59,6 +63,8 @@ export const SidebarItemBase = observer(function SidebarItemBase({
   const slug = workspaceSlug?.toString() || "";
 
   if (!allowPermissions(item.access, EUserPermissionsLevel.WORKSPACE, slug)) return null;
+  const rbacModule = RBAC_SIDEBAR_MODULES[item.key];
+  if (rbacModule && !canAccess(rbacModule, "view", slug)) return null;
 
   const isPinned = isWorkspaceItemPinned(item.key);
   if (!isPinned && !staticItems.includes(item.key)) return null;

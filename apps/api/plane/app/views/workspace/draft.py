@@ -46,6 +46,21 @@ from plane.utils.host import base_host
 class WorkspaceDraftIssueViewSet(BaseViewSet):
     model = DraftIssue
 
+    # role-based access (plane.utils.work_item_visibility): turning a draft into a work item creates one in the
+    # draft's project; drafts themselves are personal and not checked
+    def rbac_work_item_action(self, request, kwargs):
+        if request.method != "POST" or "draft_id" not in kwargs:
+            return None
+        # a missing draft, or one without a project, is the view's to answer
+        return "create" if self.rbac_create_project_id(request, kwargs) else None
+
+    def rbac_create_project_id(self, request, kwargs):
+        return (
+            DraftIssue.objects.filter(pk=kwargs.get("draft_id"), created_by=request.user)
+            .values_list("project_id", flat=True)
+            .first()
+        )
+
     def get_queryset(self):
         return (
             DraftIssue.objects.filter(workspace__slug=self.kwargs.get("slug"))

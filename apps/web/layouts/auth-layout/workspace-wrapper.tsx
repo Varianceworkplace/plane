@@ -58,8 +58,14 @@ export const WorkspaceAuthWrapper = observer(function WorkspaceAuthWrapper(props
   } = useMember();
   const { workspaces, fetchSidebarNavigationPreferences, fetchProjectNavigationPreferences } = useWorkspace();
   const { isMobile } = usePlatformOS();
-  const { loader, workspaceInfoBySlug, fetchUserWorkspaceInfo, fetchUserProjectPermissions, allowPermissions } =
-    useUserPermissions();
+  const {
+    loader,
+    workspaceInfoBySlug,
+    fetchUserWorkspaceInfo,
+    fetchUserProjectPermissions,
+    fetchWorkspaceAccess,
+    allowPermissions,
+  } = useUserPermissions();
   const { fetchWorkspaceStates } = useProjectState();
   // derived values
   const canPerformWorkspaceMemberActions = allowPermissions(
@@ -81,6 +87,13 @@ export const WorkspaceAuthWrapper = observer(function WorkspaceAuthWrapper(props
     workspaceSlug && currentWorkspace ? WORKSPACE_PROJECTS_ROLES_INFORMATION(workspaceSlug.toString()) : null,
     workspaceSlug && currentWorkspace ? () => fetchUserProjectPermissions(workspaceSlug.toString()) : null,
     { revalidateIfStale: false, revalidateOnFocus: false }
+  );
+
+  // what role-based access lets the user do (hides buttons; re-read when they come back to the tab)
+  useSWR(
+    workspaceSlug && currentWorkspace ? `WORKSPACE_ACCESS_ME_${workspaceSlug.toString()}` : null,
+    workspaceSlug && currentWorkspace ? () => fetchWorkspaceAccess(workspaceSlug.toString()) : null,
+    { revalidateIfStale: false, revalidateOnFocus: true }
   );
 
   // fetching workspace projects

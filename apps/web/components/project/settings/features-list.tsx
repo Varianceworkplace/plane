@@ -10,7 +10,16 @@ import { useTranslation } from "@plane/i18n";
 import { setPromiseToast } from "@plane/blocks/toast";
 import { Tooltip } from "@makeplane/propel/components/tooltip";
 import type { IProject } from "@plane/types";
-import { CyclesOutline, IntakeOutline, ModuleOutline, PagesOutline, ViewsOutline } from "@makeplane/propel/icons";
+import {
+  CyclesOutline,
+  IntakeOutline,
+  MilestoneOutline,
+  ModuleOutline,
+  PagesOutline,
+  PropertiesOutline,
+  TimeTrackingOutline,
+  ViewsOutline,
+} from "@makeplane/propel/icons";
 // components
 import { SettingsBoxedControlItem } from "@/components/settings/boxed-control-item";
 import { SettingsHeading } from "@/components/settings/heading";
@@ -68,8 +77,35 @@ const PROJECT_FEATURES_LIST = {
     key: "intake",
     property: "inbox_view",
     title: "Intake",
-    description: "Consider and discuss work items before you add them to your project.",
+    description: "Consider and discuss project tasks before you add them to your project.",
     icon: <IntakeOutline className="h-5 w-5 flex-shrink-0 text-tertiary" />,
+    isPro: false,
+    isEnabled: true,
+  },
+  time_tracking: {
+    key: "time_tracking",
+    property: "is_time_tracking_enabled",
+    title: "Time tracking",
+    description: "Log time spent on project tasks and projects.",
+    icon: <TimeTrackingOutline className="h-5 w-5 flex-shrink-0 text-tertiary" />,
+    isPro: false,
+    isEnabled: true,
+  },
+  milestones: {
+    key: "milestones",
+    property: "is_milestone_enabled",
+    title: "Milestones",
+    description: "Milestones provide a layer to align project tasks toward shared completion dates.",
+    icon: <MilestoneOutline className="h-5 w-5 flex-shrink-0 text-tertiary" />,
+    isPro: false,
+    isEnabled: true,
+  },
+  task_details: {
+    key: "task_details",
+    property: "is_task_details_enabled",
+    title: "Task details",
+    description: "Workplace task fields on every project task, with one assignee each.",
+    icon: <PropertiesOutline className="h-5 w-5 flex-shrink-0 text-tertiary" />,
     isPro: false,
     isEnabled: true,
   },

@@ -52,7 +52,7 @@ export const StateDelete = observer(function StateDelete(props: TStateDelete) {
           type: "error",
           title: "Error!",
           message:
-            "This state contains some work items within it, please move them to some other state to delete this state.",
+            "This state contains some project tasks within it, please move them to some other state to delete this state.",
         });
       } else {
         setToast({

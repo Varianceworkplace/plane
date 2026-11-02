@@ -11,6 +11,7 @@ import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { PageHead } from "@/components/core/page-title";
 import { ProjectDetailsForm } from "@/components/project/form";
 import { ProjectDetailsFormLoader } from "@/components/project/form-loader";
+import { ProjectDetailsSettingsSection } from "@/components/project-details/settings-section";
 import { SettingsContentWrapper } from "@/components/settings/content-wrapper";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
@@ -44,6 +45,14 @@ function ProjectSettingsPage({ params }: Route.ComponentProps) {
           />
         ) : (
           <ProjectDetailsFormLoader />
+        )}
+        {currentProjectDetails && (
+          <ProjectDetailsSettingsSection
+            workspaceSlug={workspaceSlug}
+            projectId={projectId}
+            project={currentProjectDetails}
+            isAdmin={isAdmin}
+          />
         )}
         {isAdmin && <GeneralProjectSettingsControlSection projectId={projectId} />}
       </div>

@@ -42,14 +42,14 @@
       "empty": {
         "project": "Your recent projects will appear here once you visit one.",
         "page": "Your recent pages will appear here once you visit one.",
-        "issue": "Your recent work items will appear here once you visit one.",
+        "issue": "Your recent project tasks will appear here once you visit one.",
         "default": "You don't have any recents yet."
       },
       "filters": {
         "all": "All",
         "projects": "Projects",
         "pages": "Pages",
-        "issues": "Work items"
+        "issues": "Project tasks"
       }
     },
     "new_at_plane": {

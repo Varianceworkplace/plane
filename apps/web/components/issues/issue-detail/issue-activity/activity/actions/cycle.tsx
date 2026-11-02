@@ -33,7 +33,7 @@ export const IssueCycleActivity = observer(function IssueCycleActivity(props: TI
       <>
         {activity.verb === "created" ? (
           <>
-            <span>added this work item to the cycle </span>
+            <span>added this project task to the cycle </span>
             <a
               href={`/${activity.workspace_detail?.slug}/projects/${activity.project}/cycles/${activity.new_identifier}`}
               target="_blank"
@@ -57,7 +57,7 @@ export const IssueCycleActivity = observer(function IssueCycleActivity(props: TI
           </>
         ) : (
           <>
-            <span>removed the work item from the cycle </span>
+            <span>removed the project task from the cycle </span>
             <a
               href={`/${activity.workspace_detail?.slug}/projects/${activity.project}/cycles/${activity.old_identifier}`}
               target="_blank"

@@ -42,6 +42,7 @@ from plane.bgtasks.webhook_task import model_activity, webhook_activity
 from plane.utils.exception_logger import log_exception
 from .base import BaseAPIView
 from plane.utils.host import base_host
+from plane.utils.task_details import NEW_PROJECT_FEATURES
 from plane.utils.order_queryset import PROJECT_ORDER_BY_ALLOWLIST, sanitize_order_by
 from plane.api.serializers import (
     ProjectSerializer,
@@ -76,6 +77,9 @@ from plane.utils.openapi import (
 
 class ProjectListCreateAPIEndpoint(BaseAPIView):
     """Project List and Create Endpoint"""
+
+    # role-based access (plane.utils.work_item_visibility): the project action each change needs
+    rbac_project_actions = {"POST": "create"}
 
     serializer_class = ProjectSerializer
     model = Project
@@ -230,7 +234,9 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
         try:
             workspace = Workspace.objects.get(slug=slug)
 
-            serializer = ProjectCreateSerializer(data={**request.data}, context={"workspace_id": workspace.id})
+            serializer = ProjectCreateSerializer(
+                data={**NEW_PROJECT_FEATURES, **request.data}, context={"workspace_id": workspace.id}
+            )
 
             if serializer.is_valid():
                 with transaction.atomic():
@@ -429,6 +435,9 @@ class ProjectListLiteAPIEndpoint(BaseAPIView):
 
 class ProjectDetailAPIEndpoint(BaseAPIView):
     """Project Endpoints to  update, retrieve and delete endpoint"""
+
+    # role-based access (plane.utils.work_item_visibility): the project action each change needs
+    rbac_project_actions = {"PATCH": "edit", "DELETE": "delete"}
 
     serializer_class = ProjectSerializer
     model = Project
@@ -648,6 +657,9 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
 
 class ProjectArchiveUnarchiveAPIEndpoint(BaseAPIView):
     """Project Archive and Unarchive Endpoint"""
+
+    # role-based access (plane.utils.work_item_visibility): the project action each change needs
+    rbac_project_actions = {"POST": "edit", "DELETE": "edit"}
 
     permission_classes = [ProjectBasePermission]
 

@@ -8,6 +8,7 @@ import json
 
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
+from django.db import transaction
 from django.db.models import Exists, F, OuterRef, Prefetch, Q, Subquery, Count
 from django.utils import timezone
 
@@ -30,9 +31,11 @@ from plane.db.models import (
     DeployBoard,
     Intake,
     Project,
+    ProjectDetail,
     ProjectIdentifier,
     ProjectMember,
     ProjectNetwork,
+    ProjectTeam,
     ProjectUserProperty,
     State,
     DEFAULT_STATES,
@@ -41,10 +44,16 @@ from plane.db.models import (
 )
 from plane.db.models.intake import IntakeIssueStatus
 from plane.utils.host import base_host
+from plane.utils.project_details import LEAD_REQUIRED_ERROR, parse_project_detail_payload
+from plane.utils.task_details import NEW_PROJECT_FEATURES
 from plane.utils.order_queryset import PROJECT_ORDER_BY_ALLOWLIST, sanitize_order_by
+from plane.utils.rbac import rbac_profile
 
 
 class ProjectViewSet(BaseViewSet):
+    # role-based access (plane.utils.work_item_visibility): the project action each change needs
+    rbac_project_actions = {"create": "create", "update": "edit", "partial_update": "edit", "destroy": "delete"}
+
     serializer_class = ProjectListSerializer
     model = Project
     webhook_event = "project"
@@ -127,6 +136,11 @@ class ProjectViewSet(BaseViewSet):
                 | Q(network=2)
             )
 
+        # role-based access: only the projects the person's roles reach
+        profile = rbac_profile(request, slug)
+        if profile is not None:
+            projects = projects.filter(profile.project_q("view"))
+
         if request.GET.get("per_page", False) and request.GET.get("cursor", False):
             return self.paginate(
                 order_by=sanitize_order_by(
@@ -187,6 +201,9 @@ class ProjectViewSet(BaseViewSet):
             "module_view",
             "page_view",
             "inbox_view",
+            "is_time_tracking_enabled",
+            "is_milestone_enabled",
+            "is_task_details_enabled",
             "guest_view_all_features",
             "project_lead",
             "network",
@@ -220,6 +237,11 @@ class ProjectViewSet(BaseViewSet):
                 )
                 | Q(network=2)
             )
+        # role-based access: only the projects the person's roles reach
+        profile = rbac_profile(request, slug)
+        if profile is not None:
+            projects = projects.filter(profile.project_q("view"))
+
         return Response(projects, status=status.HTTP_200_OK)
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
@@ -228,6 +250,11 @@ class ProjectViewSet(BaseViewSet):
 
         if project is None:
             return Response({"error": "Project does not exist"}, status=status.HTTP_404_NOT_FOUND)
+
+        # role-based access: a project outside the person's scope is refused even to its members
+        profile = rbac_profile(request, slug)
+        if profile is not None and not profile.can_on_project_id("view", project.id):
+            return Response({"error": "You do not have permission"}, status=status.HTTP_403_FORBIDDEN)
 
         member_ids = [str(project_member.member_id) for project_member in project.members_list]
 
@@ -258,41 +285,68 @@ class ProjectViewSet(BaseViewSet):
     def create(self, request, slug):
         workspace = Workspace.objects.get(slug=slug)
 
-        serializer = ProjectSerializer(data={**request.data}, context={"workspace_id": workspace.id})
+        # The app's create form also sends the Workplace project fields; check them all before creating anything
+        project_data = {key: value for key, value in request.data.items() if key != "project_details"}
+        details = None
+        if "project_details" in request.data:
+            details, errors = parse_project_detail_payload(request.data.get("project_details"), require_all=True)
+            if not project_data.get("project_lead"):
+                errors["project_lead"] = LEAD_REQUIRED_ERROR
+            if errors:
+                return Response({"project_details": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = ProjectSerializer(
+            data={**NEW_PROJECT_FEATURES, **project_data}, context={"workspace_id": workspace.id}
+        )
         if serializer.is_valid():
-            serializer.save()
+            # all or nothing: a failure part way must not leave a project behind that blocks its identifier
+            with transaction.atomic():
+                serializer.save()
 
-            # Add the user as Administrator to the project
-            _ = ProjectMember.objects.create(
-                project_id=serializer.data["id"],
-                member=request.user,
-                role=ROLE.ADMIN.value,
-            )
-
-            if serializer.data["project_lead"] is not None and str(serializer.data["project_lead"]) != str(
-                request.user.id
-            ):
-                ProjectMember.objects.create(
+                # Add the user as Administrator to the project
+                _ = ProjectMember.objects.create(
                     project_id=serializer.data["id"],
-                    member_id=serializer.data["project_lead"],
+                    member=request.user,
                     role=ROLE.ADMIN.value,
                 )
 
-            State.objects.bulk_create(
-                [
-                    State(
-                        name=state["name"],
-                        color=state["color"],
-                        project=serializer.instance,
-                        sequence=state["sequence"],
-                        workspace=serializer.instance.workspace,
-                        group=state["group"],
-                        default=state.get("default", False),
-                        created_by=request.user,
+                if serializer.data["project_lead"] is not None and str(serializer.data["project_lead"]) != str(
+                    request.user.id
+                ):
+                    ProjectMember.objects.create(
+                        project_id=serializer.data["id"],
+                        member_id=serializer.data["project_lead"],
+                        role=ROLE.ADMIN.value,
                     )
-                    for state in DEFAULT_STATES
-                ]
-            )
+
+                State.objects.bulk_create(
+                    [
+                        State(
+                            name=state["name"],
+                            color=state["color"],
+                            project=serializer.instance,
+                            sequence=state["sequence"],
+                            workspace=serializer.instance.workspace,
+                            group=state["group"],
+                            default=state.get("default", False),
+                            created_by=request.user,
+                        )
+                        for state in DEFAULT_STATES
+                    ]
+                )
+
+                if details is not None:
+                    ProjectDetail.objects.create(project=serializer.instance, workspace=workspace, **details)
+
+                # role-based access: a PM's new project belongs to the teams they lead
+                profile = rbac_profile(request, slug)
+                if profile is not None:
+                    ProjectTeam.objects.bulk_create(
+                        [
+                            ProjectTeam(workspace=workspace, project=serializer.instance, team_id=team_id)
+                            for team_id in profile.led_team_ids
+                        ]
+                    )
 
             project = self.get_queryset().filter(pk=serializer.data["id"]).first()
 
@@ -300,7 +354,7 @@ class ProjectViewSet(BaseViewSet):
             model_activity.delay(
                 model_name="project",
                 model_id=str(project.id),
-                requested_data=request.data,
+                requested_data=project_data,
                 current_instance=None,
                 actor_id=request.user.id,
                 slug=slug,
@@ -425,6 +479,9 @@ class ProjectViewSet(BaseViewSet):
 
 
 class ProjectArchiveUnarchiveEndpoint(BaseAPIView):
+    # role-based access (plane.utils.work_item_visibility): the project action each change needs
+    rbac_project_actions = {"POST": "edit", "DELETE": "edit"}
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def post(self, request, slug, project_id):
         project = Project.objects.get(pk=project_id, workspace__slug=slug)

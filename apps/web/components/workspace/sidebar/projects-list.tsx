@@ -44,7 +44,7 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
   // store hooks
   const { t } = useTranslation();
   const { toggleCreateProjectModal } = useCommandPalette();
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canAccess } = useUserPermissions();
   const { preferences: projectPreferences } = useProjectNavigationPreferences();
   const { isExtendedProjectSidebarOpened, toggleExtendedProjectSidebar } = useAppTheme();
 
@@ -54,10 +54,9 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
   const pathname = usePathname();
 
   // auth
-  const isAuthorizedUser = allowPermissions(
-    [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
-    EUserPermissionsLevel.WORKSPACE
-  );
+  const isAuthorizedUser =
+    allowPermissions([EUserPermissions.ADMIN, EUserPermissions.MEMBER], EUserPermissionsLevel.WORKSPACE) &&
+    canAccess("projects", "create");
 
   // Compute limited projects for main sidebar
   const displayedProjects = projectPreferences.showLimitedProjects

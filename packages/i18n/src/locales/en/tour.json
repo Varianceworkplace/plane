@@ -3,23 +3,23 @@
     "workitems": {
       "step_zero": {
         "title": "Welcome to your workspace",
-        "description": "To help you get started, we’ve created a Demo Project for you. Let’s add your first work item."
+        "description": "To help you get started, we’ve created a Demo Project for you. Let’s add your first project task."
       },
       "step_one": {
-        "title": "Click “+ Add work item”",
-        "description": "Start by clicking the “+ New Work Item” button. You can create tasks, bugs, or custom type that fits your needs."
+        "title": "Click “+ Add project task”",
+        "description": "Start by clicking the “+ New Project Task” button. You can create tasks, bugs, or custom type that fits your needs."
       },
       "step_two": {
-        "title": "Filter your work items",
+        "title": "Filter your project tasks",
         "description": "Use filters to quickly narrow down your list. You can filter by status, priority, or team members. "
       },
       "step_three": {
-        "title": "View, group, and order work items as needed.",
-        "description": "See required properties, and group or order work items as per your needs."
+        "title": "View, group, and order project tasks as needed.",
+        "description": "See required properties, and group or order project tasks as per your needs."
       },
       "step_four": {
         "title": "Visualize however you want",
-        "description": "Select which properties you want to see in the list. You can also group and sort work items your way."
+        "description": "Select which properties you want to see in the list. You can also group and sort project tasks your way."
       }
     },
     "cycle": {
@@ -33,29 +33,29 @@
       },
       "step_two": {
         "title": "Click “+ ”",
-        "description": "Start by clicking the “+” button. Add new or existing work items directly from the Cycle page."
+        "description": "Start by clicking the “+” button. Add new or existing project tasks directly from the Cycle page."
       },
       "step_three": {
         "title": "Cycle summary",
         "description": "Track cycle progress, team productivity, and priorities—and investigate if things fall behind."
       },
       "step_four": {
-        "title": "Transfer work items",
+        "title": "Transfer project tasks",
         "description": "After the due date, a cycle auto-completes. Move unfinished work to another cycle."
       }
     },
     "module": {
       "step_zero": {
         "title": "Break your project down into Modules",
-        "description": "Modules are smaller, focused projects that help users group and organize work items within specific time frames."
+        "description": "Modules are smaller, focused projects that help users group and organize project tasks within specific time frames."
       },
       "step_one": {
         "title": "Create Module",
-        "description": "Modules are smaller, focused projects that help users group and organize work items within specific time frames."
+        "description": "Modules are smaller, focused projects that help users group and organize project tasks within specific time frames."
       },
       "step_two": {
         "title": "Click “+ ”",
-        "description": "Start by clicking the “+” button. Add new or existing work items directly from the Module page."
+        "description": "Start by clicking the “+” button. Add new or existing project tasks directly from the Module page."
       },
       "step_three": {
         "title": "Module states",
@@ -95,7 +95,7 @@
     "intake": {
       "step_zero": {
         "title": "Streamline requests with intake",
-        "description": "A Plane-only feature that lets Guests create work items for bugs, requests, or tickets."
+        "description": "A Plane-only feature that lets Guests create project tasks for bugs, requests, or tickets."
       },
       "step_one": {
         "title": "Open/closed intake requests",
@@ -103,11 +103,11 @@
       },
       "step_two": {
         "title": "Accept/decline a pending request",
-        "description": "Accept to edit and move the work item to your project, or decline it to mark it as Cancelled."
+        "description": "Accept to edit and move the project task to your project, or decline it to mark it as Cancelled."
       },
       "step_three": {
         "title": "Snooze for now",
-        "description": "A work item can be snoozed to review it at a later time. It will be moved to the bottom of your open request list."
+        "description": "A project task can be snoozed to review it at a later time. It will be moved to the bottom of your open request list."
       }
     },
     "mcp_connectors": {
@@ -163,7 +163,7 @@
           "title": "Create a project"
         },
         "item_2": {
-          "title": "Create a work item"
+          "title": "Create a project task"
         },
         "item_3": {
           "title": "Invite team members"

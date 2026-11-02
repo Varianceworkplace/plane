@@ -91,8 +91,8 @@ export const DeleteEstimateModal = observer(function DeleteEstimateModal(props: 
           <DialogBody tabIndex={0}>
             <div className="text-14 text-secondary">
               Deleting the estimate <span className="font-bold text-primary">{estimate?.name}</span>
-              &nbsp;system will remove it from all work items permanently. This action cannot be undone. If you add
-              estimates again, you will need to update all the work items.
+              &nbsp;system will remove it from all project tasks permanently. This action cannot be undone. If you add
+              estimates again, you will need to update all the project tasks.
             </div>
           </DialogBody>
         </DialogMain>

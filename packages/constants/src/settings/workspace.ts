@@ -41,6 +41,22 @@ export const WORKSPACE_SETTINGS: Record<TWorkspaceSettingsTabs, TWorkspaceSettin
     access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
     highlight: (pathname: string, baseUrl: string) => pathname === `${baseUrl}/settings/members/`,
   },
+  // role-based access: roles, teams, who holds what (workspace admins and people with Role management)
+  "access-control": {
+    key: "access-control",
+    i18n_label: "workspace_settings.settings.access_control.title",
+    href: `/settings/access-control`,
+    access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
+    highlight: (pathname: string, baseUrl: string) => pathname === `${baseUrl}/settings/access-control/`,
+  },
+  // groups of team members project tasks can be assigned to (workspace admins, HR, Project Managers)
+  groups: {
+    key: "groups",
+    i18n_label: "workspace_settings.settings.groups.title",
+    href: `/settings/groups`,
+    access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
+    highlight: (pathname: string, baseUrl: string) => pathname === `${baseUrl}/settings/groups/`,
+  },
   "billing-and-plans": {
     key: "billing-and-plans",
     i18n_label: "workspace_settings.settings.billing_and_plans.title",
@@ -72,6 +88,8 @@ export const GROUPED_WORKSPACE_SETTINGS: Record<WORKSPACE_SETTINGS_CATEGORY, TWo
   [WORKSPACE_SETTINGS_CATEGORY.ADMINISTRATION]: [
     WORKSPACE_SETTINGS["general"],
     WORKSPACE_SETTINGS["members"],
+    WORKSPACE_SETTINGS["access-control"],
+    WORKSPACE_SETTINGS["groups"],
     WORKSPACE_SETTINGS["billing-and-plans"],
     WORKSPACE_SETTINGS["export"],
   ],

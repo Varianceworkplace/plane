@@ -40,7 +40,7 @@ export const usePowerKCreationCommandsRecord = (): Record<TPowerKCreationCommand
   const { config } = useInstance();
   const {
     canPerformAnyCreateAction,
-    permission: { allowPermissions },
+    permission: { allowPermissions, canAccess },
   } = useUser();
   const { workspaceProjectIds, getPartialProjectById } = useProject();
   const {
@@ -53,10 +53,9 @@ export const usePowerKCreationCommandsRecord = (): Record<TPowerKCreationCommand
   } = useCommandPalette();
   // derived values
   const canCreateWorkItem = canPerformAnyCreateAction && workspaceProjectIds && workspaceProjectIds.length > 0;
-  const canCreateProject = allowPermissions(
-    [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
-    EUserPermissionsLevel.WORKSPACE
-  );
+  const canCreateProject =
+    allowPermissions([EUserPermissions.ADMIN, EUserPermissions.MEMBER], EUserPermissionsLevel.WORKSPACE) &&
+    canAccess("projects", "create");
   const hasProjectMemberLevelPermissions = (ctx: TPowerKContext) =>
     allowPermissions(
       [EUserProjectRoles.ADMIN, EUserProjectRoles.MEMBER],

@@ -18,6 +18,7 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useWorkspace } from "@/hooks/store/use-workspace";
 // local imports
 import { NotificationContent } from "./content";
+import { JoinRequestNotificationItem } from "./join-request";
 import { NotificationOption } from "./options";
 
 type TNotificationItem = {
@@ -41,7 +42,8 @@ export const NotificationItem = observer(function NotificationItem(props: TNotif
   const issueId = notification?.data?.issue?.id || undefined;
   const workspace = getWorkspaceBySlug(workspaceSlug);
 
-  const notificationField = notification?.data?.issue_activity.field || undefined;
+  // join request notifications carry no work item activity (see JoinRequestNotificationItem below)
+  const notificationField = notification?.data?.issue_activity?.field || undefined;
   const notificationTriggeredBy = notification.triggered_by_details || undefined;
 
   const handleNotificationIssuePeekOverview = async () => {
@@ -65,6 +67,10 @@ export const NotificationItem = observer(function NotificationItem(props: TNotif
       }
     }
   };
+
+  // role-based access: requests to join a project, and the answers to them
+  if (notification?.entity_name === "project_join_request")
+    return <JoinRequestNotificationItem workspaceSlug={workspaceSlug} notificationId={notificationId} />;
 
   if (!workspaceSlug || !notificationId || !notification?.id || !notificationField || !workspace?.id || !projectId)
     return <></>;

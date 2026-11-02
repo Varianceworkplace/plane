@@ -51,6 +51,9 @@ from plane.utils.filters import IssueFilterSet
 
 
 class IssueArchiveViewSet(BaseViewSet):
+    # role-based access (plane.utils.work_item_visibility): the action each change needs
+    rbac_work_item_actions = {"POST": "edit", "DELETE": "edit"}
+
     serializer_class = IssueFlatSerializer
     model = Issue
 
@@ -303,6 +306,9 @@ class IssueArchiveViewSet(BaseViewSet):
 
 
 class BulkArchiveIssuesEndpoint(BaseAPIView):
+    # role-based access (plane.utils.work_item_visibility): the action each change needs
+    rbac_work_item_actions = {"POST": "edit"}
+
     permission_classes = [ProjectEntityPermission]
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])

@@ -1,21 +1,21 @@
 {
   "work_item_types": {
-    "label": "Work item Types",
-    "label_lowercase": "work item types",
+    "label": "Project task Types",
+    "label_lowercase": "project task types",
     "settings": {
       "description": "Customize and add your own properties to tailor it to your team's needs.",
-      "cant_delete_default_message": "This work item type cannot be deleted because it's set as the default for this project",
+      "cant_delete_default_message": "This project task type cannot be deleted because it's set as the default for this project",
       "set_as_default": "Set as default",
       "cant_set_default_inactive_message": "Activate this type before setting it as default",
       "set_default_confirmation": {
-        "title": "Set as default work item type",
-        "description": "Setting {name} as the default will import it to all projects in this workspace. All new work items will use this type by default.",
+        "title": "Set as default project task type",
+        "description": "Setting {name} as the default will import it to all projects in this workspace. All new project tasks will use this type by default.",
         "confirm_button": "Set as default"
       },
       "properties": {
         "title": "Properties",
         "description": "Create and customize properties.",
-        "tooltip": "Each work item type comes with a default set of properties like Title, Description, Assignee, State, Priority, Start date, Due date, Module, Cycle etc. You can also customize and add your own properties to tailor it to your team's needs.",
+        "tooltip": "Each project task type comes with a default set of properties like Title, Description, Assignee, State, Priority, Start date, Due date, Module, Cycle etc. You can also customize and add your own properties to tailor it to your team's needs.",
         "add_button": "Add new property",
         "project": {
           "add_button": {
@@ -195,7 +195,7 @@
           "validation_success_with_refs": "Formula is valid! Returns {resultType} ({count} field(s) referenced)",
           "error": {
             "empty": "Please enter a formula",
-            "missing_context": "Missing workspace, project, or work item type context",
+            "missing_context": "Missing workspace, project, or project task type context",
             "validation_failed": "Validation failed"
           },
           "picker": {
@@ -228,12 +228,12 @@
         },
         "empty_state": {
           "title": "Add custom properties",
-          "description": "New properties you add for this work item type will show here."
+          "description": "New properties you add for this project task type will show here."
         }
       },
       "types": {
         "title": "Types",
-        "description": "Create and customize work item types with properties.",
+        "description": "Create and customize project task types with properties.",
         "sort_options": {
           "project_count": "Number of projects part of"
         },
@@ -247,8 +247,8 @@
             "import_from_workspace": "Import from workspace"
           },
           "banner": {
-            "with_access": "Enable work item types to import types from workspace level",
-            "without_access": "Work item types are disabled. Contact workspace admin to enable them in workspace settings."
+            "with_access": "Enable project task types to import types from workspace level",
+            "without_access": "Project task types are disabled. Contact workspace admin to enable them in workspace settings."
           }
         }
       },
@@ -264,7 +264,7 @@
         },
         "unlink_confirmation": {
           "title": "Unlink property",
-          "description": "Unlinking this property will permanently delete all its values across every work item using this type. This action cannot be undone.",
+          "description": "Unlinking this property will permanently delete all its values across every project task using this type. This action cannot be undone.",
           "input_label": "Type",
           "input_label_suffix": "to continue:",
           "confirm": "Unlink property",
@@ -279,48 +279,48 @@
         "toast": {
           "success": {
             "title": "Success!",
-            "message": "Work item type deleted successfully."
+            "message": "Project task type deleted successfully."
           },
           "error": {
             "title": "Error!",
-            "message": "Failed to delete work item type. Please try again!"
+            "message": "Failed to delete project task type. Please try again!"
           }
         },
         "errors": {
-          "cannot_delete_default_work_item_type": "Cannot delete default work item type",
-          "cannot_delete_work_item_type_with_associated_work_items": "Cannot delete work item type with associated work items"
+          "cannot_delete_default_work_item_type": "Cannot delete default project task type",
+          "cannot_delete_work_item_type_with_associated_work_items": "Cannot delete project task type with associated project tasks"
         }
       }
     },
     "create": {
-      "title": "Create work item type",
-      "button": "Add work item type",
+      "title": "Create project task type",
+      "button": "Add project task type",
       "toast": {
         "success": {
           "title": "Success!",
-          "message": "Work item type created successfully."
+          "message": "Project task type created successfully."
         },
         "error": {
           "title": "Error!",
           "message": {
-            "default": "Failed to create work item type. Please try again!",
+            "default": "Failed to create project task type. Please try again!",
             "conflict": "{name} type already exists. Choose a different name."
           }
         }
       }
     },
     "update": {
-      "title": "Update work item type",
-      "button": "Update work item type",
+      "title": "Update project task type",
+      "button": "Update project task type",
       "toast": {
         "success": {
           "title": "Success!",
-          "message": "Work item type {name} updated successfully."
+          "message": "Project task type {name} updated successfully."
         },
         "error": {
           "title": "Error!",
           "message": {
-            "default": "Failed to update work item type. Please try again!",
+            "default": "Failed to update project task type. Please try again!",
             "conflict": "{name} type already exists. Choose a different name."
           }
         }
@@ -329,30 +329,30 @@
     "create_update": {
       "form": {
         "name": {
-          "placeholder": "Give this work item type a unique name"
+          "placeholder": "Give this project task type a unique name"
         },
         "description": {
-          "placeholder": "Describe what this work item type is meant for and when it's to be used."
+          "placeholder": "Describe what this project task type is meant for and when it's to be used."
         }
       }
     },
     "enable_disable": {
       "toast": {
-        "loading": "{action} {name} work item type",
+        "loading": "{action} {name} project task type",
         "success": {
           "title": "Success!",
-          "message": "Work item type {name} {action} successfully."
+          "message": "Project task type {name} {action} successfully."
         },
         "error": {
           "title": "Error!",
-          "message": "Failed to {action} work item type. Please try again!"
+          "message": "Failed to {action} project task type. Please try again!"
         }
       },
       "tooltip": "Click to {action}"
     },
     "change_confirmation": {
-      "title": "Change work item type?",
-      "description": "Changing the work item type may result in loss of custom property values that are specific to the current type. This action cannot be undone.",
+      "title": "Change project task type?",
+      "description": "Changing the project task type may result in loss of custom property values that are specific to the current type. This action cannot be undone.",
       "button": {
         "loading": "Changing",
         "default": "Change type"
@@ -360,14 +360,14 @@
     },
     "empty_state": {
       "enable": {
-        "title": "Enable Work item Types",
-        "description": "Shape work items to your work with Work item types. Customize with icons, backgrounds, and properties and configure them for this project.",
+        "title": "Enable Project task Types",
+        "description": "Shape project tasks to your work with Project task types. Customize with icons, backgrounds, and properties and configure them for this project.",
         "primary_button": {
           "text": "Enable"
         },
         "confirmation": {
-          "title": "Once enabled, Work item Types can't be disabled.",
-          "description": "Plane's Work Item will become the default work item type for this project and will show up with its icon and background in this project.",
+          "title": "Once enabled, Project task Types can't be disabled.",
+          "description": "Plane's Project Task will become the default project task type for this project and will show up with its icon and background in this project.",
           "button": {
             "default": "Enable",
             "loading": "Setting up"
@@ -375,15 +375,15 @@
         }
       },
       "get_pro": {
-        "title": "Get Pro to enable Work item types.",
-        "description": "Shape work items to your work with Work item types. Customize with icons, backgrounds, and properties and configure them for this project.",
+        "title": "Get Pro to enable Project task types.",
+        "description": "Shape project tasks to your work with Project task types. Customize with icons, backgrounds, and properties and configure them for this project.",
         "primary_button": {
           "text": "Get Pro"
         }
       },
       "upgrade": {
-        "title": "Upgrade to enable Work item types.",
-        "description": "Shape work items to your work with Work item types. Customize with icons, backgrounds, and properties and configure them for this project.",
+        "title": "Upgrade to enable Project task types.",
+        "description": "Shape project tasks to your work with Project task types. Customize with icons, backgrounds, and properties and configure them for this project.",
         "primary_button": {
           "text": "Upgrade"
         }
@@ -398,17 +398,17 @@
       "sidebar_label": "Hierarchy",
       "enable_control": {
         "title": "Enable hierarchy",
-        "description": "Create parent-child relationships between different work item types.",
+        "description": "Create parent-child relationships between different project task types.",
         "tooltip": "You cannot disable hierarchy once it is enabled."
       },
       "workspace_work_item_types_disabled_banner": {
-        "content": "Define Work Item Types first to create a new hierarchy.",
-        "cta": "Work item types settings"
+        "content": "Define Project Task Types first to create a new hierarchy.",
+        "cta": "Project task types settings"
       }
     },
     "levels": {
       "max_level_placeholder": "Drag and drop type to add a new hierarchy level",
-      "empty_level_placeholder": "Drag and drop a work item type to level {level}",
+      "empty_level_placeholder": "Drag and drop a project task type to level {level}",
       "drag_tooltip": "Drag to change level",
       "quick_actions": {
         "set_as_default": {
@@ -437,11 +437,11 @@
     "break_hierarchy_modal": {
       "title": "Validation error!",
       "content": {
-        "intro": "Work item type {workItemTypeName} has:",
-        "parent_items": "{count, plural, one {parent work item} other {parent work items}}",
-        "child_items": "{count, plural, one {sub-work item} other {sub-work items}}",
+        "intro": "Project task type {workItemTypeName} has:",
+        "parent_items": "{count, plural, one {parent project task} other {parent project tasks}}",
+        "child_items": "{count, plural, one {sub-task} other {sub-tasks}}",
         "parent_line_suffix_when_also_children": ", and ",
-        "footer": "This change will remove parent and child relationships from existing work items of {workItemTypeName} work item type."
+        "footer": "This change will remove parent and child relationships from existing project tasks of {workItemTypeName} project task type."
       },
       "confirm_input": {
         "label": "Type in \"Confirm\" to continue.",
@@ -459,18 +459,18 @@
     "work_item_modal": {
       "invalid_work_item_type_create_toast": {
         "title": "Error!",
-        "message": "The selected work item type cannot be used to create a new work item since it breaks the hierarchy rules."
+        "message": "The selected project task type cannot be used to create a new project task since it breaks the hierarchy rules."
       },
       "invalid_work_item_type_update_toast": {
         "title": "Error!",
-        "message": "Work item type cannot be updated since it breaks the hierarchy rules."
+        "message": "Project task type cannot be updated since it breaks the hierarchy rules."
       }
     },
     "work_item_type_modal": {
       "level": "Hierarchy level",
       "invalid_level_toast": {
         "title": "Error!",
-        "message": "Work item type cannot be updated since it breaks the hierarchy rules."
+        "message": "Project task type cannot be updated since it breaks the hierarchy rules."
       }
     }
   }

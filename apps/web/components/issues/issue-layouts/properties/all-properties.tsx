@@ -29,6 +29,7 @@ import {
 import { CycleSelect } from "@/components/dropdowns/cycle/cycle-select";
 import { EstimateSelect } from "@/components/dropdowns/estimate/estimate-select";
 import { MemberSelect } from "@/components/dropdowns/member/member-select";
+import { assigneeGroupUpdate, assigneesUpdate } from "@/components/member-groups/helpers";
 import { ModuleSelect } from "@/components/dropdowns/module/module-select";
 import { PrioritySelect } from "@/components/dropdowns/priority/priority-select";
 import { StateSelect } from "@/components/dropdowns/state/state-select";
@@ -119,7 +120,11 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
   };
 
   const handleAssignee = async (ids: string[]) => {
-    if (updateIssue) await updateIssue(issue.project_id, issue.id, { assignee_ids: ids });
+    if (updateIssue) await updateIssue(issue.project_id, issue.id, assigneesUpdate(ids, issue.assignee_group_id));
+  };
+
+  const handleAssigneeGroup = async (groupId: string | null) => {
+    if (updateIssue) await updateIssue(issue.project_id, issue.id, assigneeGroupUpdate(groupId));
   };
 
   const handleModule = useCallback(
@@ -323,6 +328,7 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
             projectId={issue?.project_id ?? undefined}
             value={issue?.assignee_ids ?? []}
             onChange={handleAssignee}
+            assigneeGroup={{ value: issue.assignee_group_id, onChange: handleAssigneeGroup }}
             disabled={isReadOnly}
             multiple
             variant={issue.assignee_ids?.length ? "avatar-group-sm" : "pill-sm"}

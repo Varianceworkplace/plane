@@ -68,6 +68,7 @@ from plane.bgtasks.issue_activities_task import issue_activity
 from plane.db.models import (
     Issue,
     IssueActivity,
+    IssueAssignee,
     FileAsset,
     IssueComment,
     IssueLink,
@@ -88,6 +89,7 @@ from plane.utils.order_queryset import (
 from plane.bgtasks.storage_metadata_task import get_asset_object_metadata
 from .base import BaseAPIView
 from plane.utils.host import base_host
+from plane.utils.work_item_visibility import all_work_items
 from plane.utils.issue_relation_mapper import get_actual_relation
 from plane.bgtasks.webhook_task import model_activity
 from plane.app.permissions import ROLE
@@ -261,6 +263,9 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
     """
     This viewset provides `list` and `create` on issue level
     """
+
+    # role-based access (plane.utils.work_item_visibility): the action each change needs
+    rbac_work_item_actions = {"POST": "create"}
 
     model = Issue
     webhook_event = "issue"
@@ -493,8 +498,11 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
                 )
 
             serializer.save()
-            # Refetch the issue
-            issue = Issue.objects.filter(workspace__slug=slug, project_id=project_id, pk=serializer.data["id"]).first()
+            # Refetch the issue (also when it was assigned to someone else, so the creator no longer sees it)
+            with all_work_items():
+                issue = Issue.objects.filter(
+                    workspace__slug=slug, project_id=project_id, pk=serializer.data["id"]
+                ).first()
             issue.created_at = request.data.get("created_at", timezone.now())
             issue.created_by_id = request.data.get("created_by", request.user.id)
             issue.save(update_fields=["created_at", "created_by"])
@@ -528,6 +536,9 @@ class IssueListCreateAPIEndpoint(BaseAPIView):
 
 class IssueDetailAPIEndpoint(BaseAPIView):
     """Issue Detail Endpoint"""
+
+    # role-based access (plane.utils.work_item_visibility): the action each change needs
+    rbac_work_item_actions = {"PUT": "edit", "PATCH": "edit", "DELETE": "delete"}
 
     model = Issue
     webhook_event = "issue"
@@ -849,20 +860,25 @@ class IssueDetailAPIEndpoint(BaseAPIView):
         """Delete work item
 
         Permanently delete an existing work item from the project.
-        Only admins or the item creator can perform this action.
+        Only its assignee, an admin or the item creator can perform this action.
         """
         issue = Issue.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
-        if issue.created_by_id != request.user.id and (
-            not ProjectMember.objects.filter(
-                workspace__slug=slug,
-                member=request.user,
-                role=20,
-                project_id=project_id,
-                is_active=True,
-            ).exists()
+        is_assignee = IssueAssignee.objects.filter(issue=issue, assignee=request.user).exists()
+        if (
+            not is_assignee
+            and issue.created_by_id != request.user.id
+            and (
+                not ProjectMember.objects.filter(
+                    workspace__slug=slug,
+                    member=request.user,
+                    role=20,
+                    project_id=project_id,
+                    is_active=True,
+                ).exists()
+            )
         ):
             return Response(
-                {"error": "Only admin or creator can delete the work item"},
+                {"error": "Only the assignee, an admin or the creator can delete the work item"},
                 status=status.HTTP_403_FORBIDDEN,
             )
         current_instance = json.dumps(IssueSerializer(issue).data, cls=DjangoJSONEncoder)
@@ -1117,6 +1133,9 @@ class LabelDetailAPIEndpoint(LabelListCreateAPIEndpoint):
 class IssueLinkListCreateAPIEndpoint(BaseAPIView):
     """Work Item Link List and Create Endpoint"""
 
+    # role-based access (plane.utils.work_item_visibility): changing this is editing the work item
+    rbac_work_item_actions = {"POST": "edit", "PUT": "edit", "PATCH": "edit", "DELETE": "edit"}
+
     serializer_class = IssueLinkSerializer
     model = IssueLink
     permission_classes = [ProjectEntityPermission]
@@ -1220,6 +1239,9 @@ class IssueLinkListCreateAPIEndpoint(BaseAPIView):
 
 class IssueLinkDetailAPIEndpoint(BaseAPIView):
     """Issue Link Detail Endpoint"""
+
+    # role-based access (plane.utils.work_item_visibility): changing this is editing the work item
+    rbac_work_item_actions = {"POST": "edit", "PUT": "edit", "PATCH": "edit", "DELETE": "edit"}
 
     permission_classes = [ProjectEntityPermission]
 
@@ -1810,6 +1832,9 @@ class IssueActivityDetailAPIEndpoint(BaseAPIView):
 class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
     """Issue Attachment List and Create Endpoint"""
 
+    # role-based access (plane.utils.work_item_visibility): changing this is editing the work item
+    rbac_work_item_actions = {"POST": "edit", "PUT": "edit", "PATCH": "edit", "DELETE": "edit"}
+
     serializer_class = IssueAttachmentSerializer
     model = FileAsset
     use_read_replica = True
@@ -2030,6 +2055,9 @@ class IssueAttachmentListCreateAPIEndpoint(BaseAPIView):
 
 class IssueAttachmentDetailAPIEndpoint(BaseAPIView):
     """Issue Attachment Detail Endpoint"""
+
+    # role-based access (plane.utils.work_item_visibility): changing this is editing the work item
+    rbac_work_item_actions = {"POST": "edit", "PUT": "edit", "PATCH": "edit", "DELETE": "edit"}
 
     serializer_class = IssueAttachmentSerializer
     model = FileAsset

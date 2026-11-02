@@ -1,9 +1,9 @@
 {
   "workflows": {
     "workflow_states": {
-      "work_item_creation": "Allow new work items",
-      "work_item_creation_disable_tooltip": "Work item creation is disabled for this state",
-      "default_state": "Default state lets all members create new work items. This can't be changed",
+      "work_item_creation": "Allow new project tasks",
+      "work_item_creation_disable_tooltip": "Project task creation is disabled for this state",
+      "default_state": "Default state lets all members create new project tasks. This can't be changed",
       "state_change_count": "{count, plural, one {1 permitted state change} other {{count} permitted state changes}}",
       "movers_count": "{count, plural, one {1 listed reviewer} other {{count} listed reviewers}}",
       "state_changes": {
@@ -14,19 +14,19 @@
         "move_to": "Change state to",
         "movers": {
           "label": "When reviewed by",
-          "tooltip": "Reviewers are people who are permitted to move work items from one state to another.",
+          "tooltip": "Reviewers are people who are permitted to move project tasks from one state to another.",
           "add": "Add reviewers"
         }
       }
     },
     "workflow_disabled": {
-      "title": "You can't move this work item here."
+      "title": "You can't move this project task here."
     },
     "workflow_enabled": {
       "label": "State change"
     },
     "workflow_tree": {
-      "label": "For work items in",
+      "label": "For project tasks in",
       "state_change_label": "can move it to"
     },
     "empty_state": {

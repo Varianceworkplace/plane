@@ -120,7 +120,7 @@ export const AllIssueLayoutRoot = observer(function AllIssueLayoutRoot(props: Pr
         assetKey="view"
         actions={[
           {
-            label: "Go to All work items",
+            label: "Go to All project tasks",
             onClick: () => router.push(`/${workspaceSlug}/workspace-views/all-issues`),
             variant: "primary",
           },

@@ -33,7 +33,7 @@ export const IssueModuleActivity = observer(function IssueModuleActivity(props: 
       <>
         {activity.verb === "created" ? (
           <>
-            <span>added this work item to the module </span>
+            <span>added this project task to the module </span>
             <a
               href={`/${activity.workspace_detail?.slug}/projects/${activity.project}/modules/${activity.new_identifier}`}
               target="_blank"
@@ -57,7 +57,7 @@ export const IssueModuleActivity = observer(function IssueModuleActivity(props: 
           </>
         ) : (
           <>
-            <span>removed the work item from the module </span>
+            <span>removed the project task from the module </span>
             <a
               href={`/${activity.workspace_detail?.slug}/projects/${activity.project}/modules/${activity.old_identifier}`}
               target="_blank"

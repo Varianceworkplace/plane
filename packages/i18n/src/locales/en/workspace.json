@@ -54,7 +54,7 @@
     "empty_state": {
       "general": {
         "title": "Overview of your projects, activity, and metrics",
-        "description": "Welcome to Plane, we are excited to have you here. Create your first project and track your work items, and this page will transform into a space that helps you progress. Admins will also see items which help their team progress.",
+        "description": "Welcome to Plane, we are excited to have you here. Create your first project and track your project tasks, and this page will transform into a space that helps you progress. Admins will also see items which help their team progress.",
         "primary_button": {
           "text": "Build your first project",
           "comic": {
@@ -70,26 +70,26 @@
     "page_label": "{workspace} - Analytics",
     "open_tasks": "Total open tasks",
     "error": "There was some error in fetching the data.",
-    "work_items_closed_in": "Work items closed in",
+    "work_items_closed_in": "Project tasks closed in",
     "selected_projects": "Selected projects",
     "total_members": "Total members",
     "total_cycles": "Total cycles",
     "total_modules": "Total modules",
     "pending_work_items": {
-      "title": "Pending work items",
-      "empty_state": "Analysis of pending work items by co-workers appears here."
+      "title": "Pending project tasks",
+      "empty_state": "Analysis of pending project tasks by co-workers appears here."
     },
     "work_items_closed_in_a_year": {
-      "title": "Work items closed in a year",
-      "empty_state": "Close work items to view analysis of the same in the form of a graph."
+      "title": "Project tasks closed in a year",
+      "empty_state": "Close project tasks to view analysis of the same in the form of a graph."
     },
     "most_work_items_created": {
-      "title": "Most work items created",
-      "empty_state": "Co-workers and the number of work items created by them appears here."
+      "title": "Most project tasks created",
+      "empty_state": "Co-workers and the number of project tasks created by them appears here."
     },
     "most_work_items_closed": {
-      "title": "Most work items closed",
-      "empty_state": "Co-workers and the number of work items closed by them appears here."
+      "title": "Most project tasks closed",
+      "empty_state": "Co-workers and the number of project tasks closed by them appears here."
     },
     "tabs": {
       "scope_and_demand": "Scope and Demand",
@@ -110,15 +110,15 @@
     "empty_state": {
       "project_insights": {
         "title": "No data yet",
-        "description": "Work items assigned to you, broken down by state, will show up here."
+        "description": "Project tasks assigned to you, broken down by state, will show up here."
       },
       "created_vs_resolved": {
         "title": "No data yet",
-        "description": "Work items created and resolved over time will show up here."
+        "description": "Project tasks created and resolved over time will show up here."
       },
       "customized_insights": {
         "title": "No data yet",
-        "description": "Work items assigned to you, broken down by state, will show up here."
+        "description": "Project tasks assigned to you, broken down by state, will show up here."
       },
       "general": {
         "title": "Track progress, workloads, and allocations. Spot trends, remove blockers, and move work faster",
@@ -133,19 +133,19 @@
       },
       "cycle_progress": {
         "title": "No data yet",
-        "description": "Cycle progress analytics will appear here. Add work items to cycles to start tracking progress."
+        "description": "Cycle progress analytics will appear here. Add project tasks to cycles to start tracking progress."
       },
       "module_progress": {
         "title": "No data yet",
-        "description": "Module progress analytics will appear here. Add work items to modules to start tracking progress."
+        "description": "Module progress analytics will appear here. Add project tasks to modules to start tracking progress."
       },
       "intake_trends": {
         "title": "No data yet",
-        "description": "Intake trends analytics will appear here. Add work items to intake to start tracking trends."
+        "description": "Intake trends analytics will appear here. Add project tasks to intake to start tracking trends."
       }
     },
     "upgrade_to_plan": "Upgrade to {plan} to unlock {tab}",
-    "workitem_resolved_vs_pending": "Work items resolved vs pending",
+    "workitem_resolved_vs_pending": "Project tasks resolved vs pending",
     "projects_by_status": "Projects by status",
     "active_users": "Active users",
     "intake_trends": "Intake Trends"
@@ -170,7 +170,7 @@
       "permission": "You don't have permission to perform this action.",
       "cycle_delete": "Failed to delete cycle",
       "module_delete": "Failed to delete module",
-      "issue_delete": "Failed to delete work item"
+      "issue_delete": "Failed to delete project task"
     },
     "state": {
       "backlog": "Backlog",
@@ -207,7 +207,7 @@
       },
       "no_projects": {
         "title": "No project",
-        "description": "To create work items or manage your work, you need to create a project or be a part of one.",
+        "description": "To create project tasks or manage your work, you need to create a project or be a part of one.",
         "primary_button": {
           "text": "Start your first project",
           "comic": {
@@ -229,33 +229,33 @@
     "add_view": "Add view",
     "empty_state": {
       "all-issues": {
-        "title": "No work items in the project",
-        "description": "First project done! Now, slice your work into trackable pieces with work items. Let's go!",
+        "title": "No project tasks in the project",
+        "description": "First project done! Now, slice your work into trackable pieces with project tasks. Let's go!",
         "primary_button": {
-          "text": "Create new work item"
+          "text": "Create new project task"
         }
       },
       "assigned": {
-        "title": "No work items yet",
-        "description": "Work items assigned to you can be tracked from here.",
+        "title": "No project tasks yet",
+        "description": "Project tasks assigned to you can be tracked from here.",
         "primary_button": {
-          "text": "Create new work item"
+          "text": "Create new project task"
         }
       },
       "created": {
-        "title": "No work items yet",
-        "description": "All work items created by you come here, track them here directly.",
+        "title": "No project tasks yet",
+        "description": "All project tasks created by you come here, track them here directly.",
         "primary_button": {
-          "text": "Create new work item"
+          "text": "Create new project task"
         }
       },
       "subscribed": {
-        "title": "No work items yet",
-        "description": "Subscribe to work items you are interested in, track all of them here."
+        "title": "No project tasks yet",
+        "description": "Subscribe to project tasks you are interested in, track all of them here."
       },
       "custom-view": {
-        "title": "No work items yet",
-        "description": "Work items that applies to the filters, track all of them here."
+        "title": "No project tasks yet",
+        "description": "Project tasks that applies to the filters, track all of them here."
       }
     },
     "delete_view": {
@@ -264,10 +264,10 @@
     }
   },
   "workspace_draft_issues": {
-    "draft_an_issue": "Draft a work item",
+    "draft_an_issue": "Draft a project task",
     "empty_state": {
-      "title": "Half-written work items, and soon, comments will show up here.",
-      "description": "To try this out, start adding a work item and leave it mid-way or create your first draft below. 😉",
+      "title": "Half-written project tasks, and soon, comments will show up here.",
+      "description": "To try this out, start adding a project task and leave it mid-way or create your first draft below. 😉",
       "primary_button": {
         "text": "Create your first draft"
       }
@@ -279,7 +279,7 @@
     "toasts": {
       "created": {
         "success": "Draft created",
-        "error": "Work item could not be created. Please try again."
+        "error": "Project task could not be created. Please try again."
       },
       "deleted": {
         "success": "Draft deleted"
@@ -290,7 +290,7 @@
     "empty_state": {
       "general": {
         "title": "Write a note, a doc, or a full knowledge base. Get Galileo, Plane's AI assistant, to help you get started",
-        "description": "Pages are thoughts potting space in Plane. Take down meeting notes, format them easily, embed work items, lay them out using a library of components, and keep them all in your project's context. To make short work of any doc, invoke Galileo, Plane's AI, with a shortcut or the click of a button.",
+        "description": "Pages are thoughts potting space in Plane. Take down meeting notes, format them easily, embed project tasks, lay them out using a library of components, and keep them all in your project's context. To make short work of any doc, invoke Galileo, Plane's AI, with a shortcut or the click of a button.",
         "primary_button": {
           "text": "Create your first page"
         }

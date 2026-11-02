@@ -7,7 +7,7 @@
 import { useState } from "react";
 import { observer } from "mobx-react";
 import type { Control } from "react-hook-form";
-import { Controller } from "react-hook-form";
+import { Controller, useController } from "react-hook-form";
 import { Icon as PropelIcon } from "@makeplane/propel/components/icon";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@makeplane/propel/components/menu";
 import { Pill } from "@makeplane/propel/components/pill";
@@ -67,6 +67,8 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
   } = props;
   // states
   const [parentIssueListModalOpen, setParentIssueListModalOpen] = useState(false);
+  // Assigned to holds people or one group (not for drafts, which keep only people)
+  const { field: groupField } = useController({ control, name: "assignee_group_id" });
   // store hooks
   const { t } = useTranslation();
   const { areEstimateEnabledByProjectId } = useProjectEstimates();
@@ -124,21 +126,50 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
       <Controller
         control={control}
         name="assignee_ids"
-        render={({ field: { value, onChange } }) => (
-          <MemberSelect
-            testId="create-work-item-assignee-select"
-            projectId={projectId ?? undefined}
-            value={value}
-            onChange={(assigneeIds) => {
-              onChange(assigneeIds);
-              handleFormChange();
-            }}
-            placeholder={t("assignees")}
-            multiple
-            variant={value?.length ? "avatar-group-md" : "pill-md"}
-            tabIndex={getIndex("assignee_ids")}
-          />
-        )}
+        render={({ field: { value, onChange } }) => {
+          const assigneeGroup = isDraft
+            ? undefined
+            : {
+                value: groupField.value,
+                onChange: (groupId: string | null) => {
+                  groupField.onChange(groupId);
+                  if (groupId) onChange([]);
+                  handleFormChange();
+                },
+              };
+          const setPeople = (assigneeIds: string[]) => {
+            onChange(assigneeIds);
+            if (groupField.value) groupField.onChange(null);
+            handleFormChange();
+          };
+          // projects with task details: one person, the "Assigned To" of the Project Task form
+          return projectDetails?.is_task_details_enabled ? (
+            <MemberSelect
+              testId="create-work-item-assignee-select"
+              projectId={projectId ?? undefined}
+              value={value?.[0] ?? null}
+              onChange={(assigneeId) => setPeople(assigneeId ? [assigneeId] : [])}
+              assigneeGroup={assigneeGroup}
+              placeholder="Assigned to"
+              clearable
+              clearLabel="No assignee"
+              variant="pill-md"
+              tabIndex={getIndex("assignee_ids")}
+            />
+          ) : (
+            <MemberSelect
+              testId="create-work-item-assignee-select"
+              projectId={projectId ?? undefined}
+              value={value}
+              onChange={setPeople}
+              assigneeGroup={assigneeGroup}
+              placeholder={t("assignees")}
+              multiple
+              variant={value?.length ? "avatar-group-md" : "pill-md"}
+              tabIndex={getIndex("assignee_ids")}
+            />
+          );
+        }}
       />
       <Controller
         control={control}

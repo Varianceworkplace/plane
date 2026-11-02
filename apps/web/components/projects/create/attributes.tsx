@@ -13,7 +13,6 @@ import { useTranslation } from "@plane/i18n";
 import type { IProject } from "@plane/types";
 import { getTabIndex } from "@plane/utils";
 // components
-import { MemberSelect } from "@/components/dropdowns/member/member-select";
 import { ProjectNetworkIcon } from "@/components/project/project-network-icon";
 
 type Props = {
@@ -62,25 +61,6 @@ function ProjectAttributes(props: Props) {
               </Select.Trigger>
             </Select>
           );
-        }}
-      />
-      <Controller
-        name="project_lead"
-        control={control}
-        render={({ field: { value, onChange } }) => {
-          if (value === undefined || value === null || typeof value === "string")
-            return (
-              <MemberSelect
-                value={value ?? null}
-                // Re-picking the current lead (or clearing it) unsets it, as the legacy picker did.
-                onChange={(lead) => onChange(!lead || lead === value ? null : lead)}
-                placeholder={t("lead")}
-                multiple={false}
-                variant="pill-md"
-                tabIndex={getIndex("lead")}
-              />
-            );
-          else return <></>;
         }}
       />
     </div>

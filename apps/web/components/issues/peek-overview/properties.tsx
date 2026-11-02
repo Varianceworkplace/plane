@@ -10,6 +10,8 @@ import { useTranslation } from "@plane/i18n";
 // ui icons
 import {
   CyclesOutline,
+  MilestoneOutline,
+  TimeTrackingOutline,
   DueDateOutline,
   EstimateOutline,
   LabelsOutline,
@@ -27,9 +29,13 @@ import { cn, getDate, renderFormattedPayloadDate, shouldHighlightIssueDueDate } 
 import { EstimateSelect } from "@/components/dropdowns/estimate/estimate-select";
 import { ButtonAvatars } from "@/components/dropdowns/member/avatar";
 import { MemberSelect } from "@/components/dropdowns/member/member-select";
+import { assigneeGroupUpdate, assigneesUpdate } from "@/components/member-groups/helpers";
 import { PrioritySelect } from "@/components/dropdowns/priority/priority-select";
 import { StateSelect } from "@/components/dropdowns/state/state-select";
 import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
+import { WorkItemMilestoneSelect } from "@/components/milestones/work-item-milestone-select";
+import { WorkItemTaskDetails } from "@/components/task-details/work-item-task-details";
+import { WorkItemTimeEstimate } from "@/components/worklogs/time-estimate";
 // helpers
 import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useMember } from "@/hooks/store/use-member";
@@ -92,20 +98,62 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
           />
         </SidebarPropertyListItem>
 
-        <SidebarPropertyListItem icon={MembersOutline} label={t("common.assignees")}>
-          <MemberSelect
-            testId="work-item-assignee-select"
-            value={issue?.assignee_ids ?? []}
-            onChange={(val) => issueOperations.update(workspaceSlug, projectId, issueId, { assignee_ids: val })}
-            disabled={disabled}
-            projectId={projectId}
-            placeholder={t("issue.add.assignee")}
-            multiple
-            variant="select-ghost-md"
-            showLabel={(issue?.assignee_ids?.length ?? 0) <= 1}
-            tooltip={{ heading: t("common.assignees") }}
-          />
-        </SidebarPropertyListItem>
+        {projectDetails?.is_task_details_enabled ? (
+          // one person, the "Assigned To" of the Project Task form
+          <SidebarPropertyListItem icon={MembersOutline} label="Assigned to">
+            <MemberSelect
+              testId="work-item-assignee-select"
+              value={issue?.assignee_ids?.[0] ?? null}
+              onChange={(val) =>
+                issueOperations.update(
+                  workspaceSlug,
+                  projectId,
+                  issueId,
+                  assigneesUpdate(val ? [val] : [], issue?.assignee_group_id)
+                )
+              }
+              assigneeGroup={{
+                value: issue?.assignee_group_id,
+                onChange: (groupId) =>
+                  issueOperations.update(workspaceSlug, projectId, issueId, assigneeGroupUpdate(groupId)),
+              }}
+              disabled={disabled}
+              projectId={projectId}
+              placeholder={t("issue.add.assignee")}
+              clearable
+              clearLabel="No assignee"
+              variant="select-ghost-md"
+              tooltip={{ heading: "Assigned to" }}
+            />
+          </SidebarPropertyListItem>
+        ) : (
+          <SidebarPropertyListItem icon={MembersOutline} label={t("common.assignees")}>
+            <MemberSelect
+              testId="work-item-assignee-select"
+              value={issue?.assignee_ids ?? []}
+              onChange={(val) =>
+                issueOperations.update(
+                  workspaceSlug,
+                  projectId,
+                  issueId,
+                  assigneesUpdate(val, issue?.assignee_group_id)
+                )
+              }
+              assigneeGroup={{
+                value: issue?.assignee_group_id,
+                onChange: (groupId) =>
+                  issueOperations.update(workspaceSlug, projectId, issueId, assigneeGroupUpdate(groupId)),
+              }}
+              disabled={disabled}
+              projectId={projectId}
+              placeholder={t("issue.add.assignee")}
+              multiple
+              variant="select-ghost-md"
+              showLabel={(issue?.assignee_ids?.length ?? 0) <= 1}
+              tooltip={{ heading: t("common.assignees") }}
+            />
+          </SidebarPropertyListItem>
+        )}
 
         <SidebarPropertyListItem icon={PriorityOutline} label={t("common.priority")}>
           <PrioritySelect
@@ -215,6 +263,29 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
           </SidebarPropertyListItem>
         )}
 
+        {projectDetails?.is_milestone_enabled && (
+          <SidebarPropertyListItem icon={MilestoneOutline} label="Milestone" appendElement={null}>
+            <WorkItemMilestoneSelect
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              issueId={issueId}
+              dueDate={issue.target_date}
+              disabled={disabled}
+            />
+          </SidebarPropertyListItem>
+        )}
+
+        {projectDetails?.is_time_tracking_enabled && (
+          <SidebarPropertyListItem icon={TimeTrackingOutline} label="Time spent" appendElement={null}>
+            <WorkItemTimeEstimate
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              issueId={issueId}
+              disabled={disabled}
+            />
+          </SidebarPropertyListItem>
+        )}
+
         <SidebarPropertyListItem icon={ParentOutline} label={t("common.parent")}>
           <IssueParentSelectRoot
             className="h-7.5 w-full grow"
@@ -229,6 +300,15 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
         <SidebarPropertyListItem icon={LabelsOutline} label={t("common.labels")}>
           <IssueLabel workspaceSlug={workspaceSlug} projectId={projectId} issueId={issueId} disabled={disabled} />
         </SidebarPropertyListItem>
+
+        {projectDetails?.is_task_details_enabled && (
+          <WorkItemTaskDetails
+            workspaceSlug={workspaceSlug}
+            projectId={projectId}
+            issueId={issueId}
+            disabled={disabled}
+          />
+        )}
       </div>
     </div>
   );

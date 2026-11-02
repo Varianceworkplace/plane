@@ -16,6 +16,8 @@ import { AddOutline } from "@makeplane/propel/icons";
 import { setPromiseToast } from "@plane/blocks/toast";
 import type { IProject, TIssue, EIssueLayoutTypes } from "@plane/types";
 import { cn, createIssuePayload } from "@plane/utils";
+// hooks
+import { useUserPermissions } from "@/hooks/store/user";
 // local imports
 import { QuickAddIssueFormRoot } from "./form";
 import { useCreateIssueToastActions } from "../../create-issue-toast-action-items";
@@ -67,6 +69,7 @@ export const QuickAddIssueRoot = observer(function QuickAddIssueRoot(props: TQui
   const { t } = useTranslation();
   // router
   const { workspaceSlug, projectId } = useParams();
+  const { canCreateWorkItem } = useUserPermissions();
   // propel: toast actions cross the boundary as data, never as JSX
   const buildCreateIssueToastActions = useCreateIssueToastActions();
   // states
@@ -130,7 +133,8 @@ export const QuickAddIssueRoot = observer(function QuickAddIssueRoot(props: TQui
     }
   };
 
-  if (!projectId) return null;
+  // role-based access: only where the person may create work items
+  if (!projectId || !canCreateWorkItem(projectId.toString())) return null;
 
   return (
     <div

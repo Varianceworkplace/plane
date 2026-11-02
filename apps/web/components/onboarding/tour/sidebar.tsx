@@ -17,7 +17,7 @@ const sidebarOptions: {
 }[] = [
   {
     key: "work-items",
-    label: "Work items",
+    label: "Project tasks",
     Icon: WorkItemsOutline,
   },
   {

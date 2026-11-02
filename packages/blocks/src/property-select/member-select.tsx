@@ -9,7 +9,7 @@ import { Avatar } from "@makeplane/propel/components/avatar";
 import { AvatarGroup } from "@makeplane/propel/components/avatar-group";
 import type { AvatarGroupSize } from "@makeplane/propel/components/avatar-group";
 import { Badge } from "@makeplane/propel/components/badge";
-import { AssigneeOutline, DeactivatedUserOutline, UserAltOutline } from "@makeplane/propel/icons";
+import { AssigneeOutline, DeactivatedUserOutline, TeamspacesOutline, UserAltOutline } from "@makeplane/propel/icons";
 import type { TPaginatedResponse } from "@plane/types";
 import { Select } from "../select/select";
 import type { SelectPaginationParams, SelectTooltip, SelectTriggerSize, SelectVariant } from "../select/types";
@@ -32,6 +32,11 @@ export type MemberOption = {
    * keeps an enabled row so the selection can still be removed, and the trigger shows them as usual.
    */
   suspended?: boolean;
+  /**
+   * A group of members (e.g. "PHP Group") offered next to the people, as a work item's Assigned to can be: a group
+   * glyph instead of a face, and the trigger shows its name whatever the variant.
+   */
+  isGroup?: boolean;
 };
 
 export type MemberSelectVariant = SelectVariant | `avatar-group-${SelectTriggerSize}`;
@@ -86,6 +91,10 @@ export const MAX_TRIGGER_AVATARS = 3;
 
 /** Id for the "No assignee" clear option — an empty string maps to `null` via `val || null`. */
 const CLEAR_OPTION_ID = "";
+
+function GroupGlyph(props: { className?: string }) {
+  return <TeamspacesOutline className={cn("h-3.5 w-3.5 shrink-0 text-secondary", props.className)} />;
+}
 
 /** Initials must not see labels like " (you)" — Propel uses first+last whitespace tokens. */
 function memberAvatarAlt(member: MemberOption): string {
@@ -238,6 +247,10 @@ export function MemberSelect(props: MemberSelectProps) {
         <span className={OPTION_ICON_SLOT_CLASSNAME}>
           <DeactivatedUserOutline className="h-3.5 w-3.5 text-placeholder" />
         </span>
+      ) : member.isGroup ? (
+        <span className={OPTION_ICON_SLOT_CLASSNAME}>
+          <GroupGlyph />
+        </span>
       ) : (
         <span className={OPTION_ICON_SLOT_CLASSNAME}>
           <Avatar alt={memberAvatarAlt(member)} src={member.avatar_url ?? ""} size="xs" />
@@ -249,7 +262,11 @@ export function MemberSelect(props: MemberSelectProps) {
       member.suspended ? <Badge variant="neutral" size="xs" label={suspendedLabel} /> : undefined,
     renderChip: (member: MemberOption) => (
       <>
-        <Avatar alt={memberAvatarAlt(member)} src={member.avatar_url ?? ""} size="2xs" />
+        {member.isGroup ? (
+          <GroupGlyph className="h-3 w-3" />
+        ) : (
+          <Avatar alt={memberAvatarAlt(member)} src={member.avatar_url ?? ""} size="2xs" />
+        )}
         <span className="min-w-0 truncate">{member.display_name}</span>
       </>
     ),
@@ -269,28 +286,39 @@ export function MemberSelect(props: MemberSelectProps) {
       label={(members) => triggerLabel(members, showCountOnMultiple, placeholder)}
       tooltip={tooltip}
     >
-      {(members) => (
-        <>
-          {members.length > 0 && (
-            <span
-              className={cn("flex items-center gap-1", !(showLabel && (members.length > 0 || !!placeholder)) && "grow")}
-            >
-              {/* Resolve one more than `MAX_TRIGGER_AVATARS` so `AvatarGroup` can render the real extra face
+      {(members) =>
+        members.length === 1 && members[0]?.isGroup ? (
+          // a group: its glyph and name, also where people show as faces only
+          <span className="flex min-w-0 grow items-center gap-1">
+            <GroupGlyph />
+            <span className="min-w-0 truncate text-left">{members[0].display_name}</span>
+          </span>
+        ) : (
+          <>
+            {members.length > 0 && (
+              <span
+                className={cn(
+                  "flex items-center gap-1",
+                  !(showLabel && (members.length > 0 || !!placeholder)) && "grow"
+                )}
+              >
+                {/* Resolve one more than `MAX_TRIGGER_AVATARS` so `AvatarGroup` can render the real extra face
                   instead of a "+1" chip when `total` is exactly `max + 1`; `total` covers the rest. */}
-              <AvatarGroup size={avatarSize} max={MAX_TRIGGER_AVATARS} total={members.length}>
-                {members.slice(0, MAX_TRIGGER_AVATARS + 1).map((member) => (
-                  <Avatar key={member.id} alt={memberAvatarAlt(member)} src={member.avatar_url ?? ""} />
-                ))}
-              </AvatarGroup>
-            </span>
-          )}
-          {showLabel && (members.length > 0 || !!placeholder) && (
-            <span className="min-w-0 grow truncate text-left">
-              {triggerLabel(members, showCountOnMultiple, placeholder)}
-            </span>
-          )}
-        </>
-      )}
+                <AvatarGroup size={avatarSize} max={MAX_TRIGGER_AVATARS} total={members.length}>
+                  {members.slice(0, MAX_TRIGGER_AVATARS + 1).map((member) => (
+                    <Avatar key={member.id} alt={memberAvatarAlt(member)} src={member.avatar_url ?? ""} />
+                  ))}
+                </AvatarGroup>
+              </span>
+            )}
+            {showLabel && (members.length > 0 || !!placeholder) && (
+              <span className="min-w-0 grow truncate text-left">
+                {triggerLabel(members, showCountOnMultiple, placeholder)}
+              </span>
+            )}
+          </>
+        )
+      }
     </Select.Trigger>
   );
 

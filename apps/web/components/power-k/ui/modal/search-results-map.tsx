@@ -65,7 +65,7 @@ export const POWER_K_SEARCH_RESULTS_GROUPS_MAP: Record<TPowerKSearchResultsKeys,
         projectIdentifier: workItem.project__identifier,
         sequenceId: workItem?.sequence_id,
       }),
-    title: "Work items",
+    title: "Project tasks",
   },
   issue_view: {
     icon: WorkItemsOutline,

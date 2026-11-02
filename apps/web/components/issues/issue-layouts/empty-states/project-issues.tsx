@@ -24,14 +24,13 @@ export const ProjectEmptyState = observer(function ProjectEmptyState() {
   const { t } = useTranslation();
   // store hooks
   const { toggleCreateIssueModal } = useCommandPalette();
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canCreateWorkItem } = useUserPermissions();
   // derived values
   const projectWorkItemFilter = useWorkItemFilterInstance(EIssuesStoreType.PROJECT, projectId);
 
-  const canPerformEmptyStateActions = allowPermissions(
-    [EUserProjectRoles.ADMIN, EUserProjectRoles.MEMBER],
-    EUserPermissionsLevel.PROJECT
-  );
+  const canPerformEmptyStateActions =
+    allowPermissions([EUserProjectRoles.ADMIN, EUserProjectRoles.MEMBER], EUserPermissionsLevel.PROJECT) &&
+    canCreateWorkItem(projectId);
 
   return (
     <div className="relative h-full w-full overflow-y-auto">

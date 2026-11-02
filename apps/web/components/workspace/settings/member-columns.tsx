@@ -122,7 +122,7 @@ export const AccountTypeColumn = observer(function AccountTypeColumn(props: Acco
   // form info
   const { control } = useForm();
   // store hooks
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canChangeMemberRole } = useUserPermissions();
 
   const {
     workspace: { updateMember },
@@ -132,7 +132,12 @@ export const AccountTypeColumn = observer(function AccountTypeColumn(props: Acco
   // derived values
   const isCurrentUser = currentUser?.id === rowData.member.id;
   const isAdminRole = allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE);
-  const isRoleNonEditable = isCurrentUser || !isAdminRole;
+  // HR and PMs (Employees and members › Edit) switch the people it reaches between Member and Guest; Admin stays
+  // with workspace admins
+  const canChangeRole =
+    isAdminRole || (rowData.role !== EUserPermissions.ADMIN && canChangeMemberRole(rowData.member.id, workspaceSlug));
+  const roleOptions = isAdminRole ? ROLE_OPTIONS : ROLE_OPTIONS.filter((role) => role.key !== EUserPermissions.ADMIN);
+  const isRoleNonEditable = isCurrentUser || !canChangeRole;
   const isSuspended = rowData.is_active === false;
 
   return (
@@ -169,7 +174,7 @@ export const AccountTypeColumn = observer(function AccountTypeColumn(props: Acco
                     });
                   });
                 }}
-                getValues={() => ROLE_OPTIONS}
+                getValues={() => roleOptions}
                 getOptionValue={(role) => String(role.key)}
                 getOptionLabel={(role) => role.label}
                 showSearch={false}

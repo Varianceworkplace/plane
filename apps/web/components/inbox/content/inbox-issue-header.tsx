@@ -324,14 +324,14 @@ export const InboxIssueActionsHeader = observer(function InboxIssueActionsHeader
                 variant="secondary"
                 size="md"
                 icon={<Icon icon={ChevronUpOutline} />}
-                aria-label="Previous work item"
+                aria-label="Previous project task"
                 onClick={() => handleInboxIssueNavigation("prev")}
               />
               <IconButton
                 variant="secondary"
                 size="md"
                 icon={<Icon icon={ChevronDownOutline} />}
-                aria-label="Next work item"
+                aria-label="Next project task"
                 onClick={() => handleInboxIssueNavigation("next")}
               />
             </div>
@@ -435,7 +435,7 @@ export const InboxIssueActionsHeader = observer(function InboxIssueActionsHeader
                             handleActionWithPermission(
                               isProjectAdmin,
                               () => setSelectDuplicateIssue(true),
-                              "Only project admins can mark work item as duplicate"
+                              "Only project admins can mark project task as duplicate"
                             )
                           }
                         />

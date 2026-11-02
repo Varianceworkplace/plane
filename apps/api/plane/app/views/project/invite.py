@@ -35,6 +35,7 @@ from plane.db.models import (
 )
 from plane.db.models.project import ProjectNetwork
 from plane.utils.host import base_host
+from plane.utils.rbac import rbac_profile
 
 
 class ProjectInvitationsViewset(BaseViewSet):
@@ -147,6 +148,31 @@ class UserProjectInvitationsViewset(BaseViewSet):
 
         workspace_role = workspace_member.role
         workspace = workspace_member.workspace
+
+        # role-based access: only projects the person's roles let them see, and only to view (as a guest);
+        # HR and PMs are made members of the projects they manage automatically
+        profile = rbac_profile(request, slug)
+        if profile is not None:
+            visible = set(
+                Project.objects.filter(pk__in=[p.id for p in projects])
+                .filter(profile.project_q("view"))
+                .values_list("id", flat=True)
+            )
+            if any(project.id not in visible for project in projects):
+                return Response(
+                    {"error": "Your role doesn't allow you to join this project"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            # people who can't manage a project ask their PM to approve it instead (ProjectJoinRequestEndpoint)
+            editable = set(
+                Project.objects.filter(pk__in=visible).filter(profile.project_q("edit")).values_list("id", flat=True)
+            )
+            if any(project.id not in editable for project in projects):
+                return Response(
+                    {"error": "Your PM has to approve your request to join this project.", "needs_approval": True},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            workspace_role = ROLE.GUEST.value
 
         # Use the workspace-scoped, network-validated project IDs only.
         # Raw project_ids may contain UUIDs from other workspaces; those are

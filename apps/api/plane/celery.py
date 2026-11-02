@@ -47,6 +47,10 @@ app.conf.beat_schedule = {
         "task": "plane.bgtasks.email_notification_task.stack_email_notification",
         "schedule": crontab(minute="*/5"),  # Every 5 minutes
     },
+    "sync-role-based-project-access": {
+        "task": "plane.bgtasks.rbac_sync_task.sync_all_project_access",
+        "schedule": crontab(minute=7),  # hourly: expired project shares lose their memberships
+    },
     "push-instance-metrics": {
         "task": "plane.license.bgtasks.telemetry_metrics.push_instance_metrics",
         "schedule": schedule(run_every=timedelta(minutes=METRICS_PUSH_INTERVAL_MINUTES)),

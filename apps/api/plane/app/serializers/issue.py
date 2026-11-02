@@ -42,11 +42,22 @@ from plane.db.models import (
     IssueDescriptionVersion,
     ProjectMember,
     EstimatePoint,
+    MemberGroup,
+    Project,
 )
 from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
 )
+from plane.utils.task_details import SINGLE_ASSIGNEE_ERROR, has_too_many_assignees
+
+ASSIGNEE_OR_GROUP_ERROR = "Assign the task to a person or to a group, not both."
+
+
+def assigns_group(data, current_group_id=None):
+    """Whether a work item create / update gives it to a (new) group: nobody is notified about that."""
+    group_id = data.get("assignee_group_id") if hasattr(data, "get") else None
+    return bool(group_id) and str(group_id) != str(current_group_id)
 
 
 class IssueFlatSerializer(BaseSerializer):
@@ -97,6 +108,10 @@ class IssueCreateSerializer(BaseSerializer):
         write_only=True,
         required=False,
     )
+    # a group instead of people (plane.db.models.member_group)
+    assignee_group_id = serializers.PrimaryKeyRelatedField(
+        source="assignee_group", queryset=MemberGroup.objects.all(), required=False, allow_null=True
+    )
     project_id = serializers.UUIDField(source="project.id", read_only=True)
     workspace_id = serializers.UUIDField(source="workspace.id", read_only=True)
 
@@ -111,6 +126,7 @@ class IssueCreateSerializer(BaseSerializer):
             "created_at",
             "updated_at",
             "completed_at",
+            "assignee_group",
         ]
 
     def to_representation(self, instance):
@@ -146,6 +162,10 @@ class IssueCreateSerializer(BaseSerializer):
             if not is_valid:
                 raise serializers.ValidationError({"description_binary": "Invalid binary data"})
 
+        # Projects with task details keep a single assignee
+        if has_too_many_assignees(self.context.get("project_id"), attrs.get("assignee_ids")):
+            raise serializers.ValidationError({"assignee_ids": SINGLE_ASSIGNEE_ERROR})
+
         # Validate assignees are from project
         if attrs.get("assignee_ids", []):
             attrs["assignee_ids"] = ProjectMember.objects.filter(
@@ -154,6 +174,18 @@ class IssueCreateSerializer(BaseSerializer):
                 is_active=True,
                 member_id__in=attrs["assignee_ids"],
             ).values_list("member_id", flat=True)
+
+        # A task goes to people or to one group of the workspace (whose members needn't be in the project);
+        # giving it to one takes it away from the other
+        group = attrs.get("assignee_group")
+        if group is not None:
+            if not Project.objects.filter(pk=self.context.get("project_id"), workspace_id=group.workspace_id).exists():
+                raise serializers.ValidationError({"assignee_group_id": "This group belongs to another workspace."})
+            if attrs.get("assignee_ids"):
+                raise serializers.ValidationError({"assignee_group_id": ASSIGNEE_OR_GROUP_ERROR})
+            attrs["assignee_ids"] = []
+        elif attrs.get("assignee_ids"):
+            attrs["assignee_group"] = None
 
         # Validate labels are from project
         if attrs.get("label_ids"):
@@ -229,7 +261,7 @@ class IssueCreateSerializer(BaseSerializer):
                 )
             except IntegrityError:
                 pass
-        else:
+        elif issue.assignee_group_id is None:
             # Then assign it to default assignee, if it is a valid assignee
             if (
                 default_assignee_id is not None
@@ -809,6 +841,7 @@ class IssueSerializer(DynamicBaseSerializer):
             "link_count",
             "is_draft",
             "archived_at",
+            "assignee_group_id",
         ]
         read_only_fields = fields
 
@@ -859,6 +892,7 @@ class IssueListDetailSerializer(serializers.Serializer):
             "updated_by": instance.updated_by_id,
             "is_draft": instance.is_draft,
             "archived_at": instance.archived_at,
+            "assignee_group_id": instance.assignee_group_id,
             # Computed fields
             "cycle_id": instance.cycle_id,
             "module_ids": self.get_module_ids(instance),

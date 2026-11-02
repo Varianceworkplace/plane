@@ -40,6 +40,7 @@ from plane.app.serializers import (
     IssueSerializer,
     ProjectUserPropertySerializer,
 )
+from plane.app.serializers.issue import assigns_group
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.bgtasks.issue_description_version_task import issue_description_version_task
 from plane.bgtasks.recent_visited_task import recent_visited_task
@@ -69,6 +70,7 @@ from plane.utils.grouper import (
     issue_queryset_grouper,
 )
 from plane.utils.host import base_host
+from plane.utils.work_item_visibility import all_work_items
 from plane.utils.issue_filters import issue_filters
 from plane.utils.order_queryset import order_issue_queryset
 from plane.utils.paginator import GroupedOffsetPaginator, SubGroupedOffsetPaginator
@@ -189,6 +191,7 @@ class IssueListEndpoint(BaseAPIView):
                 "module_ids",
                 "label_ids",
                 "assignee_ids",
+                "assignee_group_id",
                 "sub_issues_count",
                 "created_at",
                 "updated_at",
@@ -206,6 +209,9 @@ class IssueListEndpoint(BaseAPIView):
 
 
 class IssueViewSet(BaseViewSet):
+    # role-based access (plane.utils.work_item_visibility): the action each change needs
+    rbac_work_item_actions = {"POST": "create", "PUT": "edit", "PATCH": "edit", "DELETE": "delete"}
+
     model = Issue
     webhook_event = "issue"
     search_fields = ["name"]
@@ -426,47 +432,51 @@ class IssueViewSet(BaseViewSet):
                 project_id=str(project_id),
                 current_instance=None,
                 epoch=int(timezone.now().timestamp()),
-                notification=True,
+                # nobody is notified about a task given to a group
+                notification=not assigns_group(request.data),
                 origin=base_host(request=request, is_app=True),
             )
-            queryset = self.get_queryset()
-            queryset = self.apply_annotations(queryset)
-            issue = (
-                issue_queryset_grouper(
-                    queryset=queryset.filter(pk=serializer.data["id"]),
-                    group_by=None,
-                    sub_group_by=None,
+            # the creator may have assigned it to someone else, and then no longer sees it: still answer with it
+            with all_work_items():
+                queryset = self.get_queryset()
+                queryset = self.apply_annotations(queryset)
+                issue = (
+                    issue_queryset_grouper(
+                        queryset=queryset.filter(pk=serializer.data["id"]),
+                        group_by=None,
+                        sub_group_by=None,
+                    )
+                    .values(
+                        "id",
+                        "name",
+                        "state_id",
+                        "sort_order",
+                        "completed_at",
+                        "estimate_point",
+                        "priority",
+                        "start_date",
+                        "target_date",
+                        "sequence_id",
+                        "project_id",
+                        "parent_id",
+                        "cycle_id",
+                        "module_ids",
+                        "label_ids",
+                        "assignee_ids",
+                        "assignee_group_id",
+                        "sub_issues_count",
+                        "created_at",
+                        "updated_at",
+                        "created_by",
+                        "updated_by",
+                        "attachment_count",
+                        "link_count",
+                        "is_draft",
+                        "archived_at",
+                        "deleted_at",
+                    )
+                    .first()
                 )
-                .values(
-                    "id",
-                    "name",
-                    "state_id",
-                    "sort_order",
-                    "completed_at",
-                    "estimate_point",
-                    "priority",
-                    "start_date",
-                    "target_date",
-                    "sequence_id",
-                    "project_id",
-                    "parent_id",
-                    "cycle_id",
-                    "module_ids",
-                    "label_ids",
-                    "assignee_ids",
-                    "sub_issues_count",
-                    "created_at",
-                    "updated_at",
-                    "created_by",
-                    "updated_by",
-                    "attachment_count",
-                    "link_count",
-                    "is_draft",
-                    "archived_at",
-                    "deleted_at",
-                )
-                .first()
-            )
             datetime_fields = ["created_at", "updated_at"]
             issue = user_timezone_converter(issue, datetime_fields, request.user.user_timezone)
             # Send the model activity
@@ -675,6 +685,8 @@ class IssueViewSet(BaseViewSet):
             return Response({"error": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
 
         current_instance = json.dumps(IssueDetailSerializer(issue).data, cls=DjangoJSONEncoder)
+        # nobody is notified about a task given to a group
+        notification = not assigns_group(request.data, issue.assignee_group_id)
 
         requested_data = json.dumps(self.request.data, cls=DjangoJSONEncoder)
         serializer = IssueCreateSerializer(issue, data=request.data, partial=True, context={"project_id": project_id})
@@ -692,7 +704,7 @@ class IssueViewSet(BaseViewSet):
                     project_id=str(project_id),
                     current_instance=current_instance,
                     epoch=int(timezone.now().timestamp()),
-                    notification=True,
+                    notification=notification,
                     origin=base_host(request=request, is_app=True),
                 )
                 model_activity.delay(
@@ -713,7 +725,8 @@ class IssueViewSet(BaseViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @allow_permission([ROLE.ADMIN], creator=True, model=Issue)
+    # members only reach work items assigned to them (or unassigned ones they created): see work_item_visibility
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], creator=True, model=Issue)
     def destroy(self, request, slug, project_id, pk=None):
         issue = Issue.objects.get(workspace__slug=slug, project_id=project_id, pk=pk)
 
@@ -744,21 +757,11 @@ class ProjectUserDisplayPropertyEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST])
     def patch(self, request, slug, project_id):
         try:
-            issue_property = ProjectUserProperty.objects.get(
-                user=request.user, 
-                project_id=project_id
-            )
+            issue_property = ProjectUserProperty.objects.get(user=request.user, project_id=project_id)
         except ProjectUserProperty.DoesNotExist:
-            issue_property = ProjectUserProperty.objects.create(
-                user=request.user, 
-                project_id=project_id
-            )
+            issue_property = ProjectUserProperty.objects.create(user=request.user, project_id=project_id)
 
-        serializer = ProjectUserPropertySerializer(
-            issue_property, 
-            data=request.data,
-            partial=True
-        )
+        serializer = ProjectUserPropertySerializer(issue_property, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -771,6 +774,9 @@ class ProjectUserDisplayPropertyEndpoint(BaseAPIView):
 
 
 class BulkDeleteIssuesEndpoint(BaseAPIView):
+    # role-based access (plane.utils.work_item_visibility): the action each change needs
+    rbac_work_item_actions = {"DELETE": "delete"}
+
     @allow_permission([ROLE.ADMIN])
     def delete(self, request, slug, project_id):
         issue_ids = request.data.get("issue_ids", [])
@@ -892,6 +898,7 @@ class IssuePaginatedViewSet(BaseViewSet):
             "module_ids",
             "label_ids",
             "assignee_ids",
+            "assignee_group_id",
             "link_count",
             "attachment_count",
             "sub_issues_count",
@@ -1104,6 +1111,9 @@ class IssueDetailEndpoint(BaseAPIView):
 
 
 class IssueBulkUpdateDateEndpoint(BaseAPIView):
+    # role-based access (plane.utils.work_item_visibility): the action each change needs
+    rbac_work_item_actions = {"POST": "edit"}
+
     def validate_dates(self, current_start, current_target, new_start, new_target):
         """
         Validate that start date is before target date.

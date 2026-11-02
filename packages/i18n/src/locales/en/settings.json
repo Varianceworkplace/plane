@@ -45,7 +45,7 @@
     },
     "notifications": {
       "heading": "Email notifications",
-      "description": "Stay in the loop on Work items you are subscribed to. Enable this to get notified.",
+      "description": "Stay in the loop on Project tasks you are subscribed to. Enable this to get notified.",
       "select_default_view": "Select default view",
       "compact": "Compact",
       "full": "Full Screen"
@@ -59,7 +59,7 @@
     },
     "activity": {
       "heading": "Activity",
-      "description": "Track your recent actions and changes across all projects and work items."
+      "description": "Track your recent actions and changes across all projects and project tasks."
     },
     "connections": {
       "title": "Connections",
@@ -78,16 +78,16 @@
     "stats": {
       "workload": "Workload",
       "overview": "Overview",
-      "created": "Work items created",
-      "assigned": "Work items assigned",
-      "subscribed": "Work items subscribed",
+      "created": "Project tasks created",
+      "assigned": "Project tasks assigned",
+      "subscribed": "Project tasks subscribed",
       "state_distribution": {
-        "title": "Work items by state",
-        "empty": "Create work items to view the them by states in the graph for better analysis."
+        "title": "Project tasks by state",
+        "empty": "Create project tasks to view the them by states in the graph for better analysis."
       },
       "priority_distribution": {
-        "title": "Work items by Priority",
-        "empty": "Create work items to view the them by priority in the graph for better analysis."
+        "title": "Project tasks by Priority",
+        "empty": "Create project tasks to view the them by priority in the graph for better analysis."
       },
       "recent_activity": {
         "title": "Recent activity",
@@ -115,19 +115,19 @@
     "empty_state": {
       "activity": {
         "title": "No activities yet",
-        "description": "Get started by creating a new work item! Add details and properties to it. Explore more in Plane to see your activity."
+        "description": "Get started by creating a new project task! Add details and properties to it. Explore more in Plane to see your activity."
       },
       "assigned": {
-        "title": "No work items are assigned to you",
-        "description": "Work items assigned to you can be tracked from here."
+        "title": "No project tasks are assigned to you",
+        "description": "Project tasks assigned to you can be tracked from here."
       },
       "created": {
-        "title": "No work items yet",
-        "description": "All work items created by you come here, track them here directly."
+        "title": "No project tasks yet",
+        "description": "All project tasks created by you come here, track them here directly."
       },
       "subscribed": {
-        "title": "No work items yet",
-        "description": "Subscribe to work items you are interested in, track all of them here."
+        "title": "No project tasks yet",
+        "description": "Subscribe to project tasks you are interested in, track all of them here."
       }
     }
   },

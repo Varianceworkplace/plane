@@ -187,6 +187,36 @@ class TestProjectAPIPost(TestProjectBase):
         assert response.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.django_db
+    @pytest.mark.parametrize("name", ["Verbix-ai", "R&D (2026)", "Plane v2.0", "Sales, Ops + Support", "CRM: Phase 1"])
+    def test_create_project_name_allows_common_punctuation(self, session_client, workspace, create_user, name):
+        """Hyphens, dots, brackets etc. are fine in a project name"""
+        url = self.get_project_url(workspace.slug)
+        response = session_client.post(url, {"name": name, "identifier": "PUNCT"}, format="json")
+
+        assert response.status_code == status.HTTP_201_CREATED, response.data
+        assert Project.objects.get(identifier="PUNCT").name == name
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("name", ["<script>", "Name'quote", "Pay $100", "50% done", "Hi!", "a{b}", "a=b", "a@b"])
+    def test_create_project_name_rejects_unsafe_characters(self, session_client, workspace, create_user, name):
+        """Markup / injection prone characters are still rejected"""
+        url = self.get_project_url(workspace.slug)
+        response = session_client.post(url, {"name": name, "identifier": "UNSAFE"}, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "PROJECT_NAME_CANNOT_CONTAIN_SPECIAL_CHARACTERS" in str(response.data["name"])
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("identifier", ["VER-AI", "V.2", "A(B)"])
+    def test_create_project_identifier_stays_strict(self, session_client, workspace, create_user, identifier):
+        """Identifiers still reject the punctuation names allow"""
+        url = self.get_project_url(workspace.slug)
+        response = session_client.post(url, {"name": "Strict", "identifier": identifier}, format="json")
+
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert "PROJECT_IDENTIFIER_CANNOT_CONTAIN_SPECIAL_CHARACTERS" in str(response.data["identifier"])
+
+    @pytest.mark.django_db
     def test_create_project_missing_required_fields(self, session_client, workspace, create_user):
         """Test validation with missing required fields"""
         url = self.get_project_url(workspace.slug)

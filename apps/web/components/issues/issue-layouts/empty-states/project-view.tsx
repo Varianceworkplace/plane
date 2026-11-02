@@ -28,11 +28,11 @@ export const ProjectViewEmptyState = observer(function ProjectViewEmptyState() {
     // TODO: Add translation
     <EmptyStateDetailed
       assetKey="work-item"
-      title="View work items will appear here"
-      description="Work items help you track individual pieces of work. With work items, keep track of what's going on, who is working on it, and what's done."
+      title="View project tasks will appear here"
+      description="Project tasks help you track individual pieces of work. With project tasks, keep track of what's going on, who is working on it, and what's done."
       actions={[
         {
-          label: "New work item",
+          label: "New project task",
           onClick: () => {
             toggleCreateIssueModal(true, EIssuesStoreType.PROJECT_VIEW);
           },

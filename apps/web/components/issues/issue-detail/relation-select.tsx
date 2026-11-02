@@ -56,7 +56,7 @@ export const IssueRelationSelect = observer(function IssueRelationSelect(props: 
       setToast({
         type: "error",
         title: "Error!",
-        message: "Please select at least one work item.",
+        message: "Please select at least one project task.",
       });
       return;
     }

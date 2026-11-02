@@ -61,7 +61,7 @@ export const TransferIssuesModal = observer(function TransferIssuesModal(props: 
         setToast({
           type: "success",
           title: "Success!",
-          message: "Work items have been transferred successfully",
+          message: "Project tasks have been transferred successfully",
         });
         await getCycleDetails(payload.new_cycle_id);
       })
@@ -69,7 +69,7 @@ export const TransferIssuesModal = observer(function TransferIssuesModal(props: 
         setToast({
           type: "error",
           title: "Error!",
-          message: "Unable to transfer work items. Please try again.",
+          message: "Unable to transfer project tasks. Please try again.",
         });
       });
   };
@@ -117,7 +117,7 @@ export const TransferIssuesModal = observer(function TransferIssuesModal(props: 
             <div className="flex items-center gap-1">
               <TransferWorkItemOutline className="w-5 fill-primary" />
               <DialogHeading>
-                <DialogTitle>Transfer work items</DialogTitle>
+                <DialogTitle>Transfer project tasks</DialogTitle>
               </DialogHeading>
             </div>
           </DialogHeader>
@@ -166,7 +166,7 @@ export const TransferIssuesModal = observer(function TransferIssuesModal(props: 
                   <div className="flex w-full items-center justify-center gap-4 p-5 text-13">
                     <WarningCircleOutline className="h-3.5 w-3.5 text-secondary" />
                     <span className="text-center text-secondary">
-                      You don’t have any current cycle. Please create one to transfer the work items.
+                      You don’t have any current cycle. Please create one to transfer the project tasks.
                     </span>
                   </div>
                 )

@@ -31,6 +31,7 @@ from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
 )
+from plane.utils.task_details import SINGLE_ASSIGNEE_ERROR, has_too_many_assignees
 
 from .base import BaseSerializer
 from .cycle import CycleLiteSerializer, CycleSerializer
@@ -69,7 +70,8 @@ class IssueSerializer(BaseSerializer):
 
     class Meta:
         model = Issue
-        read_only_fields = ["id", "workspace", "project", "updated_by", "updated_at", "completed_at"]
+        # groups are set in the app (Assigned to); here they're only shown
+        read_only_fields = ["id", "workspace", "project", "updated_by", "updated_at", "completed_at", "assignee_group"]
         exclude = ["description_json", "description_stripped"]
 
     def validate(self, data):
@@ -102,6 +104,10 @@ class IssueSerializer(BaseSerializer):
             is_valid, error_msg = validate_binary_data(data["description_binary"])
             if not is_valid:
                 raise serializers.ValidationError({"description_binary": "Invalid binary data"})
+
+        # Projects with task details keep a single assignee
+        if has_too_many_assignees(self.context.get("project_id"), data.get("assignees")):
+            raise serializers.ValidationError({"assignees": SINGLE_ASSIGNEE_ERROR})
 
         # Validate assignees are from project
         if data.get("assignees", []):
@@ -255,6 +261,9 @@ class IssueSerializer(BaseSerializer):
         created_by_id = instance.created_by_id
         updated_by_id = instance.updated_by_id
 
+        if assignees:
+            # assigning people takes the task away from its group
+            validated_data["assignee_group"] = None
         if assignees is not None:
             IssueAssignee.objects.filter(issue=instance).delete()
             try:

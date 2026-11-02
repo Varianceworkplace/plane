@@ -88,5 +88,26 @@ from .label import Label
 from .device import Device, DeviceSession
 
 from .sticky import Sticky
+from .ticket import Ticket, TicketCategory, TicketToolCategory, TicketTrialTested, TICKET_STATUSES, TICKET_PRIORITIES
+from .worklog import IssueTimeEstimate, IssueWorkLog, IssueWorkLogTimer, MAX_WORKLOG_DURATION
+from .task_detail import IssueTaskDetail, TASK_DETAIL_CHOICES, PROGRESS_VALUES
+from .project_detail import ProjectDetail, PROJECT_DETAIL_CHOICES
+from .milestone import Milestone, MilestoneWorkItem, MILESTONE_STATUSES, MILESTONE_TYPES
+from .member_group import MemberGroup, MemberGroupMember
+from .rbac import (
+    AccessGrant,
+    ProjectJoinRequest,
+    ProjectTeam,
+    Role,
+    RolePermission,
+    TeamMember,
+    TeamPermission,
+    UserRole,
+    RBAC_ACTIONS,
+    RBAC_MODULES,
+    RBAC_SCOPES,
+    SYSTEM_ROLES,
+    TEAM_PERMISSION_SCOPES,
+)
 
 from .description import Description, DescriptionVersion

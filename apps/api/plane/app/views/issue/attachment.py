@@ -30,6 +30,9 @@ from plane.utils.host import base_host
 
 
 class IssueAttachmentEndpoint(BaseAPIView):
+    # role-based access (plane.utils.work_item_visibility): changing this is editing the work item
+    rbac_work_item_actions = {"POST": "edit", "PUT": "edit", "PATCH": "edit", "DELETE": "edit"}
+
     serializer_class = IssueAttachmentSerializer
     model = FileAsset
     parser_classes = (MultiPartParser, FormParser)
@@ -93,6 +96,9 @@ class IssueAttachmentEndpoint(BaseAPIView):
 
 
 class IssueAttachmentV2Endpoint(BaseAPIView):
+    # role-based access (plane.utils.work_item_visibility): changing this is editing the work item
+    rbac_work_item_actions = {"POST": "edit", "PUT": "edit", "PATCH": "edit", "DELETE": "edit"}
+
     serializer_class = IssueAttachmentSerializer
     model = FileAsset
 

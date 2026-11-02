@@ -24,6 +24,7 @@ from plane.db.models import (
     UserNotificationPreference,
     ProjectMember,
 )
+from plane.utils.work_item_visibility import who_can_see
 from django.db.models import Subquery
 
 # Third Party imports
@@ -665,6 +666,14 @@ def notifications(
                 new_mentions=new_mentions,
                 removed_mention=removed_mention,
             )
+            # nobody hears (in the app or by email) about a work item they can't see
+            if issue is not None:
+                allowed = who_can_see(
+                    issue,
+                    {n.receiver_id for n in bulk_notifications} | {log.receiver_id for log in bulk_email_logs},
+                )
+                bulk_notifications = [n for n in bulk_notifications if n.receiver_id in allowed]
+                bulk_email_logs = [log for log in bulk_email_logs if log.receiver_id in allowed]
             # Bulk create notifications
             Notification.objects.bulk_create(bulk_notifications, batch_size=100)
             EmailNotificationLog.objects.bulk_create(bulk_email_logs, batch_size=100, ignore_conflicts=True)

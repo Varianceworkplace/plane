@@ -12,6 +12,7 @@ from dateutil.relativedelta import relativedelta
 from django.db.models import (
     Case,
     Count,
+    Exists,
     F,
     Func,
     IntegerField,
@@ -43,6 +44,7 @@ from plane.db.models import (
     CycleIssue,
     Issue,
     IssueActivity,
+    IssueAssignee,
     FileAsset,
     IssueLink,
     IssueSubscriber,
@@ -58,7 +60,8 @@ from plane.utils.grouper import (
     issue_on_results,
     issue_queryset_grouper,
 )
-from plane.utils.issue_filters import issue_filters
+from plane.db.models.member_group import groups_of
+from plane.utils.issue_filters import filter_valid_uuids, issue_filters
 from plane.utils.order_queryset import ACTIVITY_ORDER_BY_ALLOWLIST, order_issue_queryset, sanitize_order_by
 from plane.utils.paginator import GroupedOffsetPaginator, SubGroupedOffsetPaginator
 from plane.utils.filters import ComplexFilterBackend
@@ -138,13 +141,23 @@ class WorkspaceUserProfileIssuesEndpoint(BaseAPIView):
         order_by_param = request.GET.get("order_by", "-created_at")
         issue_queryset = Issue.issue_objects.filter(
             id__in=Issue.issue_objects.filter(
-                Q(assignees__in=[user_id]) | Q(created_by_id=user_id) | Q(issue_subscribers__subscriber_id=user_id),
+                Q(assignees__in=[user_id])
+                | Q(assignee_group__in=groups_of([user_id]))
+                | Q(created_by_id=user_id)
+                | Q(issue_subscribers__subscriber_id=user_id),
                 workspace__slug=slug,
             ).values_list("id", flat=True),
             workspace__slug=slug,
             project__project_projectmember__member=request.user,
             project__project_projectmember__is_active=True,
         )
+        # the "Assigned" tab: assigned to the person, or to a group they're in
+        assigned_to = filter_valid_uuids([request.GET.get("assigned_to", "")])
+        if assigned_to:
+            issue_queryset = issue_queryset.filter(
+                Exists(IssueAssignee.objects.filter(issue_id=OuterRef("pk"), assignee_id=assigned_to[0]))
+                | Q(assignee_group__in=groups_of(assigned_to))
+            )
 
         # Apply filtering from filterset
         issue_queryset = self.filter_queryset(issue_queryset)

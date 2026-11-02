@@ -1,12 +1,12 @@
 {
   "power_k": {
     "actions_commands": {
-      "bulk_delete_work_items": "Bulk delete work items"
+      "bulk_delete_work_items": "Bulk delete project tasks"
     },
     "contextual_actions": {
       "work_item": {
-        "title": "Work item actions",
-        "indicator": "Work item",
+        "title": "Project task actions",
+        "indicator": "Project task",
         "change_state": "Change state",
         "change_priority": "Change priority",
         "change_assignees": "Assign to",
@@ -20,14 +20,14 @@
         "unsubscribe": "Unsubscribe from notifications",
         "delete": "Delete",
         "copy_id": "Copy ID",
-        "copy_id_toast_success": "Work item ID copied to clipboard.",
-        "copy_id_toast_error": "Some error occurred while copying the work item ID to clipboard.",
+        "copy_id_toast_success": "Project task ID copied to clipboard.",
+        "copy_id_toast_error": "Some error occurred while copying the project task ID to clipboard.",
         "copy_title": "Copy title",
-        "copy_title_toast_success": "Work item title copied to clipboard.",
-        "copy_title_toast_error": "Some error occurred while copying the work item title to clipboard.",
+        "copy_title_toast_success": "Project task title copied to clipboard.",
+        "copy_title_toast_error": "Some error occurred while copying the project task title to clipboard.",
         "copy_url": "Copy URL",
-        "copy_url_toast_success": "Work item URL copied to clipboard.",
-        "copy_url_toast_error": "Some error occurred while copying the work item URL to clipboard."
+        "copy_url_toast_success": "Project task URL copied to clipboard.",
+        "copy_url_toast_error": "Some error occurred while copying the project task URL to clipboard."
       },
       "cycle": {
         "title": "Cycle actions",
@@ -66,7 +66,7 @@
       }
     },
     "creation_actions": {
-      "create_work_item": "New work item",
+      "create_work_item": "New project task",
       "create_page": "New page",
       "create_view": "New view",
       "create_cycle": "New cycle",
@@ -83,16 +83,16 @@
       "nav_account_settings": "Go to account settings",
       "open_project": "Open a project",
       "nav_projects_list": "Go to projects list",
-      "nav_all_workspace_work_items": "Go to all work items",
-      "nav_assigned_workspace_work_items": "Go to assigned work items",
-      "nav_created_workspace_work_items": "Go to created work items",
-      "nav_subscribed_workspace_work_items": "Go to subscribed work items",
+      "nav_all_workspace_work_items": "Go to all project tasks",
+      "nav_assigned_workspace_work_items": "Go to assigned project tasks",
+      "nav_created_workspace_work_items": "Go to created project tasks",
+      "nav_subscribed_workspace_work_items": "Go to subscribed project tasks",
       "nav_workspace_analytics": "Go to workspace analytics",
       "nav_workspace_drafts": "Go to workspace drafts",
       "nav_workspace_archives": "Go to workspace archives",
       "open_workspace_setting": "Open a workspace setting",
       "nav_workspace_settings": "Go to workspace settings",
-      "nav_project_work_items": "Go to work items",
+      "nav_project_work_items": "Go to project tasks",
       "open_project_cycle": "Open a cycle",
       "nav_project_cycles": "Go to cycles",
       "open_project_module": "Open a module",

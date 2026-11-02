@@ -17,6 +17,7 @@ import {
 import { useTranslation } from "@plane/i18n";
 import { joinUrlPath } from "@plane/utils";
 // components
+import { useCanViewGroups } from "@/components/member-groups/helpers";
 import { SettingsSidebarItem } from "@/components/settings/sidebar/item";
 // hooks
 import { useUserPermissions } from "@/hooks/store/user";
@@ -28,7 +29,8 @@ export const WorkspaceSettingsSidebarItemCategories = observer(function Workspac
   const { workspaceSlug } = useParams();
   const pathname = usePathname();
   // store hooks
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canManageAccess } = useUserPermissions();
+  const canViewGroups = useCanViewGroups(workspaceSlug);
   // translation
   const { t } = useTranslation();
 
@@ -36,8 +38,13 @@ export const WorkspaceSettingsSidebarItemCategories = observer(function Workspac
     <div className="mt-3 flex flex-col divide-y divide-subtle px-3">
       {WORKSPACE_SETTINGS_CATEGORIES.map((category) => {
         const categoryItems = GROUPED_WORKSPACE_SETTINGS[category];
-        const accessibleItems = categoryItems.filter((item) =>
-          allowPermissions(item.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug)
+        const accessibleItems = categoryItems.filter(
+          (item) =>
+            allowPermissions(item.access, EUserPermissionsLevel.WORKSPACE, workspaceSlug) &&
+            // Access control: workspace admins and people with Role management (HR)
+            (item.key !== "access-control" || canManageAccess(workspaceSlug)) &&
+            // Groups: workspace admins, HR and Project Managers
+            (item.key !== "groups" || canViewGroups)
         );
 
         if (accessibleItems.length === 0) return null;

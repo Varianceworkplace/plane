@@ -63,7 +63,8 @@ class NotificationViewSet(BaseViewSet, BasePaginator):
 
         notifications = (
             Notification.objects.filter(workspace__slug=slug, receiver_id=request.user.id)
-            .filter(entity_name="issue")
+            # work items, and requests to join a project (plane.app.views.rbac.join_request)
+            .filter(entity_name__in=["issue", "project_join_request"])
             .annotate(is_inbox_issue=Exists(intake_issue))
             .annotate(is_intake_issue=Exists(intake_issue))
             .annotate(

@@ -164,7 +164,7 @@ export const CycleIssuesHeader = observer(function CycleIssuesHeader() {
             </Breadcrumbs>
             {workItemsCount && workItemsCount > 0 ? (
               <Tooltip
-                label={`There are ${workItemsCount} ${workItemsCount > 1 ? "work items" : "work item"} in this cycle`}
+                label={`There are ${workItemsCount} ${workItemsCount > 1 ? "project tasks" : "project task"} in this cycle`}
                 layout="stacked"
                 side="bottom"
                 disabled={isMobile}

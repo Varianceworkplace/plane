@@ -12,18 +12,18 @@ export const getRelationActivityContent = (activity: TIssueActivity | undefined)
   switch (activity.field) {
     case "blocking":
       return activity.old_value === ""
-        ? `marked this work item is blocking work item `
-        : `removed the blocking work item `;
+        ? `marked this project task is blocking project task `
+        : `removed the blocking project task `;
     case "blocked_by":
       return activity.old_value === ""
-        ? `marked this work item is being blocked by `
-        : `removed this work item being blocked by work item `;
+        ? `marked this project task is being blocked by `
+        : `removed this project task being blocked by project task `;
     case "duplicate":
       return activity.old_value === ""
-        ? `marked this work item as duplicate of `
-        : `removed this work item as a duplicate of `;
+        ? `marked this project task as duplicate of `
+        : `removed this project task as a duplicate of `;
     case "relates_to":
-      return activity.old_value === "" ? `marked that this work item relates to ` : `removed the relation from `;
+      return activity.old_value === "" ? `marked that this project task relates to ` : `removed the relation from `;
   }
 
   return;

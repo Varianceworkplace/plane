@@ -62,7 +62,7 @@ export const ProjectArchivedIssueDetailsHeader = observer(function ProjectArchiv
             component={
               <BreadcrumbLink
                 href={`/${workspaceSlug}/projects/${projectId}/archives/issues`}
-                label="Work items"
+                label="Project tasks"
                 icon={<WorkItemsOutline className="h-4 w-4 text-tertiary" />}
               />
             }

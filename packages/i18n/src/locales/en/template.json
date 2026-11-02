@@ -2,16 +2,16 @@
   "templates": {
     "settings": {
       "title": "Templates",
-      "description": "Save 80% time spent on creating projects, work items, and pages when you use templates.",
+      "description": "Save 80% time spent on creating projects, project tasks, and pages when you use templates.",
       "new_project_template": "New project template",
-      "new_work_item_template": "New work item template",
+      "new_work_item_template": "New project task template",
       "new_page_template": "New page template",
       "options": {
         "project": {
           "label": "Project templates"
         },
         "work_item": {
-          "label": "Work item templates"
+          "label": "Project task templates"
         },
         "page": {
           "label": "Page templates"
@@ -70,7 +70,7 @@
         "work_item": {
           "template": {
             "name": {
-              "placeholder": "Name your work-item template.",
+              "placeholder": "Name your project task template.",
               "validation": {
                 "required": "Template name is required",
                 "maxLength": "Template name should be less than 255 characters"
@@ -81,18 +81,18 @@
             }
           },
           "name": {
-            "placeholder": "Give this work item a title.",
+            "placeholder": "Give this project task a title.",
             "validation": {
-              "required": "Work item title is required",
-              "maxLength": "Work item title should be less than 255 characters"
+              "required": "Project task title is required",
+              "maxLength": "Project task title should be less than 255 characters"
             }
           },
           "description": {
-            "placeholder": "Describe this work item so its clear what you will accomplish when you complete this."
+            "placeholder": "Describe this project task so its clear what you will accomplish when you complete this."
           },
           "button": {
-            "create": "Create work-item template",
-            "update": "Update work-item template"
+            "create": "Create project task template",
+            "update": "Update project task template"
           }
         },
         "page": {
@@ -227,23 +227,23 @@
     "empty_state": {
       "upgrade": {
         "title": "Templates",
-        "description": "With project, work-item, and page templates in Plane, you don't have to create a project from scratch or set work item props manually.",
+        "description": "With project, project task, and page templates in Plane, you don't have to create a project from scratch or set project task props manually.",
         "sub_description": "Get 80% of your admin time back when you use Templates."
       },
       "no_templates": {
         "button": "Create your first template"
       },
       "no_labels": {
-        "description": "No labels yet. Create labels to help organize and filter work items in you project."
+        "description": "No labels yet. Create labels to help organize and filter project tasks in you project."
       },
       "no_modules": {
         "description": "No modules yet. Organize work into sub-projects with dedicated leads and assignees."
       },
       "no_work_items": {
-        "description": "No work items yet. Add one to structure your work better."
+        "description": "No project tasks yet. Add one to structure your work better."
       },
       "no_sub_work_items": {
-        "description": "No sub-work items yet. Add one to structure your work better."
+        "description": "No sub-tasks yet. Add one to structure your work better."
       },
       "page": {
         "no_templates": {
@@ -322,7 +322,7 @@
         "page": "Choose from template"
       },
       "tooltip": {
-        "work_item": "Pick a work item template"
+        "work_item": "Pick a project task template"
       },
       "no_results": {
         "work_item": "No templates found.",

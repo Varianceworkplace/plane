@@ -35,6 +35,9 @@ from plane.utils.host import base_host
 
 
 class IssueRelationViewSet(BaseViewSet):
+    # role-based access (plane.utils.work_item_visibility): changing this is editing the work item
+    rbac_work_item_actions = {"POST": "edit", "PUT": "edit", "PATCH": "edit", "DELETE": "edit"}
+
     serializer_class = IssueRelationSerializer
     model = IssueRelation
     permission_classes = [ProjectEntityPermission]
@@ -164,6 +167,7 @@ class IssueRelationViewSet(BaseViewSet):
             "project_id",
             "label_ids",
             "assignee_ids",
+            "assignee_group_id",
             "created_at",
             "updated_at",
             "created_by",

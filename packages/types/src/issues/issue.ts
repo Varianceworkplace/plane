@@ -52,6 +52,8 @@ export type TBaseIssue = {
   priority: TIssuePriorities | null;
   label_ids: string[];
   assignee_ids: string[];
+  /** Assigned to a group (Workspace settings › Groups) instead of people: then `assignee_ids` is empty. */
+  assignee_group_id?: string | null;
   estimate_point: string | null;
 
   sub_issues_count: number;

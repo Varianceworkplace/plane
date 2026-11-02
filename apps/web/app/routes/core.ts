@@ -105,6 +105,35 @@ export const coreRoutes: RouteConfigEntry[] = [
           route(":workspaceSlug/stickies", "./(all)/[workspaceSlug]/(projects)/stickies/page.tsx"),
         ]),
 
+        // Tickets (helpdesk)
+        layout("./(all)/[workspaceSlug]/(projects)/tickets/layout.tsx", [
+          route(":workspaceSlug/tickets", "./(all)/[workspaceSlug]/(projects)/tickets/page.tsx"),
+          route(":workspaceSlug/tickets/new", "./(all)/[workspaceSlug]/(projects)/tickets/new/page.tsx"),
+          route(":workspaceSlug/tickets/:ticketId", "./(all)/[workspaceSlug]/(projects)/tickets/[ticketId]/page.tsx"),
+          route(
+            ":workspaceSlug/tickets/:ticketId/edit",
+            "./(all)/[workspaceSlug]/(projects)/tickets/[ticketId]/edit/page.tsx"
+          ),
+        ]),
+
+        // Project Milestones (every project's milestones in one place)
+        layout("./(all)/[workspaceSlug]/(projects)/milestones/layout.tsx", [
+          route(":workspaceSlug/milestones", "./(all)/[workspaceSlug]/(projects)/milestones/page.tsx"),
+          // read-only, for people who aren't in the milestone's project
+          route(
+            ":workspaceSlug/milestones/:milestoneId",
+            "./(all)/[workspaceSlug]/(projects)/milestones/[milestoneId]/page.tsx"
+          ),
+        ]),
+
+        // Reports (worklog charts)
+        layout("./(all)/[workspaceSlug]/(projects)/reports/layout.tsx", [
+          route(
+            ":workspaceSlug/reports/:reportType",
+            "./(all)/[workspaceSlug]/(projects)/reports/[reportType]/page.tsx"
+          ),
+        ]),
+
         // Workspace Views
         layout("./(all)/[workspaceSlug]/(projects)/workspace-views/layout.tsx", [
           route(":workspaceSlug/workspace-views", "./(all)/[workspaceSlug]/(projects)/workspace-views/page.tsx"),
@@ -209,6 +238,20 @@ export const coreRoutes: RouteConfigEntry[] = [
               "./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/pages/(list)/page.tsx"
             ),
           ]),
+          // Milestones
+          route(
+            ":workspaceSlug/projects/:projectId/milestones",
+            "./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/milestones/(list)/page.tsx"
+          ),
+          route(
+            ":workspaceSlug/projects/:projectId/milestones/:milestoneId",
+            "./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/milestones/(detail)/[milestoneId]/page.tsx"
+          ),
+          // Worklogs
+          route(
+            ":workspaceSlug/projects/:projectId/worklogs",
+            "./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/worklogs/page.tsx"
+          ),
           // Intake list
           layout("./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/intake/layout.tsx", [
             route(
@@ -267,6 +310,14 @@ export const coreRoutes: RouteConfigEntry[] = [
             "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/members/page.tsx"
           ),
           route(
+            ":workspaceSlug/settings/access-control",
+            "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/access-control/page.tsx"
+          ),
+          route(
+            ":workspaceSlug/settings/groups",
+            "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/groups/page.tsx"
+          ),
+          route(
             ":workspaceSlug/settings/billing",
             "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/billing/page.tsx"
           ),
@@ -302,6 +353,11 @@ export const coreRoutes: RouteConfigEntry[] = [
               ":workspaceSlug/settings/projects/:projectId/members",
               "./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/members/page.tsx"
             ),
+            // Project Access (role-based access: owning teams, shares)
+            route(
+              ":workspaceSlug/settings/projects/:projectId/access",
+              "./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/access/page.tsx"
+            ),
             // Project Features
             route(
               ":workspaceSlug/settings/projects/:projectId/features/cycles",
@@ -322,6 +378,18 @@ export const coreRoutes: RouteConfigEntry[] = [
             route(
               ":workspaceSlug/settings/projects/:projectId/features/intake",
               "./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/features/intake/page.tsx"
+            ),
+            route(
+              ":workspaceSlug/settings/projects/:projectId/features/time-tracking",
+              "./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/features/time-tracking/page.tsx"
+            ),
+            route(
+              ":workspaceSlug/settings/projects/:projectId/features/milestones",
+              "./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/features/milestones/page.tsx"
+            ),
+            route(
+              ":workspaceSlug/settings/projects/:projectId/features/task-details",
+              "./(all)/[workspaceSlug]/(settings)/settings/projects/[projectId]/features/task-details/page.tsx"
             ),
             // Project States
             route(
@@ -377,6 +445,9 @@ export const coreRoutes: RouteConfigEntry[] = [
 
   // Analytics redirect: /:workspaceSlug/analytics → /:workspaceSlug/analytics/overview
   route(":workspaceSlug/analytics", "routes/redirects/core/analytics.tsx"),
+
+  // Reports redirect: /:workspaceSlug/reports → /:workspaceSlug/reports/project-wise
+  route(":workspaceSlug/reports", "routes/redirects/core/reports.tsx"),
 
   // API tokens redirect: /:workspaceSlug/settings/api-tokens
   // → /settings/profile/api-tokens

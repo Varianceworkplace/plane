@@ -21,6 +21,8 @@ import { setToast } from "@plane/blocks/toast";
 import type { EIssuesStoreType, TIssue } from "@plane/types";
 import type { TContextMenuItem } from "@plane/blocks/context-menu";
 import { copyUrlToClipboard, generateWorkItemLink } from "@plane/utils";
+// hooks
+import { useUserPermissions } from "@/hooks/store/user";
 import { createCopyMenuWithDuplication } from "./copy-menu-helper";
 
 /**
@@ -137,7 +139,7 @@ export const useIssueActionHandlers = (props: MenuItemFactoryProps) => {
       setToast({
         type: "success",
         title: "Link copied",
-        message: "Work item link copied to clipboard",
+        message: "Project task link copied to clipboard",
       })
     );
 
@@ -154,14 +156,14 @@ export const useIssueActionHandlers = (props: MenuItemFactoryProps) => {
         setToast({
           type: "success",
           title: "Restore success",
-          message: "Your work item can be found in project work items.",
+          message: "Your project task can be found in project tasks.",
         });
       })
       .catch(() => {
         setToast({
           type: "error",
           title: "Error!",
-          message: "Work item could not be restored. Please try again.",
+          message: "Project task could not be restored. Please try again.",
         });
       });
   };
@@ -178,13 +180,11 @@ export const useMenuItemFactory = (props: MenuItemFactoryProps) => {
   const { t } = useTranslation();
   const actionHandlers = useIssueActionHandlers(props);
 
+  const { canOnWorkItem, canCreateWorkItem } = useUserPermissions();
+
   const {
     issue,
     activeLayout = "",
-    isEditingAllowed,
-    isArchivingAllowed = false,
-    isDeletingAllowed,
-    isRestoringAllowed = false,
     isInArchivableGroup = false,
     issueTypeDetail,
     setIssueToEdit,
@@ -194,6 +194,13 @@ export const useMenuItemFactory = (props: MenuItemFactoryProps) => {
     setDuplicateWorkItemModal,
     handleRemoveFromView,
   } = props;
+  // role-based access may allow less than the project role
+  const canEdit = canOnWorkItem("edit", issue);
+  const isEditingAllowed = props.isEditingAllowed && canEdit;
+  const isArchivingAllowed = (props.isArchivingAllowed ?? false) && canEdit;
+  const isRestoringAllowed = (props.isRestoringAllowed ?? false) && canEdit;
+  const isDeletingAllowed = props.isDeletingAllowed && canOnWorkItem("delete", issue);
+  const isCopyingAllowed = props.isEditingAllowed && canCreateWorkItem(issue?.project_id);
 
   const createEditMenuItem = (customEditAction?: () => void): TContextMenuItem => ({
     key: "edit",
@@ -216,7 +223,7 @@ export const useMenuItemFactory = (props: MenuItemFactoryProps) => {
       action: () => {
         setCreateUpdateIssueModal(true);
       },
-      shouldRender: isEditingAllowed && (issueTypeDetail?.is_active ?? true),
+      shouldRender: isCopyingAllowed && (issueTypeDetail?.is_active ?? true),
     };
 
     return createCopyMenuWithDuplication({

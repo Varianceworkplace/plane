@@ -40,17 +40,16 @@ export const ProjectCardList = observer(function ProjectCardList(props: TProject
     getProjectById,
   } = useProject();
   const { currentWorkspaceDisplayFilters, currentWorkspaceFilters } = useProjectFilter();
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canAccess } = useUserPermissions();
 
   // derived values
   const workspaceProjectIds = totalProjectIdsProps ?? storeWorkspaceProjectIds;
   const filteredProjectIds = filteredProjectIdsProps ?? storeFilteredProjectIds;
 
   // permissions
-  const canPerformEmptyStateActions = allowPermissions(
-    [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
-    EUserPermissionsLevel.WORKSPACE
-  );
+  const canPerformEmptyStateActions =
+    allowPermissions([EUserPermissions.ADMIN, EUserPermissions.MEMBER], EUserPermissionsLevel.WORKSPACE) &&
+    canAccess("projects", "create");
 
   if (!filteredProjectIds || !workspaceProjectIds || loader === "init-loader" || fetchStatus !== "complete")
     return <ProjectsLoader />;

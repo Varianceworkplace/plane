@@ -22,6 +22,13 @@ from .webhook import urlpatterns as webhook_urls
 from .workspace import urlpatterns as workspace_urls
 from .timezone import urlpatterns as timezone_urls
 from .exporter import urlpatterns as exporter_urls
+from .ticket import urlpatterns as ticket_urls
+from .worklog import urlpatterns as worklog_urls
+from .milestone import urlpatterns as milestone_urls
+from .member_group import urlpatterns as member_group_urls
+from .task_detail import urlpatterns as task_detail_urls
+from .project_detail import urlpatterns as project_detail_urls
+from .rbac import urlpatterns as rbac_urls
 
 urlpatterns = [
     *analytic_urls,
@@ -44,4 +51,11 @@ urlpatterns = [
     *webhook_urls,
     *timezone_urls,
     *exporter_urls,
+    *ticket_urls,
+    *worklog_urls,
+    *milestone_urls,
+    *member_group_urls,
+    *task_detail_urls,
+    *project_detail_urls,
+    *rbac_urls,
 ]

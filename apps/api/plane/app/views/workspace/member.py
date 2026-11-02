@@ -23,8 +23,32 @@ from plane.app.serializers import (
 from plane.app.views.base import BaseAPIView
 from plane.db.models import Project, ProjectMember, WorkspaceMember, DraftIssue
 from plane.utils.cache import invalidate_cache
+from plane.utils.rbac import rbac_profile
 
 from .. import BaseViewSet
+
+
+def role_change_error(request, slug, workspace_member):
+    """Why someone who isn't a workspace admin may not change this member's workspace role, or None.
+
+    With role-based access on, Employees and members › Edit lets them switch the people it reaches (HR: everyone,
+    Project Managers: their team members) between Member and Guest. Making, changing or removing an Admin stays with
+    workspace admins.
+    """
+    profile = rbac_profile(request, slug)
+    if profile is None:
+        return "Only workspace admins can change roles."
+    reached = profile.member_ids("edit")
+    if reached is not None and workspace_member.member_id not in reached:
+        return "You can't change this person's role."
+    if workspace_member.role == ROLE.ADMIN.value:
+        return "Only workspace admins can change an admin's role."
+    if set(request.data) != {"role"} or str(request.data.get("role")) not in (
+        str(ROLE.MEMBER.value),
+        str(ROLE.GUEST.value),
+    ):
+        return "You can only make people Members or Guests."
+    return None
 
 
 class WorkSpaceMemberViewSet(BaseViewSet):
@@ -73,7 +97,7 @@ class WorkSpaceMemberViewSet(BaseViewSet):
             serializer = WorkSpaceMemberSerializer(member, fields=("id", "member", "role"))
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @allow_permission(allowed_roles=[ROLE.ADMIN], level="WORKSPACE")
+    @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def partial_update(self, request, slug, pk):
         workspace_member = WorkspaceMember.objects.get(
             pk=pk, workspace__slug=slug, member__is_bot=False, is_active=True
@@ -83,6 +107,12 @@ class WorkSpaceMemberViewSet(BaseViewSet):
                 {"error": "You cannot update your own role"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if not WorkspaceMember.objects.filter(
+            workspace__slug=slug, member=request.user, role=ROLE.ADMIN.value, is_active=True
+        ).exists():
+            error = role_change_error(request, slug, workspace_member)
+            if error:
+                return Response({"error": error}, status=status.HTTP_403_FORBIDDEN)
 
         # If a user is moved to a guest role he can't have any other role in projects
         if "role" in request.data and int(request.data.get("role")) == 5:

@@ -14,9 +14,22 @@ from django.db import models
 from django.db.models import Q
 
 # Module imports
-from plane.db.mixins import AuditModel
+from plane.db.mixins import AuditModel, SoftDeletionManager
 
 from .base import BaseModel
+
+
+class ProjectManager(SoftDeletionManager):
+    """Default manager: hides the workspace ticket project from all generic project code."""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(is_ticket_project=False)
+
+
+class TicketProjectManager(SoftDeletionManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_ticket_project=True)
+
 
 ROLE_CHOICES = ((20, "Admin"), (15, "Member"), (5, "Guest"))
 
@@ -96,8 +109,13 @@ class Project(BaseModel):
     page_view = models.BooleanField(default=True)
     intake_view = models.BooleanField(default=False)
     is_time_tracking_enabled = models.BooleanField(default=False)
+    is_milestone_enabled = models.BooleanField(default=False)
+    # vTiger-style "Project Task" fields and a single assignee on work items
+    is_task_details_enabled = models.BooleanField(default=False)
     is_issue_type_enabled = models.BooleanField(default=False)
     guest_view_all_features = models.BooleanField(default=False)
+    # Hidden per-workspace project that stores helpdesk tickets (see db/models/ticket.py)
+    is_ticket_project = models.BooleanField(default=False)
     cover_image = models.TextField(blank=True, null=True)
     cover_image_asset = models.ForeignKey(
         "db.FileAsset",
@@ -141,8 +159,15 @@ class Project(BaseModel):
         return f"{self.name} <{self.workspace.name}>"
 
     FORBIDDEN_IDENTIFIER_CHARS_PATTERN = r"^.*[&+,:;$^}{*=?@#|'<>.()%!-].*$"
+    # Names may use everyday punctuation ("Verbix-ai", "R&D (2026)", "v2.0"); only markup / injection
+    # prone characters are rejected. Identifiers keep the stricter set above.
+    FORBIDDEN_NAME_CHARS_PATTERN = r"^.*[;$^}{*=?@#|'<>%!].*$"
+
+    objects = ProjectManager()
+    ticket_projects = TicketProjectManager()
 
     class Meta:
+        default_manager_name = "objects"
         unique_together = [
             ["identifier", "workspace", "deleted_at"],
             ["name", "workspace", "deleted_at"],
@@ -222,6 +247,10 @@ class ProjectMember(ProjectBaseModel):
     preferences = models.JSONField(default=get_default_preferences)
     sort_order = models.FloatField(default=65535)
     is_active = models.BooleanField(default=True)
+    # Role-based access (plane.utils.rbac.sync_project_access): a membership the sync created, removed again when
+    # the access ends; and the role a hand-made membership had before the sync raised it, restored the same way
+    rbac_managed = models.BooleanField(default=False)
+    rbac_original_role = models.PositiveSmallIntegerField(choices=ROLE_CHOICES, null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if self._state.adding and self.member:

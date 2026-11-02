@@ -29,14 +29,13 @@ export const ProjectsBaseHeader = observer(function ProjectsBaseHeader() {
   const { t } = useTranslation();
   // store hooks
   const { toggleCreateProjectModal } = useCommandPalette();
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canAccess } = useUserPermissions();
 
   const pathname = usePathname();
   // auth
-  const isAuthorizedUser = allowPermissions(
-    [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
-    EUserPermissionsLevel.WORKSPACE
-  );
+  const isAuthorizedUser =
+    allowPermissions([EUserPermissions.ADMIN, EUserPermissions.MEMBER], EUserPermissionsLevel.WORKSPACE) &&
+    canAccess("projects", "create");
   const isArchived = pathname.includes("/archives");
 
   return (

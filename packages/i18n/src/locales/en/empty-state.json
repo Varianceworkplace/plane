@@ -2,7 +2,7 @@
   "common_empty_state": {
     "progress": {
       "title": "There're no progress metrics to show yet.",
-      "description": "Start setting property values in work items to see progress metrics here."
+      "description": "Start setting property values in project tasks to see progress metrics here."
     },
     "updates": {
       "title": "No updates yet.",
@@ -36,9 +36,9 @@
       "description": "The project you are looking for does not exist."
     },
     "work_items": {
-      "title": "Start with your first work item.",
-      "description": "Work items are the building blocks of your project — assign owners, set priorities, and track progress easily.",
-      "cta_primary": "Create your first work item"
+      "title": "Start with your first project task.",
+      "description": "Project tasks are the building blocks of your project — assign owners, set priorities, and track progress easily.",
+      "cta_primary": "Create your first project task"
     },
     "cycles": {
       "title": "Group and timebox your work in Cycles.",
@@ -46,21 +46,21 @@
       "cta_primary": "Set your first cycle"
     },
     "cycle_work_items": {
-      "title": "No work items to show in this cycle",
-      "description": "Create work items to begin monitoring your team's progress this cycle and achieve your goals on time.",
-      "cta_primary": "Create work item",
-      "cta_secondary": "Add existing work item"
+      "title": "No project tasks to show in this cycle",
+      "description": "Create project tasks to begin monitoring your team's progress this cycle and achieve your goals on time.",
+      "cta_primary": "Create project task",
+      "cta_secondary": "Add existing project task"
     },
     "modules": {
       "title": "Map your project goals to Modules and track easily.",
-      "description": "Modules are made up of interconnected work items. They assist in monitoring progress through project phases, each with specific deadlines and analytics to indicate how close you are to achieving those phases.",
+      "description": "Modules are made up of interconnected project tasks. They assist in monitoring progress through project phases, each with specific deadlines and analytics to indicate how close you are to achieving those phases.",
       "cta_primary": "Set your first module"
     },
     "module_work_items": {
-      "title": "No work items to show in this Module",
-      "description": "Create work items to begin monitoring this module.",
-      "cta_primary": "Create work item",
-      "cta_secondary": "Add existing work item"
+      "title": "No project tasks to show in this Module",
+      "description": "Create project tasks to begin monitoring this module.",
+      "cta_primary": "Create project task",
+      "cta_secondary": "Add existing project task"
     },
     "views": {
       "title": "Save custom views for your project",
@@ -68,18 +68,18 @@
       "cta_primary": "Create view"
     },
     "no_work_items_in_project": {
-      "title": "No work items in the project yet",
-      "description": "Add work items to your project and slice your work into trackable pieces with views.",
-      "cta_primary": "Add work item"
+      "title": "No project tasks in the project yet",
+      "description": "Add project tasks to your project and slice your work into trackable pieces with views.",
+      "cta_primary": "Add project task"
     },
     "work_item_filter": {
-      "title": "No work items found",
+      "title": "No project tasks found",
       "description": "Your current filter didn't return any results. Try changing the filters.",
-      "cta_primary": "Add work item"
+      "cta_primary": "Add project task"
     },
     "pages": {
       "title": "Document everything — from notes to PRDs",
-      "description": "Pages let you capture and organize information in one place. Write meeting notes, project documentation, and PRDs, embed work items, and structure them with ready-to-use components.",
+      "description": "Pages let you capture and organize information in one place. Write meeting notes, project documentation, and PRDs, embed project tasks, and structure them with ready-to-use components.",
       "cta_primary": "Create your first Page"
     },
     "archive_pages": {
@@ -92,7 +92,7 @@
       "cta_primary": "Create Intake request"
     },
     "intake_main": {
-      "title": "Select an Intake work item to view its details"
+      "title": "Select an Intake project task to view its details"
     },
     "epics": {
       "title": "Turn complex projects into structured epics.",
@@ -101,9 +101,9 @@
       "cta_secondary": "Documentation"
     },
     "epic_work_items": {
-      "title": "You haven't added work items to this epic yet.",
-      "description": "Start by adding some work items to this epic and track them here.",
-      "cta_secondary": "Add work items"
+      "title": "You haven't added project tasks to this epic yet.",
+      "description": "Start by adding some project tasks to this epic and track them here.",
+      "cta_secondary": "Add project tasks"
     }
   },
   "workspace_empty_state": {
@@ -112,8 +112,8 @@
       "description": "You can archive epics that are completed or cancelled. Find them here once archived."
     },
     "archive_work_items": {
-      "title": "No archived work items yet",
-      "description": "Manually or through automation, you can archive work items that are completed or cancelled. Find them here once archived.",
+      "title": "No archived project tasks yet",
+      "description": "Manually or through automation, you can archive project tasks that are completed or cancelled. Find them here once archived.",
       "cta_primary": "Set automation"
     },
     "archive_cycles": {
@@ -128,26 +128,26 @@
       "title": "Keep important references, resources, or docs handy for your work"
     },
     "inbox_sidebar_all": {
-      "title": "Updates for your subscribed work items will appear here"
+      "title": "Updates for your subscribed project tasks will appear here"
     },
     "inbox_sidebar_mentions": {
-      "title": "Mentions for your work items will appear here"
+      "title": "Mentions for your project tasks will appear here"
     },
     "your_work_by_priority": {
-      "title": "No work item assigned yet"
+      "title": "No project task assigned yet"
     },
     "your_work_by_state": {
-      "title": "No work item assigned yet"
+      "title": "No project task assigned yet"
     },
     "views": {
       "title": "No Views yet",
-      "description": "Add work items to your project and use views to filter, sort, and monitor progress effortlessly.",
-      "cta_primary": "Add work item"
+      "description": "Add project tasks to your project and use views to filter, sort, and monitor progress effortlessly.",
+      "cta_primary": "Add project task"
     },
     "drafts": {
-      "title": "Half-written work items",
-      "description": "To try this out, start adding a work item and leave it mid-way or create your first draft below. 😉",
-      "cta_primary": "Create draft work item"
+      "title": "Half-written project tasks",
+      "description": "To try this out, start adding a project task and leave it mid-way or create your first draft below. 😉",
+      "cta_primary": "Create draft project task"
     },
     "projects_archived": {
       "title": "No projects archived",
@@ -157,7 +157,7 @@
       "title": "Create projects to visualize project metrics here."
     },
     "analytics_work_items": {
-      "title": "Create projects with work items and assignees to start tracking performance, progress, and team impact here."
+      "title": "Create projects with project tasks and assignees to start tracking performance, progress, and team impact here."
     },
     "analytics_no_cycle": {
       "title": "Create cycles to organise work into time-bound phases and track progress across sprints."
@@ -188,7 +188,7 @@
     },
     "wiki": {
       "title": "Write a note, a doc, or a full knowledge base.",
-      "description": "Pages are thought spotting space in Plane. Take down meeting notes, format them easily, embed work items, lay them out using a library of components, and keep them all in your project's context.",
+      "description": "Pages are thought spotting space in Plane. Take down meeting notes, format them easily, embed project tasks, lay them out using a library of components, and keep them all in your project's context.",
       "cta_primary": "Create your page"
     },
     "project_overview_state_sidebar": {
@@ -199,12 +199,12 @@
   "settings_empty_state": {
     "estimates": {
       "title": "No estimates yet",
-      "description": "Define how your team measures effort and track it consistently across all work items.",
+      "description": "Define how your team measures effort and track it consistently across all project tasks.",
       "cta_primary": "Add estimate system"
     },
     "labels": {
       "title": "No labels yet",
-      "description": "Create personalized labels to effectively categorize and manage your work items.",
+      "description": "Create personalized labels to effectively categorize and manage your project tasks.",
       "cta_primary": "Create your first label"
     },
     "exports": {
@@ -227,43 +227,43 @@
       "cta_primary": "Add webhook"
     },
     "work_item_types": {
-      "title": "Create and customize work item types",
-      "description": "Define unique work item types for your project. Each type can have its own properties, workflows, and fields - tailored to your project and team's needs.",
+      "title": "Create and customize project task types",
+      "description": "Define unique project task types for your project. Each type can have its own properties, workflows, and fields - tailored to your project and team's needs.",
       "cta_primary": "Enable"
     },
     "work_item_type_properties": {
-      "title": "Define the property and details you want to capture for this work item type. Customize it to match your project's workflow.",
+      "title": "Define the property and details you want to capture for this project task type. Customize it to match your project's workflow.",
       "cta_secondary": "Add property"
     },
     "templates": {
       "title": "No templates yet",
-      "description": "Reduce setup time by creating templates for work items, and pages — and start new work in seconds.",
+      "description": "Reduce setup time by creating templates for project tasks, and pages — and start new work in seconds.",
       "cta_primary": "Create your first template"
     },
     "recurring_work_items": {
-      "title": "No recurring work item yet",
-      "description": "Set up recurring work items to automate repeat tasks and stay on schedule effortlessly.",
-      "cta_primary": "Create recurring work item"
+      "title": "No recurring project task yet",
+      "description": "Set up recurring project tasks to automate repeat tasks and stay on schedule effortlessly.",
+      "cta_primary": "Create recurring project task"
     },
     "worklogs": {
       "title": "Track timesheets for all members",
-      "description": "Log time on work items to view detailed timesheets for any team member across projects."
+      "description": "Log time on project tasks to view detailed timesheets for any team member across projects."
     },
     "group_syncing": {
       "title": "No group mappings yet"
     },
     "template_setting": {
       "title": "No templates yet",
-      "description": "Reduce setup time by creating templates for projects, work items, and pages — and start new work in seconds.",
+      "description": "Reduce setup time by creating templates for projects, project tasks, and pages — and start new work in seconds.",
       "cta_primary": "Create template"
     },
     "workflows": {
       "title": "No workflows yet",
-      "description": "Create workflows to manage the progress of your work items.",
+      "description": "Create workflows to manage the progress of your project tasks.",
       "cta_primary": "Add new workflow",
       "states": {
         "title": "Add states",
-        "description": "Select the states through which the work item progresses."
+        "description": "Select the states through which the project task progresses."
       }
     }
   }

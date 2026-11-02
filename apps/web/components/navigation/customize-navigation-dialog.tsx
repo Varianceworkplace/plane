@@ -29,6 +29,7 @@ import { IconButton } from "@makeplane/propel/components/icon-button";
 import { Sortable } from "@plane/blocks/common";
 import { cn } from "@plane/utils";
 // hooks
+import { RBAC_SIDEBAR_MODULES } from "@/components/access-control/types";
 import { useUserPermissions } from "@/hooks/store/user";
 import {
   usePersonalNavigationPreferences,
@@ -68,7 +69,8 @@ export const CustomizeNavigationDialog = observer(function CustomizeNavigationDi
   const { workspaceSlug } = useParams();
 
   // store hooks
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canAccess, workspaceAccess } = useUserPermissions();
+  const access = workspaceAccess[workspaceSlug?.toString() ?? ""];
   const {
     preferences: personalPreferences,
     togglePersonalItem,
@@ -101,7 +103,8 @@ export const CustomizeNavigationDialog = observer(function CustomizeNavigationDi
         EUserPermissionsLevel.WORKSPACE,
         workspaceSlug?.toString() || ""
       );
-      return hasPermission;
+      const rbacModule = RBAC_SIDEBAR_MODULES[item.key];
+      return hasPermission && (!rbacModule || canAccess(rbacModule, "view", workspaceSlug?.toString()));
     }).map((item) => {
       // Get pinned status and sort order from localStorage
       const preference = workspacePreferences.items[item.key];
@@ -118,7 +121,9 @@ export const CustomizeNavigationDialog = observer(function CustomizeNavigationDi
 
     // oxlint-disable-next-line unicorn/no-array-sort
     return items.sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [workspaceSlug, allowPermissions, workspacePreferences]);
+    // `access`: recompute once the person's role-based access has loaded or changed
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceSlug, allowPermissions, workspacePreferences, canAccess, access]);
 
   // Handle checkbox toggle
   const handleWorkspaceItemToggle = useCallback(

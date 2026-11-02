@@ -14,9 +14,17 @@ import {
   EUserPermissionsLevel,
   WORKSPACE_SIDEBAR_DYNAMIC_NAVIGATION_ITEMS_LINKS,
 } from "@plane/constants";
-import type { EUserProjectRoles, IUserProjectsRole, IWorkspaceMemberMe, TProjectMembership } from "@plane/types";
+import type {
+  EUserProjectRoles,
+  IUserProjectsRole,
+  IWorkspaceMemberMe,
+  TIssue,
+  TProjectMembership,
+} from "@plane/types";
 import { EUserWorkspaceRoles } from "@plane/types";
 // plane web imports
+import type { TMyAccess, TRbacAction } from "@/components/access-control/types";
+import { AccessControlService } from "@/services/access-control.service";
 import { WorkspaceService } from "@/services/workspace.service";
 import type { RootStore } from "@/store/root.store";
 // services
@@ -25,6 +33,7 @@ import userService from "@/services/user.service";
 
 // derived services
 const workspaceService = new WorkspaceService();
+const accessControlService = new AccessControlService();
 
 type ETempUserRole = TUserPermissions | EUserWorkspaceRoles | EUserProjectRoles; // TODO: Remove this once we have migrated user permissions to enums to plane constants package
 
@@ -58,6 +67,30 @@ export interface IBaseUserPermissionStore {
   joinProject: (workspaceSlug: string, projectId: string) => Promise<void>;
   leaveProject: (workspaceSlug: string, projectId: string) => Promise<void>;
   hasPageAccess: (workspaceSlug: string, key: string) => boolean;
+  // role-based access (RBAC plan step 7): hides what a person can't do; the API still checks everything.
+  // Each one allows everything while role-based access is off in the workspace, or not loaded yet.
+  workspaceAccess: Record<string, TMyAccess>; // workspaceSlug -> the person's own access
+  fetchWorkspaceAccess: (workspaceSlug: string) => Promise<TMyAccess | undefined>;
+  canManageAccess: (workspaceSlug?: string) => boolean;
+  canAccess: (module: string, rbacAction: TRbacAction, workspaceSlug?: string) => boolean;
+  canOnProject: (
+    rbacAction: "view" | "edit" | "delete",
+    projectId: string | undefined,
+    workspaceSlug?: string
+  ) => boolean;
+  canInProject: (
+    module: string,
+    rbacAction: TRbacAction,
+    projectId: string | undefined,
+    workspaceSlug?: string
+  ) => boolean;
+  canCreateWorkItem: (projectId: string | undefined | null, workspaceSlug?: string) => boolean;
+  canChangeMemberRole: (memberId: string, workspaceSlug?: string) => boolean;
+  canOnWorkItem: (
+    rbacAction: TRbacAction,
+    issue: Pick<TIssue, "project_id" | "assignee_ids" | "assignee_group_id" | "created_by"> | undefined,
+    workspaceSlug?: string
+  ) => boolean;
 }
 
 /**
@@ -70,6 +103,7 @@ export class BaseUserPermissionStore implements IBaseUserPermissionStore {
   workspaceUserInfo: Record<string, IWorkspaceMemberMe> = {};
   projectUserInfo: Record<string, Record<string, TProjectMembership>> = {};
   workspaceProjectsPermissions: Record<string, IUserProjectsRole> = {};
+  workspaceAccess: Record<string, TMyAccess> = {};
   // observables
 
   constructor(protected store: RootStore) {
@@ -79,6 +113,7 @@ export class BaseUserPermissionStore implements IBaseUserPermissionStore {
       workspaceUserInfo: observable,
       projectUserInfo: observable,
       workspaceProjectsPermissions: observable,
+      workspaceAccess: observable,
       // computed
       // actions
       fetchUserWorkspaceInfo: action,
@@ -87,6 +122,7 @@ export class BaseUserPermissionStore implements IBaseUserPermissionStore {
       fetchUserProjectPermissions: action,
       joinProject: action,
       leaveProject: action,
+      fetchWorkspaceAccess: action,
     });
   }
 
@@ -227,6 +263,106 @@ export class BaseUserPermissionStore implements IBaseUserPermissionStore {
       }
     }
 
+    return false;
+  };
+
+  // role-based access
+  /** The person's access where role-based access is on and they aren't a workspace admin; else undefined. */
+  private rbacAccess = (workspaceSlug?: string): TMyAccess | undefined => {
+    const slug = workspaceSlug || this.store.router.workspaceSlug;
+    const access = slug ? this.workspaceAccess[slug] : undefined;
+    if (!access?.is_rbac_enabled || access.is_admin || !access.permissions) return undefined;
+    return access;
+  };
+
+  private scopes = (access: TMyAccess, module: string, rbacAction: TRbacAction) =>
+    access.permissions?.[module]?.[rbacAction] ?? [];
+
+  fetchWorkspaceAccess = async (workspaceSlug: string): Promise<TMyAccess | undefined> => {
+    try {
+      const response = await accessControlService.me(workspaceSlug);
+      runInAction(() => set(this.workspaceAccess, [workspaceSlug], response));
+      return response;
+    } catch (error) {
+      console.error("Error fetching the user's access", error);
+      return undefined;
+    }
+  };
+
+  canManageAccess = (workspaceSlug?: string): boolean => {
+    const slug = workspaceSlug || this.store.router.workspaceSlug;
+    const access = slug ? this.workspaceAccess[slug] : undefined;
+    if (access) return access.can_manage_access;
+    return this.allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE, slug);
+  };
+
+  /** Allowed somewhere: for workspace pages and for buttons that aren't about one record. */
+  canAccess = (module: string, rbacAction: TRbacAction, workspaceSlug?: string): boolean => {
+    const access = this.rbacAccess(workspaceSlug);
+    return !access || this.scopes(access, module, rbacAction).length > 0;
+  };
+
+  canOnProject = (rbacAction: "view" | "edit" | "delete", projectId: string | undefined, workspaceSlug?: string) => {
+    const access = this.rbacAccess(workspaceSlug);
+    if (!access || !projectId) return true;
+    const ids = access.projects?.[rbacAction];
+    return ids === null || !!ids?.includes(projectId);
+  };
+
+  /** Milestones, worklogs, members, ... in one project; other modules by their permission alone. */
+  canInProject = (module: string, rbacAction: TRbacAction, projectId: string | undefined, workspaceSlug?: string) => {
+    const access = this.rbacAccess(workspaceSlug);
+    if (!access) return true;
+    const ids = access.modules?.[module]?.[rbacAction];
+    if (ids === undefined || !projectId) return this.scopes(access, module, rbacAction).length > 0;
+    return ids === null || ids.includes(projectId);
+  };
+
+  canCreateWorkItem = (projectId: string | undefined | null, workspaceSlug?: string) => {
+    const access = this.rbacAccess(workspaceSlug);
+    if (!access) return true;
+    const ids = access.work_items?.create_project_ids;
+    if (!projectId) return this.scopes(access, "work_items", "create").length > 0;
+    return ids === null || !!ids?.includes(projectId);
+  };
+
+  /** Workspace settings › Members: workspace admins, and with role-based access on whoever Employees and members ›
+   * Edit reaches (between Member and Guest only; the server's rule in views/workspace/member.py). */
+  canChangeMemberRole = (memberId: string, workspaceSlug?: string) => {
+    const slug = workspaceSlug || this.store.router.workspaceSlug;
+    if (this.allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.WORKSPACE, slug)) return true;
+    const ids = this.rbacAccess(slug)?.member_ids?.edit;
+    return ids === null || !!ids?.includes(memberId);
+  };
+
+  /** The server's rule (plane.utils.rbac.AccessProfile.work_item_q) for one work item. */
+  canOnWorkItem = (
+    rbacAction: TRbacAction,
+    issue: Pick<TIssue, "project_id" | "assignee_ids" | "assignee_group_id" | "created_by"> | undefined,
+    workspaceSlug?: string
+  ) => {
+    const access = this.rbacAccess(workspaceSlug);
+    if (!access || !issue) return true;
+    const scopes = this.scopes(access, "work_items", rbacAction);
+    if (scopes.includes("all")) return true;
+    if (!scopes.length || !access.work_items) return false;
+    const { member_project_ids, team_project_ids, led_member_ids, teamed_member_ids, group_ids, led_group_ids } =
+      access.work_items;
+    const me = this.store.user.data?.id;
+    const assignees = issue.assignee_ids ?? [];
+    const projectId = issue.project_id ?? "";
+    const groupId = issue.assignee_group_id ?? "";
+    // own: assigned to me, or unassigned and created by me; a task of my group I may only see
+    if (me && (assignees.includes(me) || (!assignees.length && issue.created_by === me))) return true;
+    if (rbacAction === "view" && groupId && group_ids?.includes(groupId)) return true;
+    if (scopes.includes("member") && member_project_ids.includes(projectId)) return true;
+    if (scopes.includes("team")) {
+      if (assignees.some((id) => led_member_ids.includes(id))) return true;
+      if (groupId && led_group_ids?.includes(groupId)) return true;
+      // in my team projects, the work items no team claims
+      if (team_project_ids[rbacAction]?.includes(projectId) && !assignees.some((id) => teamed_member_ids.includes(id)))
+        return true;
+    }
     return false;
   };
 

@@ -15,6 +15,8 @@ export type TPropertyValuesValidationProps = {
   projectId: string | null;
   workspaceSlug: string;
   watch: UseFormWatch<TIssue>;
+  /** drafts may be incomplete */
+  isDraft?: boolean;
 };
 
 export type TActiveAdditionalPropertiesProps = {

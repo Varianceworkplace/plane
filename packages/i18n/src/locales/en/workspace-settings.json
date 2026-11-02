@@ -39,6 +39,12 @@
           }
         }
       },
+      "access_control": {
+        "title": "Access control"
+      },
+      "groups": {
+        "title": "Groups"
+      },
       "members": {
         "title": "Members",
         "add_member": "Add member",
@@ -82,7 +88,7 @@
         "export_separate_files": "Export the data into separate files",
         "exporting_projects": "Exporting project",
         "format": "Format",
-        "filters_info": "Apply filters to export specific work items based on your criteria.",
+        "filters_info": "Apply filters to export specific project tasks based on your criteria.",
         "modal": {
           "title": "Export to",
           "toasts": {
@@ -272,12 +278,12 @@
       "templates": {
         "title": "Templates",
         "heading": "Templates",
-        "description": "Save 80% time spent on creating projects, work items, and pages when you use templates."
+        "description": "Save 80% time spent on creating projects, project tasks, and pages when you use templates."
       },
       "relations": {
         "title": "Relations",
         "heading": "Relations",
-        "description": "Create and manage relation types that connect work items across your workspace."
+        "description": "Create and manage relation types that connect project tasks across your workspace."
       },
       "cancel_trial": {
         "title": "Cancel your trial first.",
@@ -454,7 +460,7 @@
         "app_consent_unapproved_description": "Make sure you trust this app before connecting it to your workspace.",
         "go_to_app": "Go to app",
         "enable_app_mentions": "Enable App Mentions",
-        "enable_app_mentions_tooltip": "When this is enabled, Users can mention or assign Work Items to this application.",
+        "enable_app_mentions_tooltip": "When this is enabled, Users can mention or assign Project Tasks to this application.",
         "scopes": "Scopes",
         "select_scopes": "Select Scopes",
         "read_access_to": "Read-only access to",

@@ -23,6 +23,8 @@ import { cn, generateWorkItemLink } from "@plane/utils";
 // components
 import { MultipleSelectEntityAction } from "@/components/core/multiple-select";
 import { IssueProperties } from "@/components/issues/issue-layouts/properties";
+import { ListRowWorklogTimer } from "@/components/worklogs/list-row-timer";
+import { ListRowTimeEstimate } from "@/components/worklogs/time-estimate";
 import { IssueIdentifier } from "@/components/issues/issue-detail/issue-identifier";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
@@ -195,9 +197,9 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
           if (!isDraggingAllowed) {
             setToast({
               type: "warning",
-              title: "Cannot move work item",
+              title: "Cannot move project task",
               message: !canEditIssueProperties
-                ? "You are not allowed to move this work item"
+                ? "You are not allowed to move this project task"
                 : "Drag and drop is disabled for the current grouping",
             });
           }
@@ -209,7 +211,7 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
               {/* select checkbox */}
               {projectId && canSelectIssues && !isEpic && (
                 <Tooltip
-                  label="Only work items within the current project can be selected."
+                  label="Only project tasks within the current project can be selected."
                   layout="stacked"
                   disabled={issue.project_id === projectId}
                 >
@@ -286,6 +288,8 @@ export const IssueBlock = observer(function IssueBlock(props: IssueBlockProps) {
         <div className="flex flex-shrink-0 items-center gap-2">
           {!issue?.tempId ? (
             <>
+              {!isEpic && <ListRowTimeEstimate issue={issue} />}
+              {!isEpic && <ListRowWorklogTimer issue={issue} />}
               <IssueProperties
                 className={`relative flex flex-wrap ${isSidebarCollapsed ? "md:flex-shrink-0 md:flex-grow" : "lg:flex-shrink-0 lg:flex-grow"} items-center gap-2 whitespace-nowrap`}
                 issue={issue}

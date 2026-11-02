@@ -49,7 +49,7 @@ export const FilterStatus = observer(function FilterStatus(props: Props) {
   return (
     <>
       <FilterHeader
-        title={`Work item Status ${appliedFiltersCount > 0 ? ` (${appliedFiltersCount})` : ""}`}
+        title={`Project task Status ${appliedFiltersCount > 0 ? ` (${appliedFiltersCount})` : ""}`}
         isPreviewEnabled={previewEnabled}
         handleIsPreviewEnabled={() => setPreviewEnabled(!previewEnabled)}
       />

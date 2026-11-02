@@ -6,6 +6,7 @@
 
 // components
 import { Outlet } from "react-router";
+import { RbacModuleGuard } from "@/components/access-control/module-guard";
 import { AppHeader } from "@/components/core/app-header";
 import { ContentWrapper } from "@/components/core/content-wrapper";
 import { WorkspaceAnalyticsHeader } from "./header";
@@ -15,7 +16,9 @@ export default function WorkspaceAnalyticsTabLayout() {
     <>
       <AppHeader header={<WorkspaceAnalyticsHeader />} />
       <ContentWrapper>
-        <Outlet />
+        <RbacModuleGuard module="analytics">
+          <Outlet />
+        </RbacModuleGuard>
       </ContentWrapper>
     </>
   );

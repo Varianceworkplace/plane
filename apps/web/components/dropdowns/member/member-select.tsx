@@ -14,9 +14,15 @@ import type { SelectPaginationParams, SelectTooltip, SelectTooltipOverride } fro
 import { useTranslation } from "@plane/i18n";
 import type { TPaginatedResponse } from "@plane/types";
 import { getFileURL } from "@plane/utils";
+// components
+import { useMemberGroups } from "@/components/member-groups/helpers";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useUser } from "@/hooks/store/user";
+
+// group options share the list with people: their ids carry this prefix
+const GROUP_PREFIX = "group:";
+const groupIdOf = (id: string) => (id.startsWith(GROUP_PREFIX) ? id.slice(GROUP_PREFIX.length) : undefined);
 
 type MemberSelectWebCommonProps = {
   /** value-agnostic e2e selector — forwarded to the block's trigger as data-testid */
@@ -44,6 +50,13 @@ type MemberSelectWebCommonProps = {
   tooltip?: SelectTooltip;
   /** Tab order of the trigger, for forms that sequence focus explicitly (`ETabIndices`). */
   tabIndex?: number;
+  /**
+   * A work item's Assigned to: the workspace's groups are offered after the people, and it holds people or one
+   * group. Picking a group calls this `onChange` (the caller clears the people with it); picking a person while a
+   * group is selected calls the main `onChange` (the caller clears the group with it); unpicking the group calls this
+   * `onChange(null)`.
+   */
+  assigneeGroup?: { value: string | null | undefined; onChange: (groupId: string | null) => void };
 };
 
 export type MemberSelectWebProps = MemberSelectWebCommonProps &
@@ -80,10 +93,13 @@ export const MemberSelect = observer(function MemberSelect(props: MemberSelectWe
     tooltip,
     testId,
     tabIndex,
+    assigneeGroup,
   } = props;
   // router params
   const { workspaceSlug } = useParams();
   const slug = workspaceSlug?.toString();
+  // groups, only for a work item's Assigned to
+  const { groups, getGroup } = useMemberGroups(assigneeGroup ? slug : undefined);
   // store hooks
   const {
     getUserDetails,
@@ -121,6 +137,15 @@ export const MemberSelect = observer(function MemberSelect(props: MemberSelectWe
     [getUserDetails, currentUser?.id, youLabel, slug, isUserSuspended]
   );
 
+  const toGroupOption = useCallback(
+    (groupId: string): MemberOption => {
+      const name = getGroup(groupId)?.name ?? "Group";
+      return { id: `${GROUP_PREFIX}${groupId}`, display_name: name, name, isGroup: true };
+    },
+    [getGroup]
+  );
+  const selectedGroupId = assigneeGroup?.value || undefined;
+
   const getValues = useCallback(
     async ({ search }: SelectPaginationParams): Promise<TPaginatedResponse<MemberOption[]>> => {
       let rosterIds = memberIds ?? (projectId ? getProjectMemberIds(projectId, false) : workspaceMemberIds);
@@ -139,9 +164,16 @@ export const MemberSelect = observer(function MemberSelect(props: MemberSelectWe
         if (id === currentUser?.id) results.unshift(toOption(id));
         else results.push(toOption(id));
       }
+      // then the groups, whoever is in the project
+      if (assigneeGroup)
+        for (const group of groups ?? [])
+          if (!query || group.name.toLowerCase().includes(query)) results.push(toGroupOption(group.id));
       return { results, next_page_results: false };
     },
     [
+      assigneeGroup,
+      groups,
+      toGroupOption,
       memberIds,
       projectId,
       slug,
@@ -157,14 +189,23 @@ export const MemberSelect = observer(function MemberSelect(props: MemberSelectWe
   const filterOption = useCallback((option: MemberOption) => !excludeSet?.has(option.id), [excludeSet]);
 
   if (props.multiple) {
+    const { onChange } = props;
+    const handleChange = (ids: string[]) => {
+      const people = ids.filter((id) => !groupIdOf(id));
+      const pickedGroup = ids.map(groupIdOf).find((groupId) => groupId && groupId !== selectedGroupId);
+      if (assigneeGroup && pickedGroup) assigneeGroup.onChange(pickedGroup);
+      else if (assigneeGroup && selectedGroupId && !people.length) {
+        if (!ids.length) assigneeGroup.onChange(null);
+      } else onChange(people);
+    };
     return (
       <MemberSelectBlock
         multiple
         testId={testId}
         getValues={getValues}
         // Resolved in the observer render so MobX re-renders once the members load.
-        value={props.value.map(toOption)}
-        onChange={props.onChange}
+        value={selectedGroupId ? [toGroupOption(selectedGroupId)] : props.value.map(toOption)}
+        onChange={handleChange}
         variant={variant}
         showLabel={showLabel}
         disabled={disabled}
@@ -177,13 +218,20 @@ export const MemberSelect = observer(function MemberSelect(props: MemberSelectWe
       />
     );
   }
+  const { onChange } = props;
+  const handleChange = (id: string) => {
+    const pickedGroup = groupIdOf(id);
+    if (assigneeGroup && pickedGroup) assigneeGroup.onChange(pickedGroup);
+    else if (assigneeGroup && selectedGroupId && !id) assigneeGroup.onChange(null);
+    else onChange(id);
+  };
   return (
     <MemberSelectBlock
       multiple={false}
       testId={testId}
       getValues={getValues}
-      value={props.value ? toOption(props.value) : null}
-      onChange={props.onChange}
+      value={selectedGroupId ? toGroupOption(selectedGroupId) : props.value ? toOption(props.value) : null}
+      onChange={handleChange}
       variant={variant}
       showLabel={showLabel}
       clearable={clearable}

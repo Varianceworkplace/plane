@@ -18,7 +18,7 @@ import { SidebarAddButton } from "@/components/sidebar/add-button";
 // hooks
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
 import { useProject } from "@/hooks/store/use-project";
-import { useUserPermissions } from "@/hooks/store/user";
+import { useUser, useUserPermissions } from "@/hooks/store/user";
 import useLocalStorage from "@/hooks/use-local-storage";
 
 export const SidebarQuickActions = observer(function SidebarQuickActions() {
@@ -35,14 +35,16 @@ export const SidebarQuickActions = observer(function SidebarQuickActions() {
   // store hooks
   const { toggleCreateIssueModal } = useCommandPalette();
   const { joinedProjectIds } = useProject();
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canCreateWorkItem, workspaceAccess } = useUserPermissions();
+  const { projectsWithCreatePermissions } = useUser();
   // local storage
   const { storedValue, setValue } = useLocalStorage<Record<string, Partial<TIssue>>>("draftedIssue", {});
   // derived values
-  const canCreateIssue = allowPermissions(
-    [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
-    EUserPermissionsLevel.WORKSPACE
-  );
+  // role-based access: only when there's a project they may create in (a PM made them a member of it)
+  const isRbacOn = !!(workspaceSlug && workspaceAccess[workspaceSlug]?.is_rbac_enabled);
+  const canCreateIssue =
+    allowPermissions([EUserPermissions.ADMIN, EUserPermissions.MEMBER], EUserPermissionsLevel.WORKSPACE) &&
+    (!isRbacOn || Object.keys(projectsWithCreatePermissions ?? {}).some((projectId) => canCreateWorkItem(projectId)));
   const disabled = joinedProjectIds.length === 0 || !canCreateIssue;
   const workspaceDraftIssue = workspaceSlug ? (storedValue?.[workspaceSlug] ?? undefined) : undefined;
 

@@ -19,9 +19,9 @@
     "start_date": "Start date",
     "end_date": "End date",
     "in_your_timezone": "In your timezone",
-    "transfer_work_items": "Transfer {count} work items",
+    "transfer_work_items": "Transfer {count} project tasks",
     "transfer": {
-      "no_cycles_available": "No other cycles available to transfer work items to."
+      "no_cycles_available": "No other cycles available to transfer project tasks to."
     },
     "date_range": "Date range",
     "add_date": "Add date",
@@ -29,9 +29,9 @@
       "label": "Active cycle",
       "progress": "Progress",
       "chart": "Burndown chart",
-      "priority_issue": "Priority work items",
+      "priority_issue": "Priority project tasks",
       "assignees": "Assignees",
-      "issue_burndown": "Work item burndown",
+      "issue_burndown": "Project task burndown",
       "ideal": "Ideal",
       "current": "Current",
       "labels": "Labels",
@@ -113,18 +113,18 @@
         }
       },
       "no_issues": {
-        "title": "No work items added to the cycle",
-        "description": "Add or create work items you wish to timebox and deliver within this cycle",
+        "title": "No project tasks added to the cycle",
+        "description": "Add or create project tasks you wish to timebox and deliver within this cycle",
         "primary_button": {
-          "text": "Create new work item"
+          "text": "Create new project task"
         },
         "secondary_button": {
-          "text": "Add existing work item"
+          "text": "Add existing project task"
         }
       },
       "completed_no_issues": {
-        "title": "No work items in the cycle",
-        "description": "No work items in the cycle. Work items are either transferred or hidden. To see hidden work items if any, update your display properties accordingly."
+        "title": "No project tasks in the cycle",
+        "description": "No project tasks in the cycle. Project tasks are either transferred or hidden. To see hidden project tasks if any, update your display properties accordingly."
       },
       "active": {
         "title": "No active cycle",
@@ -144,7 +144,7 @@
         "primary_button": {
           "text": "Create your first view",
           "comic": {
-            "title": "Views work atop Work item properties.",
+            "title": "Views work atop Project task properties.",
             "description": "You can create a view from here with as many properties as filters as you see fit."
           }
         },
@@ -154,14 +154,14 @@
         }
       },
       "no_archived_issues": {
-        "title": "No archived work items yet",
-        "description": "Manually or through automation, you can archive work items that are completed or cancelled. Find them here once archived.",
+        "title": "No archived project tasks yet",
+        "description": "Manually or through automation, you can archive project tasks that are completed or cancelled. Find them here once archived.",
         "primary_button": {
           "text": "Set automation"
         }
       },
       "issues_empty_filter": {
-        "title": "No work items found matching the filters applied",
+        "title": "No project tasks found matching the filters applied",
         "secondary_button": {
           "text": "Clear all filters"
         }
@@ -190,25 +190,25 @@
   "project_issues": {
     "empty_state": {
       "no_issues": {
-        "title": "Create a work item and assign it to someone, even yourself",
-        "description": "Think of work items as jobs, tasks, work, or JTBD. Which we like. A work item and its sub-work items are usually time-based actionables assigned to members of your team. Your team creates, assigns, and completes work items to move your project towards its goal.",
+        "title": "Create a project task and assign it to someone, even yourself",
+        "description": "Think of project tasks as jobs, tasks, work, or JTBD. Which we like. A project task and its sub-tasks are usually time-based actionables assigned to members of your team. Your team creates, assigns, and completes project tasks to move your project towards its goal.",
         "primary_button": {
-          "text": "Create your first work item",
+          "text": "Create your first project task",
           "comic": {
-            "title": "Work items are building blocks in Plane.",
-            "description": "Redesign the Plane UI, Rebrand the company, or Launch the new fuel injection system are examples of work items that likely have sub-work items."
+            "title": "Project tasks are building blocks in Plane.",
+            "description": "Redesign the Plane UI, Rebrand the company, or Launch the new fuel injection system are examples of project tasks that likely have sub-tasks."
           }
         }
       },
       "no_archived_issues": {
-        "title": "No archived work items yet",
-        "description": "Manually or through automation, you can archive work items that are completed or cancelled. Find them here once archived.",
+        "title": "No archived project tasks yet",
+        "description": "Manually or through automation, you can archive project tasks that are completed or cancelled. Find them here once archived.",
         "primary_button": {
           "text": "Set automation"
         }
       },
       "issues_empty_filter": {
-        "title": "No work items found matching the filters applied",
+        "title": "No project tasks found matching the filters applied",
         "secondary_button": {
           "text": "Clear all filters"
         }
@@ -225,7 +225,7 @@
     "empty_state": {
       "general": {
         "title": "Map your project milestones to Modules and track aggregated work easily.",
-        "description": "A group of work items that belong to a logical, hierarchical parent form a module. Think of them as a way to track work by project milestones. They have their own periods and deadlines as well as analytics to help you see how close or far you are from a milestone.",
+        "description": "A group of project tasks that belong to a logical, hierarchical parent form a module. Think of them as a way to track work by project milestones. They have their own periods and deadlines as well as analytics to help you see how close or far you are from a milestone.",
         "primary_button": {
           "text": "Build your first module",
           "comic": {
@@ -235,13 +235,13 @@
         }
       },
       "no_issues": {
-        "title": "No work items in the module",
-        "description": "Create or add work items which you want to accomplish as part of this module",
+        "title": "No project tasks in the module",
+        "description": "Create or add project tasks which you want to accomplish as part of this module",
         "primary_button": {
-          "text": "Create new work items"
+          "text": "Create new project tasks"
         },
         "secondary_button": {
-          "text": "Add an existing work item"
+          "text": "Add an existing project task"
         }
       },
       "archived": {
@@ -272,7 +272,7 @@
     "empty_state": {
       "general": {
         "title": "Write a note, a doc, or a full knowledge base. Get Galileo, Plane's AI assistant, to help you get started",
-        "description": "Pages are thoughts potting space in Plane. Take down meeting notes, format them easily, embed work items, lay them out using a library of components, and keep them all in your project's context. To make short work of any doc, invoke Galileo, Plane's AI, with a shortcut or the click of a button.",
+        "description": "Pages are thoughts potting space in Plane. Take down meeting notes, format them easily, embed project tasks, lay them out using a library of components, and keep them all in your project's context. To make short work of any doc, invoke Galileo, Plane's AI, with a shortcut or the click of a button.",
         "primary_button": {
           "text": "Create your first page"
         }
@@ -301,7 +301,7 @@
     "empty_state": {
       "inbox": {
         "title": "Intake is not enabled for the project.",
-        "description": "Intake helps you manage incoming requests to your project and add them as work items in your workflow. Enable intake from project settings to manage requests.",
+        "description": "Intake helps you manage incoming requests to your project and add them as project tasks in your workflow. Enable intake from project settings to manage requests.",
         "primary_button": {
           "text": "Manage features"
         }
@@ -353,7 +353,7 @@
     "order_by": {
       "name": "Name",
       "progress": "Progress",
-      "issues": "Number of work items",
+      "issues": "Number of project tasks",
       "due_date": "Due date",
       "created_at": "Created date",
       "manual": "Manual"

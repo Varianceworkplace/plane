@@ -13,6 +13,7 @@ import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { GANTT_TIMELINE_TYPE } from "@plane/types";
 // components
 import { ProjectAccessRestriction } from "@/components/auth-screens/project/project-access-restriction";
+import { JoinProjectModal } from "@/components/project/join-project-modal";
 import {
   PROJECT_DETAILS,
   PROJECT_ME_INFORMATION,
@@ -49,10 +50,11 @@ export const ProjectAuthWrapper = observer(function ProjectAuthWrapper(props: IP
   const { workspaceSlug, projectId, children, isLoading: isParentLoading = false } = props;
   // states
   const [isJoiningProject, setIsJoiningProject] = useState(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   // store hooks
   const { fetchUserProjectInfo, allowPermissions, getProjectRoleByWorkspaceSlugAndProjectId } = useUserPermissions();
-  const { fetchProjectDetails } = useProject();
-  const { joinProject } = useUserPermissions();
+  const { fetchProjectDetails, getProjectById } = useProject();
+  const { joinProject, canOnProject } = useUserPermissions();
   const { fetchAllCycles } = useCycle();
   const { fetchModulesSlim, fetchModules } = useModule();
   const { initGantt } = useTimeLineChart(GANTT_TIMELINE_TYPE.MODULE);
@@ -138,6 +140,11 @@ export const ProjectAuthWrapper = observer(function ProjectAuthWrapper(props: IP
 
   // handle join project
   const handleJoinProject = () => {
+    // role-based access: people who can't manage the project ask their PM instead (the modal sends the request)
+    if (!canOnProject("edit", projectId, workspaceSlug)) {
+      setIsJoinModalOpen(true);
+      return;
+    }
     setIsJoiningProject(true);
     joinProject(workspaceSlug, projectId).finally(() => setIsJoiningProject(false));
   };
@@ -147,13 +154,24 @@ export const ProjectAuthWrapper = observer(function ProjectAuthWrapper(props: IP
   if (isProjectLoading) return null;
 
   if (!isProjectLoading && hasPermissionToCurrentProject === false) {
+    const project = getProjectById(projectId);
     return (
-      <ProjectAccessRestriction
-        errorStatusCode={projectDetailsError?.status}
-        isWorkspaceAdmin={isWorkspaceAdmin}
-        handleJoinProject={handleJoinProject}
-        isJoinButtonDisabled={isJoiningProject}
-      />
+      <>
+        <ProjectAccessRestriction
+          errorStatusCode={projectDetailsError?.status}
+          isWorkspaceAdmin={isWorkspaceAdmin}
+          handleJoinProject={handleJoinProject}
+          isJoinButtonDisabled={isJoiningProject}
+        />
+        {project && (
+          <JoinProjectModal
+            isOpen={isJoinModalOpen}
+            workspaceSlug={workspaceSlug}
+            project={project}
+            handleClose={() => setIsJoinModalOpen(false)}
+          />
+        )}
+      </>
     );
   }
 

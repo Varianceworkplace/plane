@@ -31,6 +31,9 @@ from plane.utils.order_queryset import order_issue_queryset
 
 
 class SubIssuesEndpoint(BaseAPIView):
+    # role-based access (plane.utils.work_item_visibility): the action each change needs
+    rbac_work_item_actions = {"POST": "edit"}
+
     permission_classes = [ProjectEntityPermission]
 
     @method_decorator(gzip_page)
@@ -40,9 +43,7 @@ class SubIssuesEndpoint(BaseAPIView):
         # in it, so an unscoped filter leaks sub-issue metadata across projects in the
         # same workspace.
         sub_issues = (
-            Issue.issue_objects.filter(
-                parent_id=issue_id, workspace__slug=slug, project_id=project_id
-            )
+            Issue.issue_objects.filter(parent_id=issue_id, workspace__slug=slug, project_id=project_id)
             .annotate(
                 cycle_id=Subquery(
                     CycleIssue.objects.filter(issue=OuterRef("id"), deleted_at__isnull=True).values("cycle_id")[:1]
@@ -161,6 +162,7 @@ class SubIssuesEndpoint(BaseAPIView):
                 "module_ids",
                 "label_ids",
                 "assignee_ids",
+                "assignee_group_id",
                 "sub_issues_count",
                 "created_at",
                 "updated_at",
@@ -211,9 +213,7 @@ class SubIssuesEndpoint(BaseAPIView):
         # SECURITY: bind the parent issue to the URL workspace + project. A bare
         # pk lookup let any project member re-parent issues under a parent in a
         # different project/workspace.
-        parent_issue = Issue.issue_objects.filter(
-            pk=issue_id, workspace__slug=slug, project_id=project_id
-        ).first()
+        parent_issue = Issue.issue_objects.filter(pk=issue_id, workspace__slug=slug, project_id=project_id).first()
         if parent_issue is None:
             return Response(
                 {"error": "Parent issue not found"},
@@ -228,9 +228,7 @@ class SubIssuesEndpoint(BaseAPIView):
             )
 
         # Scope to workspace + project to prevent cross-project/cross-tenant IDOR
-        sub_issues = Issue.issue_objects.filter(
-            id__in=sub_issue_ids, workspace__slug=slug, project_id=project_id
-        )
+        sub_issues = Issue.issue_objects.filter(id__in=sub_issue_ids, workspace__slug=slug, project_id=project_id)
 
         for sub_issue in sub_issues:
             sub_issue.parent = parent_issue

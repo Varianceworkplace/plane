@@ -17,6 +17,7 @@ from django import apps
 
 # Module imports
 from plane.utils.html_processor import strip_tags
+from plane.utils.work_item_visibility import filter_visible
 from plane.utils.path_validator import sanitize_filename
 from plane.db.mixins import SoftDeletionManager, ChangeTrackerMixin
 from plane.utils.exception_logger import log_exception
@@ -91,18 +92,41 @@ def get_default_display_properties():
 # TODO: Handle identifiers for Bulk Inserts - nk
 class IssueManager(SoftDeletionManager):
     def get_queryset(self):
-        return (
+        queryset = (
             super()
             .get_queryset()
             .exclude(state__group=StateGroup.TRIAGE.value)
             .exclude(archived_at__isnull=False)
             .exclude(project__archived_at__isnull=False)
             .exclude(is_draft=True)
+            .exclude(project__is_ticket_project=True)
         )
+        # private work items: only what the signed-in user may see (plane.utils.work_item_visibility)
+        return filter_visible(queryset)
+
+
+class NonTicketIssueManager(SoftDeletionManager):
+    """Default manager: helpdesk tickets are only reachable through Issue.ticket_objects."""
+
+    def get_queryset(self):
+        # private work items: only what the signed-in user may see (plane.utils.work_item_visibility)
+        return filter_visible(super().get_queryset().exclude(project__is_ticket_project=True))
+
+
+class NonTicketProjectManager(SoftDeletionManager):
+    """Default manager for issue child tables that are listed outside a project URL."""
+
+    def get_queryset(self):
+        return super().get_queryset().exclude(project__is_ticket_project=True)
+
+
+class TicketIssueManager(SoftDeletionManager):
+    def get_queryset(self):
+        return super().get_queryset().filter(project__is_ticket_project=True)
 
 
 class Issue(ChangeTrackerMixin, ProjectBaseModel):
-    TRACKED_FIELDS = ["state_id"]
+    TRACKED_FIELDS = ["state_id", "assignee_group_id"]
 
     PRIORITY_CHOICES = (
         ("urgent", "Urgent"),
@@ -153,6 +177,14 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
         through="IssueAssignee",
         through_fields=("issue", "assignee"),
     )
+    # assigned to a group instead of people (plane.db.models.member_group): then it has no assignees
+    assignee_group = models.ForeignKey(
+        "db.MemberGroup",
+        on_delete=models.SET_NULL,
+        related_name="assigned_issues",
+        null=True,
+        blank=True,
+    )
     sequence_id = models.IntegerField(default=1, verbose_name="Issue Sequence ID")
     labels = models.ManyToManyField("db.Label", blank=True, related_name="labels", through="IssueLabel")
     sort_order = models.FloatField(default=65535)
@@ -169,9 +201,12 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
         blank=True,
     )
 
+    objects = NonTicketIssueManager()
     issue_objects = IssueManager()
+    ticket_objects = TicketIssueManager()
 
     class Meta:
+        default_manager_name = "objects"
         verbose_name = "Issue"
         verbose_name_plural = "Issues"
         db_table = "issues"
@@ -437,7 +472,10 @@ class IssueActivity(ProjectBaseModel):
     new_identifier = models.UUIDField(null=True)
     epoch = models.FloatField(null=True)
 
+    objects = NonTicketProjectManager()
+
     class Meta:
+        default_manager_name = "objects"
         verbose_name = "Issue Activity"
         verbose_name_plural = "Issue Activities"
         db_table = "issue_activities"

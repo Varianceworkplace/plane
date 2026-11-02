@@ -19,10 +19,18 @@ from django.utils import timezone
 from django.db.models import Prefetch
 
 # Module imports
-from plane.db.models import ExporterHistory, Issue, IssueComment, IssueRelation, IssueSubscriber
+from plane.db.models import (
+    ExporterHistory,
+    Issue,
+    IssueComment,
+    IssueRelation,
+    IssueSubscriber,
+    WorkspaceMember,
+)
 from plane.utils.exception_logger import log_exception
 from plane.utils.porters.exporter import DataExporter
 from plane.utils.porters.serializers.issue import IssueExportSerializer
+from plane.utils.work_item_visibility import as_viewer
 
 
 def create_zip_file(files: List[tuple[str, str | bytes]]) -> io.BytesIO:
@@ -144,75 +152,24 @@ def issue_export_task(
         exporter_instance.status = "processing"
         exporter_instance.save(update_fields=["status"])
 
-        # Build base queryset for issues
-        workspace_issues = (
-            Issue.objects.filter(
-                workspace__id=workspace_id,
-                project_id__in=project_ids,
-                project__project_projectmember__member=exporter_instance.initiated_by_id,
-                project__project_projectmember__is_active=True,
-                project__archived_at__isnull=True,
-            )
-            .select_related(
-                "project",
-                "workspace",
-                "state",
-                "created_by",
-                "estimate_point",
-            )
-            .prefetch_related(
-                "labels",
-                "issue_cycle__cycle",
-                "issue_module__module",
-                "assignees",
-                "issue_link",
-                Prefetch(
-                    "issue_subscribers",
-                    queryset=IssueSubscriber.objects.select_related("subscriber"),
-                ),
-                Prefetch(
-                    "issue_comments",
-                    queryset=IssueComment.objects.select_related("actor").order_by("created_at"),
-                ),
-                Prefetch(
-                    "issue_relation",
-                    queryset=IssueRelation.objects.select_related("related_issue", "related_issue__project"),
-                ),
-                Prefetch(
-                    "issue_related",
-                    queryset=IssueRelation.objects.select_related("issue", "issue__project"),
-                ),
-                Prefetch(
-                    "parent",
-                    queryset=Issue.objects.select_related("type", "project"),
-                ),
-            )
-        )
-
-        # Create exporter for the specified format
-        try:
-            exporter = DataExporter(IssueExportSerializer, format_type=provider)
-        except ValueError as e:
-            # Invalid format type
-            exporter_instance = ExporterHistory.objects.get(token=token_id)
+        # The file holds what the person who asked for it can see in the app, so it runs as them. Nobody to run as
+        # (they left the workspace, or the export has no owner) means no file rather than every work item.
+        initiated_by = exporter_instance.initiated_by
+        if (
+            initiated_by is None
+            or not WorkspaceMember.objects.filter(
+                workspace_id=workspace_id, member=initiated_by, is_active=True
+            ).exists()
+        ):
             exporter_instance.status = "failed"
-            exporter_instance.reason = str(e)
+            exporter_instance.reason = "The person who started this export is no longer a member of the workspace."
             exporter_instance.save(update_fields=["status", "reason"])
             return
 
-        files = []
-        if multiple:
-            # Export each project separately with its own queryset
-            for project_id in project_ids:
-                project_issues = workspace_issues.filter(project_id=project_id)
-                export_filename = f"{slug}-{project_id}"
-                filename, content = exporter.export(export_filename, project_issues)
-                files.append((filename, content))
-        else:
-            # Export all issues in a single file
-            export_filename = f"{slug}-{workspace_id}"
-            filename, content = exporter.export(export_filename, workspace_issues)
-            files.append((filename, content))
+        with as_viewer(initiated_by, workspace_id):
+            files = build_export_files(provider, workspace_id, project_ids, token_id, multiple, slug, exporter_instance)
+        if files is None:
+            return
 
         zip_buffer = create_zip_file(files)
         upload_to_s3(zip_buffer, workspace_id, token_id, slug)
@@ -224,3 +181,77 @@ def issue_export_task(
         exporter_instance.save(update_fields=["status", "reason"])
         log_exception(e)
         return
+
+
+def build_export_files(provider, workspace_id, project_ids, token_id, multiple, slug, exporter_instance):
+    """The export files, as (filename, content) pairs; None when the format is invalid (the export is failed)."""
+    # Build base queryset for issues
+    workspace_issues = (
+        Issue.objects.filter(
+            workspace__id=workspace_id,
+            project_id__in=project_ids,
+            project__project_projectmember__member=exporter_instance.initiated_by_id,
+            project__project_projectmember__is_active=True,
+            project__archived_at__isnull=True,
+        )
+        .select_related(
+            "project",
+            "workspace",
+            "state",
+            "created_by",
+            "estimate_point",
+        )
+        .prefetch_related(
+            "labels",
+            "issue_cycle__cycle",
+            "issue_module__module",
+            "assignees",
+            "issue_link",
+            Prefetch(
+                "issue_subscribers",
+                queryset=IssueSubscriber.objects.select_related("subscriber"),
+            ),
+            Prefetch(
+                "issue_comments",
+                queryset=IssueComment.objects.select_related("actor").order_by("created_at"),
+            ),
+            Prefetch(
+                "issue_relation",
+                queryset=IssueRelation.objects.select_related("related_issue", "related_issue__project"),
+            ),
+            Prefetch(
+                "issue_related",
+                queryset=IssueRelation.objects.select_related("issue", "issue__project"),
+            ),
+            Prefetch(
+                "parent",
+                queryset=Issue.objects.select_related("type", "project"),
+            ),
+        )
+    )
+
+    # Create exporter for the specified format
+    try:
+        exporter = DataExporter(IssueExportSerializer, format_type=provider)
+    except ValueError as e:
+        # Invalid format type
+        exporter_instance = ExporterHistory.objects.get(token=token_id)
+        exporter_instance.status = "failed"
+        exporter_instance.reason = str(e)
+        exporter_instance.save(update_fields=["status", "reason"])
+        return None
+
+    files = []
+    if multiple:
+        # Export each project separately with its own queryset
+        for project_id in project_ids:
+            project_issues = workspace_issues.filter(project_id=project_id)
+            export_filename = f"{slug}-{project_id}"
+            filename, content = exporter.export(export_filename, project_issues)
+            files.append((filename, content))
+    else:
+        # Export all issues in a single file
+        export_filename = f"{slug}-{workspace_id}"
+        filename, content = exporter.export(export_filename, workspace_issues)
+        files.append((filename, content))
+    return files

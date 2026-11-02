@@ -122,6 +122,20 @@ class TestProjectListCreateAPIEndpoint:
         assert State.objects.filter(project=project).count() == 5
 
     @pytest.mark.django_db
+    def test_create_project_name_with_hyphen(self, api_key_client, workspace, create_user):
+        """Project names may contain everyday punctuation; unsafe characters are still rejected."""
+        url = self.get_url(workspace.slug)
+
+        response = api_key_client.post(url, {"name": "Verbix-ai", "identifier": "VERBIX"}, format="json")
+        assert response.status_code == status.HTTP_201_CREATED, f"Got {response.status_code}: {response.data!r}"
+
+        response = api_key_client.post(url, {"name": "<b>bold</b>", "identifier": "BOLD"}, format="json")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+        response = api_key_client.post(url, {"name": "Strict", "identifier": "VER-AI"}, format="json")
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.django_db
     def test_create_project_with_lead_not_in_workspace_returns_400(self, api_key_client, workspace, outsider_user):
         """When project_lead refers to a user that is NOT a member of the
         target workspace, the endpoint must reject the request with a 400

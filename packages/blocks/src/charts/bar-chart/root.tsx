@@ -19,6 +19,7 @@ import {
 // plane imports
 import { AXIS_LABEL_CLASSNAME } from "@plane/constants";
 import type { TBarChartProps } from "@plane/types";
+import { cn } from "@plane/utils";
 // local components
 import { getLegendProps } from "../components/legend";
 import { CustomXAxisTick, CustomYAxisTick } from "../components/tick";
@@ -110,7 +111,8 @@ export const BarChart = React.memo(function BarChart<K extends string, T extends
             const node = shapeVariant(shapeProps, bar, stackKeys);
             return React.isValidElement(node) ? node : <>{node}</>;
           }}
-          className="[&_path]:transition-opacity [&_path]:duration-200"
+          className={cn("[&_path]:transition-opacity [&_path]:duration-200", bar.onClick && "cursor-pointer")}
+          onClick={bar.onClick ? (item: any) => bar.onClick?.(item?.payload) : undefined}
           onMouseEnter={() => setActiveBar(bar.key)}
           onMouseLeave={() => setActiveBar(null)}
           fill={getBarColor(data, bar.key)}

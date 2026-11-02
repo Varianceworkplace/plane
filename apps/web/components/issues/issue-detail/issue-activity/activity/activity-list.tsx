@@ -31,6 +31,7 @@ import {
   IssueArchivedAtActivity,
   IssueInboxActivity,
 } from "./actions";
+import { IssueMilestoneActivity } from "./actions/milestone";
 
 type TIssueActivityItem = {
   activityId: string;
@@ -86,6 +87,8 @@ export const IssueActivityItem = observer(function IssueActivityItem(props: TIss
       return <IssueLinkActivity {...componentDefaultProps} showIssue={false} />;
     case "attachment":
       return <IssueAttachmentActivity {...componentDefaultProps} showIssue={false} />;
+    case "milestone":
+      return <IssueMilestoneActivity {...componentDefaultProps} />;
     case "archived_at":
       return <IssueArchivedAtActivity {...componentDefaultProps} />;
     case "intake":

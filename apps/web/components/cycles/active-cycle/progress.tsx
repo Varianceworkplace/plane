@@ -54,7 +54,7 @@ export const ActiveCycleProgress = observer(function ActiveCycleProgress(props: 
           {cycle.total_issues > 0 && (
             <span className="flex gap-1 rounded-xs px-3 py-1 text-13 font-medium whitespace-nowrap text-placeholder">
               {`${cycle.completed_issues + cycle.cancelled_issues}/${cycle.total_issues - cycle.cancelled_issues} ${
-                cycle.completed_issues + cycle.cancelled_issues > 1 ? "Work items" : "Work item"
+                cycle.completed_issues + cycle.cancelled_issues > 1 ? "Project tasks" : "Project task"
               } closed`}
             </span>
           )}
@@ -92,7 +92,7 @@ export const ActiveCycleProgress = observer(function ActiveCycleProgress(props: 
                       <span className="w-16 font-medium text-tertiary capitalize">{group}</span>
                     </div>
                     <span className="text-tertiary">{`${groupedIssues[group]} ${
-                      groupedIssues[group] > 1 ? "Work items" : "Work item"
+                      groupedIssues[group] > 1 ? "Project tasks" : "Project task"
                     }`}</span>
                   </div>
                 </div>
@@ -103,7 +103,7 @@ export const ActiveCycleProgress = observer(function ActiveCycleProgress(props: 
             <span className="flex items-center gap-2 text-13 text-tertiary">
               <span>
                 {`${cycle.cancelled_issues} cancelled ${
-                  cycle.cancelled_issues > 1 ? "work items are" : "work item is"
+                  cycle.cancelled_issues > 1 ? "project tasks are" : "project task is"
                 } excluded from this report.`}{" "}
               </span>
             </span>

@@ -47,8 +47,8 @@ export const BASE_NOTIFICATION_CONTENT_MAP: TNotificationContentMap = {
   duplicate: ({ verb }) => ({
     action:
       verb === "created"
-        ? "marked that this work item is a duplicate of"
-        : "marked that this work item is not a duplicate",
+        ? "marked that this project task is a duplicate of"
+        : "marked that this project task is not a duplicate",
     value: null,
     showConnector: false,
   }),
@@ -78,7 +78,7 @@ export const BASE_NOTIFICATION_CONTENT_MAP: TNotificationContentMap = {
     showConnector: false,
   }),
   relates_to: () => ({
-    action: "marked that this work item is related to",
+    action: "marked that this project task is related to",
     value: null,
     showConnector: true,
   }),
@@ -88,19 +88,19 @@ export const BASE_NOTIFICATION_CONTENT_MAP: TNotificationContentMap = {
     showConnector: false,
   }),
   archived_at: ({ newValue }) => ({
-    action: newValue === "restore" ? "restored the work item" : "archived the work item",
+    action: newValue === "restore" ? "restored the project task" : "archived the project task",
     value: null,
     showConnector: false,
   }),
   None: () => ({
     action: null,
-    value: "the work item and assigned it to you.",
+    value: "the project task and assigned it to you.",
     showConnector: false,
   }),
   // Fields below only define value - action falls through to default handler
   attachment: () => ({
     action: null,
-    value: "the work item",
+    value: "the project task",
     showConnector: true,
   }),
   description: ({ newValue }) => ({

@@ -187,9 +187,9 @@ export const InboxIssueProperties = observer(function InboxIssueProperties(props
                   }
                 />
                 <MenuContent side="bottom" align="start">
-                  <MenuItem label="Change parent work item" onClick={() => setParentIssueModalOpen(true)} />
+                  <MenuItem label="Change parent project task" onClick={() => setParentIssueModalOpen(true)} />
                   <MenuItem
-                    label="Remove parent work item"
+                    label="Remove parent project task"
                     onClick={() => {
                       handleData("parent_id", "");
                       setSelectedParentIssue(undefined);

@@ -536,6 +536,8 @@ export class ProjectStore implements IProjectStore {
     try {
       const response = await this.projectService.createProject(workspaceSlug, data);
       this.processProjectAfterCreation(workspaceSlug, response);
+      // a PM's new project belongs to the teams they lead: refresh what they may do in it
+      void this.rootStore.user.permission.fetchWorkspaceAccess(workspaceSlug);
       return response;
     } catch (error) {
       console.log("Failed to create project from project store");

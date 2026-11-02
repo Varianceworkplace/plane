@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from "react";
 import { observer } from "mobx-react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { LogOutOutline, SettingsOutline } from "@makeplane/propel/icons";
 // plane imports
 import { Avatar } from "@makeplane/propel/components/avatar";
@@ -22,20 +22,31 @@ import { AppSidebarItem } from "@/components/sidebar/sidebar-item";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
-import { useUser } from "@/hooks/store/user";
+import { useUser, useUserPermissions } from "@/hooks/store/user";
 
 export const UserMenuRoot = observer(function UserMenuRoot() {
   // states
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   // router
   const router = useRouter();
+  const { workspaceSlug } = useParams();
   // store hooks
   const { toggleAnySidebarDropdown } = useAppTheme();
   const { data: currentUser } = useUser();
   const { signOut } = useUser();
+  const { workspaceAccess } = useUserPermissions();
   const { toggleProfileSettingsModal } = useCommandPalette();
   // derived values
   const isUserInstanceAdmin = false;
+  // role-based access: the roles the person holds in this workspace
+  const access = workspaceSlug ? workspaceAccess[workspaceSlug.toString()] : undefined;
+  const roleLabel = !access?.is_rbac_enabled
+    ? undefined
+    : access.role_names?.length
+      ? access.role_names.join(", ")
+      : access.is_admin
+        ? "Workspace admin"
+        : "No role assigned";
   // translation
   const { t } = useTranslation();
 
@@ -107,6 +118,7 @@ export const UserMenuRoot = observer(function UserMenuRoot() {
                       {currentUser?.first_name} {currentUser?.last_name}
                     </p>
                     <p className="text-caption-md-regular">{currentUser?.email}</p>
+                    {roleLabel && <p className="mt-1 text-caption-md-medium">{roleLabel}</p>}
                   </div>
                 </div>
               </div>

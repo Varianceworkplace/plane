@@ -175,7 +175,7 @@ export const ANALYTICS_X_AXIS_VALUES: { value: ChartXAxisProperty; label: string
 export const ANALYTICS_Y_AXIS_VALUES: { value: ChartYAxisMetric; label: string }[] = [
   {
     value: ChartYAxisMetric.WORK_ITEM_COUNT,
-    label: "Work item",
+    label: "Project task",
   },
   {
     value: ChartYAxisMetric.ESTIMATE_POINT_COUNT,

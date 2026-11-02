@@ -11,6 +11,7 @@ import { useParams } from "next/navigation";
 import { WORKSPACE_SIDEBAR_DYNAMIC_NAVIGATION_ITEMS_LINKS, EUserPermissionsLevel } from "@plane/constants";
 import type { EUserWorkspaceRoles } from "@plane/types";
 // hooks
+import { RBAC_SIDEBAR_MODULES } from "@/components/access-control/types";
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useUserPermissions } from "@/hooks/store/user";
 import { useWorkspaceNavigationPreferences } from "@/hooks/use-navigation-preferences";
@@ -25,7 +26,8 @@ export const ExtendedAppSidebar = observer(function ExtendedAppSidebar() {
   const { workspaceSlug } = useParams();
   // store hooks
   const { isExtendedSidebarOpened, toggleExtendedSidebar } = useAppTheme();
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canAccess, workspaceAccess } = useUserPermissions();
+  const access = workspaceAccess[workspaceSlug.toString()];
   const { preferences: workspacePreferences, updateWorkspaceItemSortOrder } = useWorkspaceNavigationPreferences();
 
   // derived values
@@ -38,8 +40,9 @@ export const ExtendedAppSidebar = observer(function ExtendedAppSidebar() {
       WORKSPACE_SIDEBAR_DYNAMIC_NAVIGATION_ITEMS_LINKS.filter((item) => {
         // Permission check
         const hasPermission = allowPermissions(item.access, EUserPermissionsLevel.WORKSPACE, slug);
+        const rbacModule = RBAC_SIDEBAR_MODULES[item.key];
 
-        return hasPermission;
+        return hasPermission && (!rbacModule || canAccess(rbacModule, "view", slug));
       })
         // oxlint-disable-next-line oxc/no-map-spread
         .map((item) => {
@@ -60,7 +63,9 @@ export const ExtendedAppSidebar = observer(function ExtendedAppSidebar() {
           return a.sort_order - b.sort_order;
         })
     );
-  }, [workspaceSlug, currentWorkspaceNavigationPreferences, allowPermissions]);
+    // `access`: recompute once the person's role-based access has loaded or changed
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceSlug, currentWorkspaceNavigationPreferences, allowPermissions, canAccess, access]);
 
   const sortedNavigationItemsKeys = sortedNavigationItems.map((item) => item.key);
 

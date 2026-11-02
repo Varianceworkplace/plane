@@ -18,13 +18,14 @@ from django.db import models
 from django.db.models.functions import Cast, Concat
 
 # Module imports
-from plane.db.models import Issue
+from plane.db.models import Issue, ProjectMember, User, WorkspaceMember
 from plane.license.utils.instance_value import get_email_configuration
 from plane.utils.analytics_plot import build_graph_plot
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
 from plane.utils.issue_filters import issue_filters
 from plane.utils.csv_utils import sanitize_csv_row
+from plane.utils.work_item_visibility import as_viewer
 
 row_mapping = {
     "state__name": "State",
@@ -346,10 +347,45 @@ def generate_non_segmented_rows(
     return [tuple(row_zero)] + rows
 
 
+def export_viewer(user_id, slug):
+    """The person the analytics export is for, while they're still an admin or member of the workspace."""
+    if not user_id:
+        return None
+    user = User.objects.filter(pk=user_id, is_active=True).first()
+    if (
+        not user
+        or not WorkspaceMember.objects.filter(
+            workspace__slug=slug, member=user, is_active=True, role__in=[20, 15]
+        ).exists()
+    ):
+        return None
+    return user
+
+
 @shared_task
-def analytic_export_task(email, data, slug):
+def analytic_export_task(email, data, slug, user_id=None):
+    # The numbers cover what the person who asked can see: their projects and, within them, the work items visible
+    # to them. Nobody to run as (left the workspace, or a task queued before user_id was sent) means no email.
+    user = export_viewer(user_id, slug)
+    if user is None:
+        logging.getLogger("plane.worker").info("Analytics export skipped: no member to run it as.")
+        return
+    workspace_id = (
+        WorkspaceMember.objects.filter(workspace__slug=slug, member=user).values_list("workspace_id", flat=True).first()
+    )
+    with as_viewer(user, workspace_id):
+        build_and_send_analytics_export(email, data, slug, user)
+
+
+def build_and_send_analytics_export(email, data, slug, user):
     try:
         filters = issue_filters(data, "POST")
+        # also limits the detail lookups below (assignees, labels, states, cycles, modules)
+        filters["project_id__in"] = list(
+            ProjectMember.objects.filter(
+                member=user, workspace__slug=slug, is_active=True, project__archived_at__isnull=True
+            ).values_list("project_id", flat=True)
+        )
         queryset = Issue.issue_objects.filter(**filters, workspace__slug=slug)
 
         x_axis = data.get("x_axis", False)

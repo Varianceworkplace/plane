@@ -24,6 +24,9 @@ from plane.utils.host import base_host
 
 
 class IssueLinkViewSet(BaseViewSet):
+    # role-based access (plane.utils.work_item_visibility): changing this is editing the work item
+    rbac_work_item_actions = {"POST": "edit", "PUT": "edit", "PATCH": "edit", "DELETE": "edit"}
+
     permission_classes = [ProjectEntityPermission]
 
     model = IssueLink

@@ -67,7 +67,7 @@ export function CreateProjectModal(props: Props) {
         if (!open) onClose();
       }}
     >
-      <DialogContent size="lg">
+      <DialogContent size="xl">
         {currentStep === EProjectCreationSteps.CREATE_PROJECT && (
           // CreateProjectForm has no DialogBody scroller of its own yet, so this wrapper keeps the
           // whole form (including the submit footer) reachable on short viewports.

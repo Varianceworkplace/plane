@@ -66,7 +66,7 @@ export const PeekOverviewHeader = observer(function PeekOverviewHeader(props: Pr
       setToast({
         type: "success",
         title: "Link copied!",
-        message: "Work item link copied to clipboard.",
+        message: "Project task link copied to clipboard.",
       });
     });
   };

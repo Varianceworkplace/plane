@@ -79,6 +79,8 @@ export type TBarItem<T extends string> = {
   showTopBorderRadius?: (barKey: string, payload: any) => boolean;
   showBottomBorderRadius?: (barKey: string, payload: any) => boolean;
   shapeVariant?: TBarChartShapeVariant;
+  /** Called with the clicked bar's data item; bars become clickable when set. */
+  onClick?: (payload: any) => void;
 };
 
 export type TBarChartProps<K extends string, T extends string> = TAxisChartProps<K, T> & {

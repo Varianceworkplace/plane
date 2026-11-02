@@ -65,6 +65,8 @@ export type TIssueParams =
   | "state_group"
   | "state"
   | "assignees"
+  // the profile's Assigned tab: assigned to the person or to a group they're in
+  | "assigned_to"
   | "mentions"
   | "created_by"
   | "subscriber"

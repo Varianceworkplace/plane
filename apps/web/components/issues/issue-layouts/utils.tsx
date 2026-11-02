@@ -128,7 +128,7 @@ export const getGroupByColumns = ({
     return [
       {
         id: "All Issues",
-        name: `All ${isEpic ? "Epics" : "work items"}`,
+        name: `All ${isEpic ? "Epics" : "project tasks"}`,
         payload: {},
         icon: undefined,
       },
@@ -200,7 +200,7 @@ const getCycleColumns = (): IGroupByColumn[] | undefined => {
       icon: <CycleGroupIcon cycleGroup={cycleStatus} className="h-3.5 w-3.5" />,
       payload: { cycle_id: cycle.id },
       isDropDisabled,
-      dropErrorMessage: isDropDisabled ? "Work item cannot be moved to completed cycles" : undefined,
+      dropErrorMessage: isDropDisabled ? "Project task cannot be moved to completed cycles" : undefined,
     });
   });
   cycles.push({

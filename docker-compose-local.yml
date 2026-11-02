@@ -24,19 +24,12 @@ services:
       RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST}
 
   plane-minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    image: chainguard/minio:latest
     restart: unless-stopped
+    user: root
     networks:
       - dev_env
-    entrypoint: >
-      /bin/sh -c "
-      mkdir -p /export/${AWS_S3_BUCKET_NAME} &&
-      minio server /export --console-address ':9090' &
-      sleep 5 &&
-      mc alias set myminio http://localhost:9000 ${AWS_ACCESS_KEY_ID} ${AWS_SECRET_ACCESS_KEY} &&
-      mc mb myminio/${AWS_S3_BUCKET_NAME} -p || true
-      && tail -f /dev/null
-      "
+    command: server /export --console-address ':9090'
     volumes:
       - uploads:/export
     env_file:
@@ -61,7 +54,7 @@ services:
     environment:
       PGDATA: /var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5434:5432"
 
   api:
     build:
@@ -149,3 +142,7 @@ volumes:
 networks:
   dev_env:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
+          gateway: 172.18.0.1

@@ -30,7 +30,7 @@ export const MultipleSelectEntityAction = observer(function MultipleSelectEntity
       <Checkbox
         checked={isSelected}
         disabled={disabled}
-        aria-label="Select work item"
+        aria-label="Select project task"
         onClick={(e) => {
           e.stopPropagation();
           selectionHelpers.handleEntityClick(e, id, groupId);

@@ -29,6 +29,9 @@ from plane.utils.date_utils import (
 
 
 class AdvanceAnalyticsBaseView(BaseAPIView):
+    # role-based access (plane.utils.work_item_visibility): needs Analytics "view"
+    rbac_workspace_module = "analytics"
+
     def initialize_workspace(self, slug: str, type: str) -> None:
         self._workspace_slug = slug
         self.filters = get_analytics_filters(

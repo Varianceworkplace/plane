@@ -12,6 +12,7 @@ from django.db import models
 
 # Third party imports
 from rest_framework import status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 # Module imports
@@ -32,6 +33,21 @@ from plane.db.models import (
 from plane.utils.analytics_plot import build_graph_plot, VALID_ANALYTICS_FIELDS, VALID_YAXIS
 from plane.utils.issue_filters import issue_filters
 from plane.app.permissions import allow_permission, ROLE
+from plane.db.models import WorkspaceMember
+from plane.utils.rbac import rbac_profile
+
+
+def analytics_projects(request, slug):
+    """The projects workspace analytics count for this person: None for all of them (workspace admins), else the
+    projects they're a member of. With role-based access on, a role without Analytics "view" is refused."""
+    profile = rbac_profile(request, slug)
+    if profile is not None and not profile.can("analytics", "view"):
+        raise PermissionDenied("Your role doesn't include analytics.")
+    if WorkspaceMember.objects.filter(
+        member=request.user, workspace__slug=slug, role=ROLE.ADMIN.value, is_active=True
+    ).exists():
+        return None
+    return ProjectMember.objects.filter(member=request.user, workspace__slug=slug, is_active=True).values("project_id")
 
 
 class AnalyticsEndpoint(BaseAPIView):
@@ -57,6 +73,9 @@ class AnalyticsEndpoint(BaseAPIView):
 
         # Additional filters that need to be applied
         filters = issue_filters(request.GET, "GET")
+        projects = analytics_projects(request, slug)
+        if projects is not None:
+            filters["project_id__in"] = projects
 
         # Get the issues for the workspace with the additional filters applied
         queryset = Issue.issue_objects.filter(workspace__slug=slug, **filters)
@@ -192,7 +211,10 @@ class SavedAnalyticEndpoint(BaseAPIView):
         analytic_view = AnalyticView.objects.get(pk=analytic_id, workspace__slug=slug)
 
         filter = analytic_view.query
-        queryset = Issue.issue_objects.filter(**filter)
+        queryset = Issue.issue_objects.filter(**filter).filter(workspace__slug=slug)
+        projects = analytics_projects(request, slug)
+        if projects is not None:
+            queryset = queryset.filter(project_id__in=projects)
 
         x_axis = analytic_view.query_dict.get("x_axis", False)
         y_axis = analytic_view.query_dict.get("y_axis", False)
@@ -240,7 +262,9 @@ class ExportAnalyticsEndpoint(BaseAPIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        analytic_export_task.delay(email=request.user.email, data=request.data, slug=slug)
+        # user_id: the task counts only what this person can see (their projects, their visible work items)
+        analytics_projects(request, slug)
+        analytic_export_task.delay(email=request.user.email, data=request.data, slug=slug, user_id=str(request.user.id))
 
         return Response(
             {"message": f"Once the export is ready it will be emailed to you at {str(request.user.email)}"},
@@ -252,6 +276,9 @@ class DefaultAnalyticsEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def get(self, request, slug):
         filters = issue_filters(request.GET, "GET")
+        projects = analytics_projects(request, slug)
+        if projects is not None:
+            filters["project_id__in"] = projects
         base_issues = Issue.issue_objects.filter(workspace__slug=slug, **filters)
 
         total_issues = base_issues.count()
@@ -407,6 +434,9 @@ class ProjectStatsEndpoint(BaseAPIView):
             requested_fields = valid_fields
 
         projects = Project.objects.filter(workspace__slug=slug)
+        allowed = analytics_projects(request, slug)
+        if allowed is not None:
+            projects = projects.filter(pk__in=allowed)
         if project_ids:
             projects = projects.filter(id__in=project_ids.split(","))
 

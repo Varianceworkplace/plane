@@ -65,7 +65,7 @@ export const useGroupIssuesDragNDrop = (
     const errorToastProps: SetToastProps = {
       type: "error",
       title: "Error!",
-      message: "Error while updating work item",
+      message: "Error while updating project task",
     };
     const moduleKey = ISSUE_FILTER_DEFAULT_DATA["module"];
     const cycleKey = ISSUE_FILTER_DEFAULT_DATA["cycle"];

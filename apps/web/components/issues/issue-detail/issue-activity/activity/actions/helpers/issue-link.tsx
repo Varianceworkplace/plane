@@ -34,7 +34,7 @@ export function IssueLink(props: TIssueLink) {
   });
   return (
     <Tooltip
-      label={activity.issue_detail ? activity.issue_detail.name : "This work item has been deleted"}
+      label={activity.issue_detail ? activity.issue_detail.name : "This project task has been deleted"}
       layout="stacked"
       disabled={isMobile}
     >
@@ -47,7 +47,7 @@ export function IssueLink(props: TIssueLink) {
       >
         {activity.issue_detail
           ? `${activity.project_detail.identifier}-${activity.issue_detail.sequence_id}`
-          : "Work items"}{" "}
+          : "Project tasks"}{" "}
         <span className="font-regular">{activity.issue_detail?.name}</span>
       </a>
     </Tooltip>

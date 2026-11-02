@@ -47,7 +47,7 @@ export const IssuesHeader = observer(function IssuesHeader() {
   const { currentProjectDetails, loader } = useProject();
 
   const { toggleCreateIssueModal } = useCommandPalette();
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canCreateWorkItem } = useUserPermissions();
   const { isMobile } = usePlatformOS();
 
   const SPACE_APP_URL =
@@ -56,10 +56,9 @@ export const IssuesHeader = observer(function IssuesHeader() {
   const publishedURL = `${SPACE_APP_URL}/issues/${currentProjectDetails?.anchor}`;
 
   const issuesCount = getGroupIssueCount(undefined, undefined, false);
-  const canUserCreateIssue = allowPermissions(
-    [EUserPermissions.ADMIN, EUserPermissions.MEMBER],
-    EUserPermissionsLevel.PROJECT
-  );
+  const canUserCreateIssue =
+    allowPermissions([EUserPermissions.ADMIN, EUserPermissions.MEMBER], EUserPermissionsLevel.PROJECT) &&
+    canCreateWorkItem(projectId?.toString());
 
   return (
     <Header>
@@ -74,7 +73,7 @@ export const IssuesHeader = observer(function IssuesHeader() {
             <Breadcrumbs.Item
               component={
                 <BreadcrumbLink
-                  label="Work Items"
+                  label="Project Tasks"
                   href={`/${workspaceSlug}/projects/${projectId}/issues/`}
                   icon={<WorkItemsOutline className="h-4 w-4 text-tertiary" />}
                   isLast
@@ -85,7 +84,7 @@ export const IssuesHeader = observer(function IssuesHeader() {
           </Breadcrumbs>
           {issuesCount && issuesCount > 0 ? (
             <Tooltip
-              label={`There are ${issuesCount} ${issuesCount > 1 ? "work items" : "work item"} in this project`}
+              label={`There are ${issuesCount} ${issuesCount > 1 ? "project tasks" : "project task"} in this project`}
               layout="stacked"
               side="bottom"
               disabled={isMobile}

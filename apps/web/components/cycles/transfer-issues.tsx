@@ -34,7 +34,7 @@ export function TransferIssues(props: Props) {
             iconPosition="start"
             onClick={handleClick}
             disabled={disabled}
-            label="Transfer work items"
+            label="Transfer project tasks"
           />
         </div>
       )}
