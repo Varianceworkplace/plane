@@ -16,6 +16,7 @@ from plane.app.views.worklog.base import (
     WorkspaceWorkLogTimerStopEndpoint,
 )
 from plane.app.views.worklog.estimate import IssueTimeEstimateEndpoint, ProjectTimeEstimatesEndpoint
+from plane.app.views.worklog.analytics import WorkLogReportAnalyticsEndpoint, WorkLogReportOptionsEndpoint
 from plane.app.views.worklog.report import (
     WorkLogReportDetailEndpoint,
     WorkLogReportDownloadEndpoint,
@@ -72,6 +73,16 @@ urlpatterns = [
         name="workspace-worklogs-download",
     ),
     path("workspaces/<str:slug>/worklog-reports/", WorkLogReportEndpoint.as_view(), name="worklog-reports"),
+    path(
+        "workspaces/<str:slug>/worklog-reports/analytics/",
+        WorkLogReportAnalyticsEndpoint.as_view(),
+        name="worklog-report-analytics",
+    ),
+    path(
+        "workspaces/<str:slug>/worklog-reports/options/",
+        WorkLogReportOptionsEndpoint.as_view(),
+        name="worklog-report-options",
+    ),
     path(
         "workspaces/<str:slug>/worklog-reports/monthly/",
         WorkLogReportMonthlyEndpoint.as_view(),

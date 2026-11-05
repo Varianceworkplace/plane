@@ -13,8 +13,9 @@ Worklog reports (Reports > Project-wise / User-wise).
       - project members: only the time they logged themselves
       - guests: nothing
   * Filters: ?project=&logged_by=&issue=&state_group=&state= (comma separated) and ?from_date=&to_date= (YYYY-MM-DD,
-    both inclusive, in the requesting user's timezone). The date is when the work started (timer entries) or
-    when it was logged (manual entries).
+    both inclusive, in the requesting user's timezone). ?team= (departments), ?pm= (the teams a project manager
+    leads) and ?group= (member groups) narrow to the people in them, together with ?logged_by=. The date is when the
+    work started (timer entries) or when it was logged (manual entries).
   * ?group_by=work_item lists worklogs work item by work item (newest first within each) instead of newest first.
 """
 
@@ -39,7 +40,17 @@ from rest_framework.response import Response
 # Module imports
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.views.base import BaseAPIView
-from plane.db.models import Issue, Project, ProjectMember, StateGroup, User, WorkspaceMember
+from plane.db.models import (
+    Issue,
+    IssueAssignee,
+    MemberGroupMember,
+    Project,
+    ProjectMember,
+    StateGroup,
+    TeamMember,
+    User,
+    WorkspaceMember,
+)
 from plane.utils.csv_utils import sanitize_csv_row
 from plane.utils.rbac import rbac_profile
 
@@ -105,6 +116,37 @@ def visible_worklogs(user, slug, scope):
     )
 
 
+def report_people(request, slug):
+    """The people ?logged_by=, ?team=, ?pm= and ?group= narrow a report to (all of them that are given), or None."""
+    sets = []
+    users = _uuid_list(request.GET.get("logged_by"))
+    if users:
+        sets.append(set(users))
+    teams = _uuid_list(request.GET.get("team"))
+    if teams:
+        sets.append(
+            set(TeamMember.objects.filter(workspace__slug=slug, team_id__in=teams).values_list("member_id", flat=True))
+        )
+    managers = _uuid_list(request.GET.get("pm"))
+    if managers:
+        led = TeamMember.objects.filter(workspace__slug=slug, member_id__in=managers, is_lead=True).values("team_id")
+        sets.append(
+            set(TeamMember.objects.filter(workspace__slug=slug, team_id__in=led).values_list("member_id", flat=True))
+        )
+    groups = _uuid_list(request.GET.get("group"))
+    if groups:
+        sets.append(
+            set(
+                MemberGroupMember.objects.filter(workspace__slug=slug, group_id__in=groups).values_list(
+                    "member_id", flat=True
+                )
+            )
+        )
+    if not sets:
+        return None
+    return set.intersection(*sets)
+
+
 def _parse_date(value, field):
     if not value:
         return None
@@ -130,9 +172,9 @@ def report_worklogs(request, slug, scope):
     projects = _uuid_list(request.GET.get("project"))
     if projects:
         worklogs = worklogs.filter(project_id__in=projects)
-    users = _uuid_list(request.GET.get("logged_by"))
-    if users:
-        worklogs = worklogs.filter(logged_by_id__in=users)
+    people = report_people(request, slug)
+    if people is not None:
+        worklogs = worklogs.filter(logged_by_id__in=people)
     issues = _uuid_list(request.GET.get("issue"))
     if issues:
         worklogs = worklogs.filter(issue_id__in=issues)
@@ -366,8 +408,22 @@ class WorkLogReportMonthlyEndpoint(ReportBaseEndpoint):
         return Response({**self.monthly(request, worklogs), "scope": serialize_scope(scope)}, status=status.HTTP_200_OK)
 
 
+# ?ordering= keys of the worklog list, and what they sort on
+DETAIL_SORTS = {
+    "work_date": "work_at",
+    "duration": "duration",
+    "user": "logged_by__display_name",
+    "project": "project__identifier",
+    "task": "issue__name",
+    "status": "issue__state__name",
+}
+
+
 class WorkLogReportDetailEndpoint(ReportBaseEndpoint):
     """Date-wise worklogs behind a chart bar (usually filtered to one user), or a project's worklogs.
+
+    ?search= matches the work item, the description, the person and the project; ?ordering= sorts by one of
+    DETAIL_SORTS (prefix - for descending). Each worklog carries its work item's assignees.
 
     With ?group_by=work_item the page lists one work item after the other, and `work_items` carries each work
     item's totals over every page, so a group split across pages still shows its full total.
@@ -378,6 +434,27 @@ class WorkLogReportDetailEndpoint(ReportBaseEndpoint):
         _, worklogs, error = self.report(request, slug)
         if error:
             return error
+        search = (request.GET.get("search") or "").strip()
+        if search:
+            worklogs = worklogs.filter(
+                Q(issue__name__icontains=search)
+                | Q(description__icontains=search)
+                | Q(logged_by__display_name__icontains=search)
+                | Q(logged_by__first_name__icontains=search)
+                | Q(logged_by__last_name__icontains=search)
+                | Q(project__name__icontains=search)
+                | Q(project__identifier__icontains=search)
+            )
+        ordering = request.GET.get("ordering") or ""
+        if ordering:
+            field = DETAIL_SORTS.get(ordering.removeprefix("-"))
+            if not field:
+                return Response(
+                    {"ordering": f"Sort by one of: {', '.join(DETAIL_SORTS)} (prefix - for descending)."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            direction = "-" if ordering.startswith("-") else ""
+            worklogs = worklogs.order_by(f"{direction}{field}", "-work_at", "-created_at")
         try:
             per_page = min(max(int(request.GET.get("per_page", DEFAULT_PAGE_SIZE)), 1), MAX_PAGE_SIZE)
             page = max(int(request.GET.get("page", 1)), 1)
@@ -396,8 +473,16 @@ class WorkLogReportDetailEndpoint(ReportBaseEndpoint):
             .order_by("-work_date")
         ]
         offset = (page - 1) * per_page
+        page_worklogs = list(worklogs[offset : offset + per_page])
+        assignees = {}
+        for row in IssueAssignee.objects.filter(issue_id__in={w.issue_id for w in page_worklogs}).select_related(
+            "assignee"
+        ):
+            assignees.setdefault(row.issue_id, []).append(serialize_user(row.assignee))
         body = {
-            "results": [serialize_report_worklog(w) for w in worklogs[offset : offset + per_page]],
+            "results": [
+                {**serialize_report_worklog(w), "assignees": assignees.get(w.issue_id, [])} for w in page_worklogs
+            ],
             "days": days,
             "total_count": sum(d["worklog_count"] for d in days),
             "total_duration": sum(d["total_duration"] for d in days),
@@ -419,9 +504,10 @@ class WorkLogReportDetailEndpoint(ReportBaseEndpoint):
 
 
 class WorkLogReportDownloadEndpoint(ReportBaseEndpoint):
-    """?type=csv|xlsx&view=summary|monthly|worklogs.
+    """?type=csv|xlsx&view=summary|monthly|worklogs|analytics (with ?period= for analytics).
 
-    CSV carries the requested view; Excel files add the worklogs behind it as a second sheet.
+    CSV carries the requested view (analytics: every table one after the other); Excel files add the report
+    analytics (tasks, people, projects, departments, milestones, tickets) and the worklogs behind it as more sheets.
     """
 
     WORKLOG_HEADERS = [
@@ -525,9 +611,17 @@ class WorkLogReportDownloadEndpoint(ReportBaseEndpoint):
         if file_format not in ("csv", "xlsx"):
             return Response({"error": "Type must be csv or xlsx."}, status=status.HTTP_400_BAD_REQUEST)
         view = request.GET.get("view", "summary")
-        if view not in ("summary", "monthly", "worklogs"):
-            return Response({"error": "View must be summary, monthly or worklogs."}, status=status.HTTP_400_BAD_REQUEST)
-        _, worklogs, error = self.report(request, slug)
+        if view not in ("summary", "monthly", "worklogs", "analytics"):
+            return Response(
+                {"error": "View must be summary, monthly, worklogs or analytics."}, status=status.HTTP_400_BAD_REQUEST
+            )
+        # analytics builds on this module's report filters, so it's imported here
+        from .analytics import PERIODS, analytics_sheets, build_analytics
+
+        period = request.GET.get("period") or None
+        if period is not None and period not in PERIODS:
+            return Response({"period": f"Use one of: {', '.join(PERIODS)}."}, status=status.HTTP_400_BAD_REQUEST)
+        scope, worklogs, error = self.report(request, slug)
         if error:
             return error
 
@@ -535,8 +629,13 @@ class WorkLogReportDownloadEndpoint(ReportBaseEndpoint):
         sheets = {}
         if view == "monthly":
             sheets["Monthly"] = self.monthly_rows(self.monthly(request, worklogs))
-        elif file_format == "xlsx" or view == "summary":
+        elif view != "analytics" and (file_format == "xlsx" or view == "summary"):
             sheets["Summary"] = self.summary_rows(build_summary(worklogs))
+        analytics = {}
+        if view == "analytics" or (file_format == "xlsx" and view in ("summary", "monthly")):
+            report_period = period or ("month" if view == "monthly" else None)
+            analytics = analytics_sheets(build_analytics(request, slug, scope, worklogs, report_period))
+            sheets.update(analytics)
         if file_format == "xlsx" or view == "worklogs":
             sheets["Worklogs"] = self.worklog_rows(worklogs, tz)
 
@@ -548,9 +647,10 @@ class WorkLogReportDownloadEndpoint(ReportBaseEndpoint):
                 sheet = workbook.create_sheet(title)
                 for row in rows:
                     sheet.append(sanitize_csv_row(row))
-                # header, totals and per-user subtotals
+                # header, plus totals and per-user subtotals outside the analytics tables
                 for row in sheet.iter_rows():
-                    if row[0].row in (1, sheet.max_row) or row[1].value == "Total":
+                    with_totals = title not in analytics and (row[0].row == sheet.max_row or row[1].value == "Total")
+                    if row[0].row == 1 or with_totals:
                         for cell in row:
                             cell.font = Font(bold=True)
             buffer = io.BytesIO()
@@ -565,6 +665,13 @@ class WorkLogReportDownloadEndpoint(ReportBaseEndpoint):
         response = HttpResponse(content_type="text/csv")
         response["Content-Disposition"] = f'attachment; filename="{filename}-{view}.csv"'
         writer = csv.writer(response)
+        if view == "analytics":
+            for title, rows in analytics.items():
+                writer.writerow([title])
+                for row in rows:
+                    writer.writerow(sanitize_csv_row(row))
+                writer.writerow([])
+            return response
         for row in next(iter(sheets.values())):
             writer.writerow(sanitize_csv_row(row))
         return response

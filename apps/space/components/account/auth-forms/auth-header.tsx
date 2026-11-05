@@ -27,7 +27,7 @@ const Titles: TAuthHeaderDetails = {
   },
   [EAuthModes.SIGN_UP]: {
     header: "View, comment, and do more",
-    subHeader: "Sign up or log in to work with Plane project tasks and Pages.",
+    subHeader: "Sign up or log in to work with Variance project tasks and Pages.",
   },
 };
 
@@ -41,7 +41,7 @@ export function AuthHeader(props: TAuthHeader) {
 
     return {
       header: "Comment or react to project tasks",
-      subHeader: "Use plane to add your valuable inputs to features.",
+      subHeader: "Use Variance to add your valuable inputs to features.",
     };
   };
 

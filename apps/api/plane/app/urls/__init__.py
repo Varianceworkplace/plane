@@ -28,6 +28,7 @@ from .milestone import urlpatterns as milestone_urls
 from .member_group import urlpatterns as member_group_urls
 from .task_detail import urlpatterns as task_detail_urls
 from .project_detail import urlpatterns as project_detail_urls
+from .project_summary import urlpatterns as project_summary_urls
 from .rbac import urlpatterns as rbac_urls
 
 urlpatterns = [
@@ -57,5 +58,6 @@ urlpatterns = [
     *member_group_urls,
     *task_detail_urls,
     *project_detail_urls,
+    *project_summary_urls,
     *rbac_urls,
 ]

@@ -81,7 +81,7 @@ export const JoinRequestNotificationItem = observer(function JoinRequestNotifica
         fetchUserProjectPermissions(workspaceSlug),
         fetchWorkspaceAccess(workspaceSlug),
       ]).catch((error: unknown) => console.error(error));
-      router.push(`/${workspaceSlug}/projects/${notification.project}/issues`);
+      router.push(`/${workspaceSlug}/projects/${notification.project}/summary`);
     }
   };
 

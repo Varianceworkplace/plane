@@ -15,7 +15,6 @@ import { ROLE } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 // types
 import { Button } from "@makeplane/propel/components/button";
-import { PlaneLogo } from "@plane/blocks/icons";
 import { setToast } from "@plane/blocks/toast";
 import type { IWorkspaceMemberInvitation } from "@plane/types";
 import { truncateText } from "@plane/utils";
@@ -23,6 +22,7 @@ import { truncateText } from "@plane/utils";
 import emptyInvitation from "@/app/assets/empty-state/invitation.svg?url";
 // components
 import { EmptyState } from "@/components/common/empty-state";
+import { VarianceMark } from "@/components/common/variance-logo";
 import { WorkspaceLogo } from "@/components/workspace/logo";
 import { USER_WORKSPACES_LIST } from "@plane/constants";
 // hooks
@@ -87,7 +87,9 @@ function UserInvitationsPage() {
             setIsJoiningWorkspaces(false);
             fetchWorkspaces().then(() => {
               router.push(`/${redirectWorkspace?.slug}`);
+              return undefined;
             });
+            return undefined;
           })
           .catch(() => {
             setToast({
@@ -97,6 +99,7 @@ function UserInvitationsPage() {
             });
             setIsJoiningWorkspaces(false);
           });
+        return undefined;
       })
       .catch((_err) => {
         setToast({
@@ -117,7 +120,7 @@ function UserInvitationsPage() {
             href="/"
             className="absolute top-1/2 left-5 z-10 grid -translate-y-1/2 place-items-center px-3 sm:top-12 sm:left-1/2 sm:-translate-x-[15px] sm:translate-y-0 sm:px-0 sm:py-5 md:left-1/3"
           >
-            <PlaneLogo className="h-9 w-auto text-primary" />
+            <VarianceMark className="h-9" />
           </Link>
           <div className="absolute top-1/4 right-4 -translate-y-1/2 text-13 text-primary sm:fixed sm:top-12 sm:right-16 sm:translate-y-0 sm:py-5">
             {currentUser?.email}

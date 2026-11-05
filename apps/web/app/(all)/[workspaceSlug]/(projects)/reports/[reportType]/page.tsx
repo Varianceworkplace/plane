@@ -13,7 +13,9 @@ import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 // components
 import { PageHead } from "@/components/core/page-title";
 import { WORKLOG_REPORT_TYPES, isWorklogReportType } from "@/components/worklog-reports/helpers";
+import { QuarterlyWorklogReport, YearlyWorklogReport } from "@/components/worklog-reports/long-period-report";
 import { MonthlyWorklogReport } from "@/components/worklog-reports/monthly-report";
+import { PeriodWorklogReport } from "@/components/worklog-reports/period-report";
 import { WorklogReportRoot } from "@/components/worklog-reports/worklog-report-root";
 // hooks
 import { useAppRouter } from "@/hooks/use-app-router";
@@ -56,6 +58,16 @@ function WorklogReportsPage({ params }: Route.ComponentProps) {
             {/* keyed so each report keeps its own filters */}
             {reportType === "monthly" ? (
               <MonthlyWorklogReport workspaceSlug={workspaceSlug} />
+            ) : reportType === "quarterly" ? (
+              <QuarterlyWorklogReport workspaceSlug={workspaceSlug} />
+            ) : reportType === "yearly" ? (
+              <YearlyWorklogReport workspaceSlug={workspaceSlug} />
+            ) : reportType === "daily" || reportType === "weekly" ? (
+              <PeriodWorklogReport
+                key={reportType}
+                workspaceSlug={workspaceSlug}
+                period={reportType === "daily" ? "day" : "week"}
+              />
             ) : (
               <WorklogReportRoot key={reportType} workspaceSlug={workspaceSlug} reportType={reportType} />
             )}

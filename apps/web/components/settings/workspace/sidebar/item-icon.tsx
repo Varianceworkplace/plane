@@ -6,7 +6,6 @@
 
 import type { LucideIcon } from "lucide-react";
 import {
-  BillingsOutline,
   BuildingOutline,
   ExportOutline,
   LockOutline,
@@ -24,6 +23,5 @@ export const WORKSPACE_SETTINGS_ICONS: Record<TWorkspaceSettingsTabs, LucideIcon
   "access-control": LockOutline,
   groups: TeamspacesOutline,
   export: ExportOutline,
-  "billing-and-plans": BillingsOutline,
   webhooks: WebhooksOutline,
 };

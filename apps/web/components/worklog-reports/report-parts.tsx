@@ -14,7 +14,8 @@ import { getFileURL } from "@plane/utils";
 import { getWorklogUserName } from "@/components/worklogs/helpers";
 import type { TWorklogUser } from "@/components/worklogs/types";
 
-export const TABLE_CLASSNAME = "overflow-hidden rounded-lg border-[0.5px] border-subtle";
+// wide tables scroll sideways on narrow screens instead of being cut off
+export const TABLE_CLASSNAME = "overflow-x-auto rounded-lg border-[0.5px] border-subtle";
 export const HEAD_CELL = "px-3 py-2.5 font-medium";
 export const ROW_CLASSNAME =
   "cursor-pointer border-t-[0.5px] border-subtle text-body-xs-regular text-primary hover:bg-layer-transparent-hover";
@@ -62,12 +63,23 @@ export function Section({
   );
 }
 
-export function ReportExportMenu({
+export type TReportExportFormat = "csv" | "xlsx" | "pdf";
+
+const EXPORT_LABELS: Record<TReportExportFormat, string> = {
+  csv: "Export as CSV",
+  xlsx: "Export as Excel",
+  pdf: "Export as PDF",
+};
+
+/** Export split button: the main click exports the first format, the menu lists them all. */
+export function ReportExportMenu<T extends TReportExportFormat = "csv" | "xlsx">({
   disabled,
   onExport,
+  formats = ["csv", "xlsx"] as T[],
 }: {
   disabled: boolean;
-  onExport: (format: "csv" | "xlsx") => void;
+  onExport: (format: T) => void;
+  formats?: T[];
 }) {
   return (
     <Menu>
@@ -77,11 +89,12 @@ export function ReportExportMenu({
         label="Export"
         menuLabel="Choose export format"
         disabled={disabled}
-        onClick={() => onExport("csv")}
+        onClick={() => onExport(formats[0])}
       />
       <MenuContent side="bottom" align="end">
-        <MenuItem label="Export as CSV" onClick={() => onExport("csv")} />
-        <MenuItem label="Export as Excel" onClick={() => onExport("xlsx")} />
+        {formats.map((format) => (
+          <MenuItem key={format} label={EXPORT_LABELS[format]} onClick={() => onExport(format)} />
+        ))}
       </MenuContent>
     </Menu>
   );

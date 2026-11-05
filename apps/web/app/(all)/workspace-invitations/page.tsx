@@ -7,14 +7,7 @@
 import { observer } from "mobx-react";
 import { useSearchParams } from "next/navigation";
 import useSWR from "swr";
-import {
-  BoxesOutline,
-  CloseOutline,
-  ShareAltOutline,
-  StarOutline,
-  TickOutline,
-  UserOutline,
-} from "@makeplane/propel/icons";
+import { BoxesOutline, CloseOutline, TickOutline, UserOutline } from "@makeplane/propel/icons";
 // components
 import { LogoSpinner } from "@/components/common/logo-spinner";
 import { EmptySpace, EmptySpaceItem } from "@/components/ui/empty-space";
@@ -64,6 +57,7 @@ function WorkspaceInvitationPage() {
         } else {
           router.push("/");
         }
+        return undefined;
       })
       .catch((err: unknown) => console.error(err));
   };
@@ -77,6 +71,7 @@ function WorkspaceInvitationPage() {
       })
       .then(() => {
         router.push("/");
+        return undefined;
       })
       .catch((err: unknown) => console.error(err));
   };
@@ -92,7 +87,7 @@ function WorkspaceInvitationPage() {
           ) : (
             <EmptySpace
               title={`You have been invited to ${invitationDetail.workspace.name}`}
-              description="Your workspace is where you'll create projects, collaborate on your project tasks, and organize different streams of work in your Plane account."
+              description="Your workspace is where you'll create projects, collaborate on your project tasks, and organize different streams of work in your Variance account."
             >
               <EmptySpaceItem Icon={TickOutline} title="Accept" action={handleAccept} />
               <EmptySpaceItem Icon={CloseOutline} title="Ignore" action={handleReject} />
@@ -102,14 +97,14 @@ function WorkspaceInvitationPage() {
           invitationDetail?.accepted ? (
             <EmptySpace
               title={`You are already a member of ${invitationDetail.workspace.name}`}
-              description="Your workspace is where you'll create projects, collaborate on your project tasks, and organize different streams of work in your Plane account."
+              description="Your workspace is where you'll create projects, collaborate on your project tasks, and organize different streams of work in your Variance account."
             >
               <EmptySpaceItem Icon={BoxesOutline} title="Continue to home" href="/" />
             </EmptySpace>
           ) : (
             <EmptySpace
               title="This invitation link is not active anymore."
-              description="Your workspace is where you'll create projects, collaborate on your project tasks, and organize different streams of work in your Plane account."
+              description="Your workspace is where you'll create projects, collaborate on your project tasks, and organize different streams of work in your Variance account."
               link={{ text: "Or start from an empty project", href: "/" }}
             >
               {!currentUser ? (
@@ -117,12 +112,6 @@ function WorkspaceInvitationPage() {
               ) : (
                 <EmptySpaceItem Icon={BoxesOutline} title="Continue to home" href="/" />
               )}
-              <EmptySpaceItem Icon={StarOutline} title="Star us on GitHub" href="https://github.com/makeplane" />
-              <EmptySpaceItem
-                Icon={ShareAltOutline}
-                title="Join our community of active creators"
-                href="https://forum.plane.so"
-              />
             </EmptySpace>
           )
         ) : (

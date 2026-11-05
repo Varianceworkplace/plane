@@ -24,33 +24,37 @@ type TAuthHeader = {
   currentAuthStep: EAuthSteps;
 };
 
-const Titles = {
+const SignInHeader = (
+  <span className="flex flex-col items-center gap-2 text-center">
+    <span className="text-h3-bold text-primary">Welcome back</span>
+    <span className="text-body-md-regular text-balance text-secondary">Sign in to your VarianceInfoTech account.</span>
+  </span>
+);
+
+const Titles: Record<EAuthModes, Record<EAuthSteps, { header?: React.ReactNode; subHeader?: string }>> = {
   [EAuthModes.SIGN_IN]: {
     [EAuthSteps.EMAIL]: {
-      header: "Work in all dimensions.",
-      subHeader: "Welcome back to Plane.",
+      header: SignInHeader,
     },
     [EAuthSteps.PASSWORD]: {
-      header: "Work in all dimensions.",
-      subHeader: "Welcome back to Plane.",
+      header: SignInHeader,
     },
     [EAuthSteps.UNIQUE_CODE]: {
-      header: "Work in all dimensions.",
-      subHeader: "Welcome back to Plane.",
+      header: SignInHeader,
     },
   },
   [EAuthModes.SIGN_UP]: {
     [EAuthSteps.EMAIL]: {
       header: "Work in all dimensions.",
-      subHeader: "Create your Plane account.",
+      subHeader: "Create your Variance account.",
     },
     [EAuthSteps.PASSWORD]: {
       header: "Work in all dimensions.",
-      subHeader: "Create your Plane account.",
+      subHeader: "Create your Variance account.",
     },
     [EAuthSteps.UNIQUE_CODE]: {
       header: "Work in all dimensions.",
-      subHeader: "Create your Plane account.",
+      subHeader: "Create your Variance account.",
     },
   },
 };
@@ -74,11 +78,11 @@ export const AuthHeader = observer(function AuthHeader(props: TAuthHeader) {
   const getHeaderSubHeader = (
     step: EAuthSteps,
     mode: EAuthModes,
-    invitation: IWorkspaceMemberInvitation | undefined,
+    workspaceInvitation: IWorkspaceMemberInvitation | undefined,
     email: string | undefined
   ) => {
-    if (invitation && email && invitation.email === email && invitation.workspace) {
-      const workspace = invitation.workspace;
+    if (workspaceInvitation && email && workspaceInvitation.email === email && workspaceInvitation.workspace) {
+      const workspace = workspaceInvitation.workspace;
       return {
         header: (
           <div className="relative inline-flex items-center gap-2">
@@ -110,15 +114,15 @@ export const AuthHeader = observer(function AuthHeader(props: TAuthHeader) {
 });
 
 type TAuthHeaderBase = {
-  header: React.ReactNode;
-  subHeader: string;
+  header?: React.ReactNode;
+  subHeader?: string;
 };
 
 export function AuthHeaderBase(props: TAuthHeaderBase) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-h4-semibold text-primary">{props.header}</span>
-      <span className="text-h4-semibold text-placeholder">{props.subHeader}</span>
+      {props.header && <span className="text-h4-semibold text-primary">{props.header}</span>}
+      {props.subHeader && <span className="text-h4-semibold text-placeholder">{props.subHeader}</span>}
     </div>
   );
 }

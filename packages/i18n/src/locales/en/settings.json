@@ -115,7 +115,7 @@
     "empty_state": {
       "activity": {
         "title": "No activities yet",
-        "description": "Get started by creating a new project task! Add details and properties to it. Explore more in Plane to see your activity."
+        "description": "Get started by creating a new project task! Add details and properties to it. Explore more in Variance to see your activity."
       },
       "assigned": {
         "title": "No project tasks are assigned to you",

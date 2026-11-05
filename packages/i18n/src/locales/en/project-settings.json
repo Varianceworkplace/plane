@@ -185,18 +185,18 @@
       "description": "Configure automated actions to streamline your project management workflow and reduce manual tasks.",
       "auto-archive": {
         "title": "Auto-archive closed project tasks",
-        "description": "Plane will auto archive project tasks that have been completed or canceled.",
+        "description": "Variance will auto archive project tasks that have been completed or canceled.",
         "duration": "Auto-archive project tasks that are closed for"
       },
       "auto-close": {
         "title": "Auto-close project tasks",
-        "description": "Plane will automatically close project tasks that haven't been completed or canceled.",
+        "description": "Variance will automatically close project tasks that haven't been completed or canceled.",
         "duration": "Auto-close project tasks that are inactive for",
         "auto_close_status": "Auto-close status"
       },
       "auto-remind": {
         "title": "Auto-reminders",
-        "description": "Plane will automatically send reminders via email and in-app notifications to keep your team on track with deadlines.",
+        "description": "Variance will automatically send reminders via email and in-app notifications to keep your team on track with deadlines.",
         "duration": "Send reminder before"
       }
     },
@@ -374,7 +374,7 @@
         },
         "email": {
           "title": "Email",
-          "description": "Collect new project tasks from anyone who sends an email to a Plane email address.",
+          "description": "Collect new project tasks from anyone who sends an email to a Variance email address.",
           "fieldName": "Email ID"
         },
         "form": {

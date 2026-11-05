@@ -87,12 +87,13 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
   const handleClose = useCallback(() => toggleExtendedProjectSidebar(false), [toggleExtendedProjectSidebar]);
 
   const handleCopyText = (projectId: string) => {
-    copyUrlToClipboard(`${workspaceSlug}/projects/${projectId}/issues`).then(() => {
+    copyUrlToClipboard(`${workspaceSlug}/projects/${projectId}/summary`).then(() => {
       setToast({
         type: "success",
         title: t("link_copied"),
         message: t("project_link_copied_to_clipboard"),
       });
+      return undefined;
     });
   };
   return (
@@ -138,6 +139,7 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
                 type="text"
                 placeholder={t("search")}
                 value={searchQuery}
+                // oxlint-disable-next-line jsx-a11y/no-autofocus -- the search box is the only thing in this panel and is meant to be typed into straight away
                 autoFocus
                 onChange={(e) => setSearchQuery(e.target.value)}
               />

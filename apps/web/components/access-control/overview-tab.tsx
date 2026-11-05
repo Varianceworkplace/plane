@@ -71,7 +71,7 @@ export const AccessOverviewTab = observer(function AccessOverviewTab(props: Prop
         title: enabled ? "Role-based access is on" : "Role-based access is off",
         message: enabled
           ? "Project memberships are being updated for HR and PMs."
-          : "Plane's own roles apply again; memberships added for roles are being removed.",
+          : "Variance's own roles apply again; memberships added for roles are being removed.",
       });
       onChanged();
       // menus and buttons follow the switch straight away
@@ -102,8 +102,8 @@ export const AccessOverviewTab = observer(function AccessOverviewTab(props: Prop
           </span>
           <span className="text-body-xs-regular text-secondary">
             When on, what people see and do follows their roles and teams: HR sees everything, a PM their teams'
-            projects and work, an employee only the work assigned to them. When off, Plane's own Admin / Member / Guest
-            roles apply and nothing set up here has any effect.
+            projects and work, an employee only the work assigned to them. When off, Variance's own Admin / Member /
+            Guest roles apply and nothing set up here has any effect.
           </span>
           {!overview.can_switch && (
             <span className="text-caption-md-regular text-tertiary">Only workspace admins can turn it on or off.</span>
@@ -175,7 +175,7 @@ export const AccessOverviewTab = observer(function AccessOverviewTab(props: Prop
             <p className="px-5 py-4 text-body-sm-regular text-secondary">
               {confirming
                 ? "Everyone's access changes right away: lists, projects, reports and exports follow their roles and teams. HR and PMs are added to the projects they manage. You can turn it off again at any time."
-                : "Plane's own roles apply again and the project memberships added for roles are removed. Roles, teams and shares are kept for next time."}
+                : "Variance's own roles apply again and the project memberships added for roles are removed. Roles, teams and shares are kept for next time."}
             </p>
           </DialogMain>
           <DialogActions>

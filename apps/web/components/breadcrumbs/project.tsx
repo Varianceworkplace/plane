@@ -66,13 +66,13 @@ export const ProjectBreadcrumb = observer(function ProjectBreadcrumb(props: TPro
           selectedItemKey={currentProjectDetails.id}
           navigationItems={switcherOptions}
           onChange={(value: string) => {
-            router.push(`/${workspaceSlug}/projects/${value}/issues`);
+            router.push(`/${workspaceSlug}/projects/${value}/summary`);
           }}
           label={currentProjectDetails.name}
           icon={<Logo logo={currentProjectDetails.logo_props} size={14} />}
           handleOnClick={() => {
             if (handleOnClick) handleOnClick();
-            else router.push(`/${workspaceSlug}/projects/${currentProjectDetails.id}/issues/`);
+            else router.push(`/${workspaceSlug}/projects/${currentProjectDetails.id}/summary/`);
           }}
           placeholder={t("common.project")}
           searchPlaceholder={t("common.search.label")}

@@ -19,11 +19,12 @@ import { checkEmailValidity } from "@plane/utils";
 // helpers
 type TAuthEmailForm = {
   defaultEmail: string;
+  placeholder?: string;
   onSubmit: (data: IEmailCheckData) => Promise<void>;
 };
 
 export const AuthEmailForm = observer(function AuthEmailForm(props: TAuthEmailForm) {
-  const { onSubmit, defaultEmail } = props;
+  const { onSubmit, defaultEmail, placeholder } = props;
   // states
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [email, setEmail] = useState(defaultEmail);
@@ -72,8 +73,9 @@ export const AuthEmailForm = observer(function AuthEmailForm(props: TAuthEmailFo
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={t("auth.common.email.placeholder")}
+              placeholder={placeholder ?? t("auth.common.email.placeholder")}
               autoComplete="off"
+              // oxlint-disable-next-line jsx-a11y/no-autofocus -- sole primary field of a dedicated auth step; matches standard sign-in flows
               autoFocus
               ref={inputRef}
             />
