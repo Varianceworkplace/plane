@@ -142,7 +142,7 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
     });
   };
 
-  const projectLink = `${workspaceSlug}/projects/${project.id}/issues`;
+  const projectLink = `${workspaceSlug}/projects/${project.id}/summary`;
   const handleCopyText = () =>
     copyUrlToClipboard(projectLink).then(() =>
       setToast({
@@ -227,7 +227,7 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
       )}
       <Link
         ref={projectCardRef}
-        href={`/${workspaceSlug}/projects/${project.id}/issues`}
+        href={`/${workspaceSlug}/projects/${project.id}/summary`}
         onClick={(e) => {
           if (!isMemberOfProject || isArchived) {
             e.preventDefault();

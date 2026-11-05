@@ -4,12 +4,21 @@
  * See the LICENSE file for details.
  */
 
+import type { ComponentType } from "react";
 import { useCallback, useMemo } from "react";
 import { observer } from "mobx-react";
+import { useParams } from "next/navigation";
 // plane imports
 import { Icon } from "@makeplane/propel/components/icon";
 import { IconButton } from "@makeplane/propel/components/icon-button";
-import { CalendarOutline, CloseOutline, StateOutline } from "@makeplane/propel/icons";
+import {
+  BuildingOutline,
+  CalendarOutline,
+  CloseOutline,
+  GroupOutline,
+  StateOutline,
+  UserCogOutline,
+} from "@makeplane/propel/icons";
 import { StateGroupIcon } from "@plane/blocks/icons";
 import type { MemberOption, ProjectOption } from "@plane/blocks/property-select";
 import { DateSelect, MemberSelect, ProjectSelect } from "@plane/blocks/property-select";
@@ -22,11 +31,52 @@ import { useMember } from "@/hooks/store/use-member";
 import { useProject } from "@/hooks/store/use-project";
 import { useUserProfile } from "@/hooks/store/user";
 // local imports
-import { EMPTY_WORKLOG_REPORT_FILTERS, fromReportDate, hasWorklogReportFilters, toReportDate } from "./helpers";
+import {
+  EMPTY_WORKLOG_REPORT_FILTERS,
+  fromReportDate,
+  hasWorklogReportFilters,
+  toReportDate,
+  useWorklogReportOptions,
+} from "./helpers";
 import type { TWorklogReportFilters, TWorklogReportScope } from "./types";
 
 type StateGroupOption = (typeof STATE_GROUPS)[TStateGroups];
 const STATE_GROUP_OPTIONS = Object.values(STATE_GROUPS);
+
+type NamedOption = { id: string; name: string };
+
+/** A multi-select pill over named options (departments, project managers, groups). */
+function NamedOptionFilter(props: {
+  label: string;
+  plural: string;
+  icon: ComponentType<{ className?: string }>;
+  options: NamedOption[];
+  value: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const { label, plural, icon: OptionIcon, options, value, onChange } = props;
+  return (
+    <Select<NamedOption>
+      multiple
+      getValues={() => options}
+      value={options.filter((option) => value.includes(option.id))}
+      onChange={(ids) => onChange(ids as string[])}
+      getOptionValue={(option) => option.id}
+      getOptionLabel={(option) => option.name}
+      showSearch={options.length > 8}
+      pinSelected={false}
+    >
+      <Select.Trigger<NamedOption>
+        variant="pill-md"
+        prependIcon={() => <OptionIcon aria-hidden="true" className="size-3 text-secondary" />}
+      >
+        {(selected) =>
+          selected.length === 0 ? label : selected.length === 1 ? selected[0].name : `${selected.length} ${plural}`
+        }
+      </Select.Trigger>
+    </Select>
+  );
+}
 
 type Props = {
   filters: TWorklogReportFilters;
@@ -34,19 +84,27 @@ type Props = {
   /** Project-wise reports look at one project at a time; a project's own Worklogs page has no picker */
   projectMode: "single" | "multiple" | "hidden";
   scope: TWorklogReportScope | undefined;
+  /** quarterly and yearly reports pick their range with their own period picker */
+  showDates?: boolean;
 };
 
 export const WorklogReportFilters = observer(function WorklogReportFilters(props: Props) {
-  const { filters, onChange, projectMode, scope } = props;
+  const { filters, onChange, projectMode, scope, showDates = true } = props;
   // store hooks
   const {
     workspace: { workspaceMemberIds, getWorkspaceMemberDetails },
   } = useMember();
   const { workspaceProjectIds, getProjectById } = useProject();
   const { data: userProfile } = useUserProfile();
+  const { workspaceSlug } = useParams();
   // derived values
   const update = (patch: Partial<TWorklogReportFilters>) => onChange({ ...filters, ...patch });
   const canViewOthers = !!scope?.can_view_others;
+  const peopleOptions = useWorklogReportOptions(workspaceSlug?.toString() ?? "", canViewOthers);
+  const managerOptions = useMemo<NamedOption[]>(
+    () => (peopleOptions?.project_managers ?? []).map((pm) => ({ id: pm.id, name: pm.display_name })),
+    [peopleOptions]
+  );
 
   // ------------------------------------------------------------ options
   const memberOptions = useMemo<MemberOption[]>(
@@ -143,6 +201,36 @@ export const WorklogReportFilters = observer(function WorklogReportFilters(props
           showLabel
         />
       )}
+      {canViewOthers && !!peopleOptions?.departments.length && (
+        <NamedOptionFilter
+          label="Department"
+          plural="departments"
+          icon={BuildingOutline}
+          options={peopleOptions.departments}
+          value={filters.team ?? []}
+          onChange={(ids) => update({ team: ids })}
+        />
+      )}
+      {canViewOthers && !!managerOptions.length && (
+        <NamedOptionFilter
+          label="Project manager"
+          plural="managers"
+          icon={UserCogOutline}
+          options={managerOptions}
+          value={filters.pm ?? []}
+          onChange={(ids) => update({ pm: ids })}
+        />
+      )}
+      {canViewOthers && !!peopleOptions?.groups.length && (
+        <NamedOptionFilter
+          label="Group"
+          plural="groups"
+          icon={GroupOutline}
+          options={peopleOptions.groups}
+          value={filters.group ?? []}
+          onChange={(ids) => update({ group: ids })}
+        />
+      )}
       <Select<StateGroupOption>
         multiple
         getValues={() => STATE_GROUP_OPTIONS}
@@ -169,26 +257,30 @@ export const WorklogReportFilters = observer(function WorklogReportFilters(props
           }
         </Select.Trigger>
       </Select>
-      <DateSelect
-        variant="pill-md"
-        value={fromDate}
-        onChange={(date) => update({ from_date: toReportDate(date) })}
-        maxDate={toDate ?? undefined}
-        placeholder="From date"
-        icon={<CalendarOutline />}
-        clearable
-        weekStartsOn={userProfile?.start_of_the_week}
-      />
-      <DateSelect
-        variant="pill-md"
-        value={toDate}
-        onChange={(date) => update({ to_date: toReportDate(date) })}
-        minDate={fromDate ?? undefined}
-        placeholder="To date"
-        icon={<CalendarOutline />}
-        clearable
-        weekStartsOn={userProfile?.start_of_the_week}
-      />
+      {showDates && (
+        <>
+          <DateSelect
+            variant="pill-md"
+            value={fromDate}
+            onChange={(date) => update({ from_date: toReportDate(date) })}
+            maxDate={toDate ?? undefined}
+            placeholder="From date"
+            icon={<CalendarOutline />}
+            clearable
+            weekStartsOn={userProfile?.start_of_the_week}
+          />
+          <DateSelect
+            variant="pill-md"
+            value={toDate}
+            onChange={(date) => update({ to_date: toReportDate(date) })}
+            minDate={fromDate ?? undefined}
+            placeholder="To date"
+            icon={<CalendarOutline />}
+            clearable
+            weekStartsOn={userProfile?.start_of_the_week}
+          />
+        </>
+      )}
       {hasWorklogReportFilters(filters) && (
         <IconButton
           variant="ghost"

@@ -10,7 +10,6 @@ import type { ShouldRevalidateFunctionArgs } from "react-router";
 import useSWR from "swr";
 // components
 import { LogoSpinner } from "@/components/common/logo-spinner";
-import { PoweredBy } from "@/components/common/powered-by";
 import { SomethingWentWrongError } from "@/components/issues/issue-layouts/error";
 import { IssuesNavbarRoot } from "@/components/issues/navbar";
 // hooks
@@ -19,8 +18,8 @@ import { usePublish, usePublishList } from "@/hooks/store/publish";
 import { useIssueFilter } from "@/hooks/store/use-issue-filter";
 import type { Route } from "./+types/layout";
 
-const DEFAULT_TITLE = "Plane";
-const DEFAULT_DESCRIPTION = "Made with Plane, an AI-powered work management platform with publishing capabilities.";
+const DEFAULT_TITLE = "Variance";
+const DEFAULT_DESCRIPTION = "Made with Variance, an AI-powered work management platform with publishing capabilities.";
 
 interface IssueMetadata {
   name?: string;
@@ -131,17 +130,14 @@ function IssuesLayout(props: Route.ComponentProps) {
   if (error) return <SomethingWentWrongError />;
 
   return (
-    <>
-      <div className="relative flex h-screen min-h-[500px] w-screen flex-col overflow-hidden">
-        <div className="relative flex h-[60px] shrink-0 items-center border-b border-subtle-1 bg-surface-1 select-none">
-          <IssuesNavbarRoot publishSettings={publishSettings} />
-        </div>
-        <div className="relative size-full overflow-hidden bg-surface-2">
-          <Outlet />
-        </div>
+    <div className="relative flex h-screen min-h-[500px] w-screen flex-col overflow-hidden">
+      <div className="relative flex h-[60px] shrink-0 items-center border-b border-subtle-1 bg-surface-1 select-none">
+        <IssuesNavbarRoot publishSettings={publishSettings} />
       </div>
-      <PoweredBy />
-    </>
+      <div className="relative size-full overflow-hidden bg-surface-2">
+        <Outlet />
+      </div>
+    </div>
   );
 }
 

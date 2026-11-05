@@ -12,7 +12,7 @@ export type TTabPreferences = {
 
 // Constants
 export const TAB_PREFS_KEY = "plane_tab_prefs";
-export const DEFAULT_TAB_KEY = "work_items";
+export const DEFAULT_TAB_KEY = "summary";
 
 /**
  * Get tab preferences for a specific project from localStorage
@@ -66,6 +66,7 @@ export const saveTabPreferences = (projectId: string, preferences: TTabPreferenc
 export const getTabUrl = (workspaceSlug: string, projectId: string, tabKey: string): string => {
   const baseUrl = `/${workspaceSlug}/projects/${projectId}`;
   const tabUrlMap: Record<string, string> = {
+    summary: `${baseUrl}/summary`,
     work_items: `${baseUrl}/issues`,
     cycles: `${baseUrl}/cycles`,
     modules: `${baseUrl}/modules`,

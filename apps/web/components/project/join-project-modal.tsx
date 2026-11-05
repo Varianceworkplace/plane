@@ -59,7 +59,7 @@ export const JoinProjectModal = observer(function JoinProjectModal(props: TJoinP
 
     await joinProject(workspaceSlug, project.id)
       .then(() => {
-        router.push(`/${workspaceSlug}/projects/${project.id}/issues`);
+        router.push(`/${workspaceSlug}/projects/${project.id}/summary`);
         handleClose();
         return;
       })

@@ -195,7 +195,7 @@ smtp_config_variables = [
     },
     {
         "key": "EMAIL_FROM",
-        "value": os.environ.get("EMAIL_FROM", ""),
+        "value": os.environ.get("EMAIL_FROM", "info@varianceinfotech.com"),
         "category": "SMTP",
         "is_encrypted": False,
     },

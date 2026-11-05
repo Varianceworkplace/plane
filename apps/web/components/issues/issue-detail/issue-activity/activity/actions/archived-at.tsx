@@ -36,7 +36,7 @@ export const IssueArchivedAtActivity = observer(function IssueArchivedAtActivity
       }
       activityId={activityId}
       ends={ends}
-      customUserName={activity.new_value === "archive" ? "Plane" : undefined}
+      customUserName={activity.new_value === "archive" ? "Variance" : undefined}
     >
       {activity.new_value === "restore" ? "restored the project task" : "archived the project task"}.
     </IssueActivityBlockComponent>

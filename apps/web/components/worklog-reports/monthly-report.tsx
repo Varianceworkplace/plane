@@ -22,11 +22,17 @@ import {
   getMonthRange,
   hasWorklogReportFilters,
   minutesToHours,
+  useWorklogAnalytics,
   useWorklogMonthlyReport,
   worklogReportService,
 } from "./helpers";
+import { ReportChartGrid } from "./analytics-charts";
+import { monthlyCharts } from "./long-period-report";
+import { useReportPdfExport } from "./report-pdf-export";
+import { WorklogReportRecords } from "./report-records";
 import { WorklogReportChart } from "./report-chart";
 import { WorklogReportFilters } from "./report-filters";
+import type { TReportExportFormat } from "./report-parts";
 import { HEAD_CELL, OwnTimeNotice, ReportExportMenu, Section, Stat, TABLE_CLASSNAME, UserCell } from "./report-parts";
 import type {
   TWorklogMonthMinutes,
@@ -114,6 +120,9 @@ export const MonthlyWorklogReport = observer(function MonthlyWorklogReport({ wor
   const [collapsedUsers, setCollapsedUsers] = useState<Set<string>>(new Set());
   const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());
   const { monthly, isLoading } = useWorklogMonthlyReport(workspaceSlug, filters);
+  // trends and performance over the same months
+  const { analytics } = useWorklogAnalytics(workspaceSlug, filters, "month");
+  const insightCharts = useMemo(() => (analytics ? monthlyCharts(analytics) : []), [analytics]);
 
   const months = useMemo(() => monthly?.months ?? [], [monthly]);
   const series = useMemo(
@@ -148,8 +157,62 @@ export const MonthlyWorklogReport = observer(function MonthlyWorklogReport({ wor
       range: month ? getMonthRange(month, filters) : undefined,
     });
 
-  const download = (format: "csv" | "xlsx") => {
-    window.open(worklogReportService.downloadUrl(workspaceSlug, filters, format, "monthly"), "_self");
+  const exportPdf = useReportPdfExport(workspaceSlug, filters);
+  const download = (format: TReportExportFormat) => {
+    if (format !== "pdf") {
+      window.open(worklogReportService.downloadUrl(workspaceSlug, filters, format, "monthly"), "_self");
+      return;
+    }
+    if (!monthly) return;
+    void exportPdf({
+      title: "Monthly report",
+      cards: [
+        { label: "Total time", value: formatWorklogDuration(monthly.total_duration) },
+        { label: "Total hours", value: minutesToHours(monthly.total_duration) },
+        {
+          label: "Average per month",
+          value: formatWorklogDuration(months.length ? monthly.total_duration / months.length : 0),
+        },
+        { label: "Entries", value: monthly.total_count },
+        { label: "Users", value: monthly.users.length },
+      ],
+      charts: [
+        {
+          key: "hours-by-month",
+          kind: "bar",
+          title: "Hours by month",
+          isEmpty: !monthly.total_count,
+          emptyText: "No time logged in these months.",
+          rows: chartData,
+          series,
+          format: "hours",
+          xAxisLabel: "Months",
+        },
+        ...insightCharts,
+      ],
+      tables: [
+        {
+          title: "Month-wise breakdown",
+          columns: [
+            { label: "User", flex: 2 },
+            ...months.map((month) => ({ label: formatReportMonth(month), align: "right" as const })),
+            { label: "Total", align: "right" },
+          ],
+          rows: [
+            ...monthly.users.map((user) => [
+              getWorklogUserName(user),
+              ...months.map((month) => formatWorklogDuration(user.months[month] ?? 0)),
+              formatWorklogDuration(user.total_duration),
+            ]),
+            [
+              "Total",
+              ...months.map((month) => formatWorklogDuration(monthly.month_totals[month] ?? 0)),
+              formatWorklogDuration(monthly.total_duration),
+            ],
+          ],
+        },
+      ],
+    });
   };
 
   return (
@@ -157,7 +220,7 @@ export const MonthlyWorklogReport = observer(function MonthlyWorklogReport({ wor
       {/* toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <WorklogReportFilters filters={filters} onChange={setFilters} projectMode="multiple" scope={monthly?.scope} />
-        <ReportExportMenu disabled={!monthly?.total_count} onExport={download} />
+        <ReportExportMenu disabled={!monthly?.total_count} formats={["csv", "xlsx", "pdf"]} onExport={download} />
       </div>
       {monthly && !monthly.scope.can_view_others && <OwnTimeNotice />}
 
@@ -207,6 +270,8 @@ export const MonthlyWorklogReport = observer(function MonthlyWorklogReport({ wor
               />
             </div>
           </Section>
+
+          <ReportChartGrid charts={insightCharts} />
 
           <Section
             title="Month-wise breakdown"
@@ -342,6 +407,8 @@ export const MonthlyWorklogReport = observer(function MonthlyWorklogReport({ wor
               </div>
             </div>
           </Section>
+
+          <WorklogReportRecords workspaceSlug={workspaceSlug} filters={filters} />
         </div>
       )}
 

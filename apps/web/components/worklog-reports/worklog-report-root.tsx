@@ -20,9 +20,13 @@ import {
   formatShare,
   hasWorklogReportFilters,
   minutesToHours,
+  useWorklogAnalytics,
   useWorklogReport,
   worklogReportService,
 } from "./helpers";
+import type { TChartRow, TReportChart } from "./analytics-charts";
+import { shortLabel } from "./analytics-charts";
+import { ProjectWiseInsights, UserWiseInsights, projectWiseCharts, userWiseCharts } from "./analytics-insights";
 import { WorklogReportChart } from "./report-chart";
 import { WorklogReportFilters } from "./report-filters";
 import {
@@ -30,20 +34,19 @@ import {
   OwnTimeNotice,
   ROW_CLASSNAME,
   ReportExportMenu,
+  type TReportExportFormat,
   Section,
   Stat,
   TABLE_CLASSNAME,
   UserCell,
 } from "./report-parts";
-import type {
-  TWorklogReportFilters,
-  TWorklogReportSelection,
-  TWorklogReportSummary,
-  TWorklogReportType,
-} from "./types";
+import type { TReportPdfTable } from "./report-pdf";
+import { useReportPdfExport } from "./report-pdf-export";
+import { WorklogReportRecords } from "./report-records";
+import type { TWorklogReportFilters, TWorklogReportSelection, TWorklogReportSummary } from "./types";
 import { WorklogReportDetailModal } from "./worklog-detail-modal";
 
-type Props = { workspaceSlug: string; reportType: Exclude<TWorklogReportType, "monthly"> };
+type Props = { workspaceSlug: string; reportType: "project-wise" | "user-wise" };
 
 // ------------------------------------------------------------ project-wise
 
@@ -305,6 +308,98 @@ function UserWiseReport({ summary, onSelect }: ReportBodyProps) {
   );
 }
 
+// ------------------------------------------------------------ PDF
+
+/** The report's main hours chart and table, for the PDF (the page draws them itself). */
+const summaryPdfParts = (
+  summary: TWorklogReportSummary,
+  isProjectWise: boolean,
+  filters: TWorklogReportFilters
+): { chart: TReportChart; table: TReportPdfTable } => {
+  const hours = (minutes: number) => minutesToHours(minutes);
+  if (isProjectWise) {
+    const project =
+      filters.project.length === 1 ? summary.projects.find((p) => p.id === filters.project[0]) : undefined;
+    const rows: TChartRow[] = project
+      ? summary.users.map((user) => ({
+          key: user.id,
+          name: shortLabel(getWorklogUserName(user)),
+          title: getWorklogUserName(user),
+          hours: hours(user.projects.find((p) => p.id === project.id)?.total_duration ?? 0),
+        }))
+      : summary.projects.map((p) => ({ key: p.id, name: p.identifier, title: p.name, hours: hours(p.total_duration) }));
+    return {
+      chart: {
+        key: "hours",
+        kind: "bar",
+        title: project ? `Hours by user in ${project.name}` : "Hours by project",
+        isEmpty: !rows.length,
+        emptyText: "No time logged for these filters.",
+        rows,
+        series: [{ key: "hours", label: "Hours" }],
+        format: "hours",
+        xAxisLabel: project ? "Users" : "Projects",
+      },
+      table: {
+        title: "Projects",
+        columns: [
+          { label: "Project", flex: 2.5 },
+          { label: "Users", align: "right" },
+          { label: "Entries", align: "right" },
+          { label: "Time", align: "right" },
+          { label: "Share", align: "right" },
+        ],
+        rows: summary.projects.map((p) => [
+          `${p.identifier} ${p.name}`,
+          summary.users.filter((user) => user.projects.some((up) => up.id === p.id)).length,
+          p.worklog_count,
+          formatWorklogDuration(p.total_duration),
+          formatShare(p.total_duration, summary.total_duration),
+        ]),
+      },
+    };
+  }
+  const rows = summary.users.map<TChartRow>((user) => {
+    const row: TChartRow = {
+      key: user.id,
+      name: shortLabel(getWorklogUserName(user)),
+      title: getWorklogUserName(user),
+    };
+    for (const p of user.projects) row[p.id] = hours(p.total_duration);
+    return row;
+  });
+  return {
+    chart: {
+      key: "hours",
+      kind: "bar",
+      title: "Hours by user across projects",
+      isEmpty: !rows.length,
+      emptyText: "No time logged for these filters.",
+      rows,
+      series: summary.projects.map((p) => ({ key: p.id, label: p.name })),
+      format: "hours",
+      xAxisLabel: "Users",
+    },
+    table: {
+      title: "Breakdown by user",
+      columns: [
+        { label: "User", flex: 2 },
+        { label: "Projects", align: "right" },
+        { label: "Entries", align: "right" },
+        { label: "Time", align: "right" },
+        { label: "Share", align: "right" },
+      ],
+      rows: summary.users.map((user) => [
+        getWorklogUserName(user),
+        user.projects.length,
+        user.worklog_count,
+        formatWorklogDuration(user.total_duration),
+        formatShare(user.total_duration, summary.total_duration),
+      ]),
+    },
+  };
+};
+
 // ------------------------------------------------------------ root
 
 export const WorklogReportRoot = observer(function WorklogReportRoot(props: Props) {
@@ -312,9 +407,39 @@ export const WorklogReportRoot = observer(function WorklogReportRoot(props: Prop
   const [filters, setFilters] = useState<TWorklogReportFilters>(EMPTY_WORKLOG_REPORT_FILTERS);
   const [selection, setSelection] = useState<TWorklogReportSelection | null>(null);
   const { summary, isLoading } = useWorklogReport(workspaceSlug, filters);
+  // tasks, people, milestones and status splits for the extra charts and cards
+  const { analytics } = useWorklogAnalytics(workspaceSlug, filters);
+  const hasTime = !!summary?.total_count;
+  const hasTasks = !!analytics?.summary.tasks_total;
+  const isProjectWise = reportType === "project-wise";
 
-  const download = (format: "csv" | "xlsx") => {
-    window.open(worklogReportService.downloadUrl(workspaceSlug, filters, format, "summary"), "_self");
+  const exportPdf = useReportPdfExport(workspaceSlug, filters);
+  const download = (format: TReportExportFormat) => {
+    if (format !== "pdf") {
+      window.open(worklogReportService.downloadUrl(workspaceSlug, filters, format, "summary"), "_self");
+      return;
+    }
+    if (!summary) return;
+    const { chart, table } = summaryPdfParts(summary, isProjectWise, filters);
+    void exportPdf({
+      title: isProjectWise ? "Project-wise report" : "User-wise report",
+      cards: [
+        { label: "Total time", value: formatWorklogDuration(summary.total_duration) },
+        { label: "Total hours", value: minutesToHours(summary.total_duration) },
+        { label: "Worklog entries", value: summary.total_count },
+        { label: "Employees", value: summary.users.length },
+        { label: "Projects", value: summary.projects.length },
+        ...(analytics
+          ? [
+              { label: isProjectWise ? "Total tasks" : "Tasks assigned", value: analytics.summary.tasks_total },
+              { label: "Completed tasks", value: analytics.summary.tasks_completed },
+              { label: "Pending tasks", value: analytics.summary.tasks_pending },
+            ]
+          : []),
+      ],
+      charts: [chart, ...(analytics ? (isProjectWise ? projectWiseCharts(analytics) : userWiseCharts(analytics)) : [])],
+      tables: [table],
+    });
   };
 
   const ReportBody = reportType === "project-wise" ? ProjectWiseReport : UserWiseReport;
@@ -329,7 +454,7 @@ export const WorklogReportRoot = observer(function WorklogReportRoot(props: Prop
           projectMode={reportType === "project-wise" ? "single" : "multiple"}
           scope={summary?.scope}
         />
-        <ReportExportMenu disabled={!summary?.total_count} onExport={download} />
+        <ReportExportMenu disabled={!summary?.total_count} formats={["csv", "xlsx", "pdf"]} onExport={download} />
       </div>
       {summary && !summary.scope.can_view_others && <OwnTimeNotice />}
 
@@ -342,7 +467,7 @@ export const WorklogReportRoot = observer(function WorklogReportRoot(props: Prop
           </div>
           <Loader.Item height="320px" width="100%" />
         </Loader>
-      ) : !summary?.total_count ? (
+      ) : !hasTime && !hasTasks ? (
         <div className="flex flex-col items-center rounded-lg border-[0.5px] border-subtle py-12">
           <EmptyStateCompact
             title={hasWorklogReportFilters(filters) ? "No time logged for these filters" : "No time logged yet"}
@@ -358,14 +483,35 @@ export const WorklogReportRoot = observer(function WorklogReportRoot(props: Prop
         </div>
       ) : (
         <div className={cn("flex flex-col gap-6 transition-opacity", isLoading && "opacity-60")}>
-          <div className="flex flex-wrap gap-3">
-            <Stat label="Total time" value={formatWorklogDuration(summary.total_duration)} />
-            <Stat label="Total hours" value={minutesToHours(summary.total_duration)} />
-            <Stat label="Entries" value={summary.total_count} />
-            <Stat label="Users" value={summary.users.length} />
-            <Stat label="Projects" value={summary.projects.length} />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 2xl:grid-cols-8">
+            <Stat label="Total time" value={formatWorklogDuration(summary?.total_duration ?? 0)} />
+            <Stat label="Total hours" value={minutesToHours(summary?.total_duration ?? 0)} />
+            <Stat label="Worklog entries" value={summary?.total_count ?? 0} />
+            <Stat label="Employees" value={summary?.users.length ?? 0} />
+            <Stat label="Projects" value={summary?.projects.length ?? 0} />
+            {analytics && (
+              <>
+                <Stat label={isProjectWise ? "Total tasks" : "Tasks assigned"} value={analytics.summary.tasks_total} />
+                <Stat label="Completed tasks" value={analytics.summary.tasks_completed} />
+                <Stat label="Pending tasks" value={analytics.summary.tasks_pending} />
+              </>
+            )}
           </div>
-          <ReportBody summary={summary} filters={filters} onFiltersChange={setFilters} onSelect={setSelection} />
+          {summary && hasTime ? (
+            <ReportBody summary={summary} filters={filters} onFiltersChange={setFilters} onSelect={setSelection} />
+          ) : (
+            <p className="text-body-xs-regular text-tertiary">No time logged for these filters yet.</p>
+          )}
+          {analytics &&
+            (isProjectWise ? (
+              <ProjectWiseInsights
+                analytics={analytics}
+                onSelectProject={(projectId) => setFilters({ ...filters, project: [projectId] })}
+              />
+            ) : (
+              <UserWiseInsights analytics={analytics} />
+            ))}
+          {hasTime && <WorklogReportRecords workspaceSlug={workspaceSlug} filters={filters} />}
         </div>
       )}
 

@@ -66,7 +66,7 @@ export function InstanceSetupForm() {
   const lastNameParam = searchParams?.get("last_name") || undefined;
   const companyParam = searchParams?.get("company") || undefined;
   const emailParam = searchParams?.get("email") || undefined;
-  const isTelemetryEnabledParam = (searchParams?.get("is_telemetry_enabled") === "True" ? true : false) || true;
+  const isTelemetryEnabledParam = searchParams?.get("is_telemetry_enabled") === "True" || true;
   const errorCode = searchParams?.get("error_code") || undefined;
   const errorMessage = searchParams?.get("error_message") || undefined;
   // state
@@ -123,14 +123,14 @@ export function InstanceSetupForm() {
 
   const isButtonDisabled = useMemo(
     () =>
-      !isSubmitting &&
-      formData.first_name &&
-      formData.email &&
-      formData.password &&
-      getPasswordStrength(formData.password) === E_PASSWORD_STRENGTH.STRENGTH_VALID &&
-      formData.password === formData.confirm_password
-        ? false
-        : true,
+      !(
+        !isSubmitting &&
+        formData.first_name &&
+        formData.email &&
+        formData.password &&
+        getPasswordStrength(formData.password) === E_PASSWORD_STRENGTH.STRENGTH_VALID &&
+        formData.password === formData.confirm_password
+      ),
     [formData.confirm_password, formData.email, formData.first_name, formData.password, isSubmitting]
   );
 
@@ -144,8 +144,8 @@ export function InstanceSetupForm() {
       <div className="mt-10 flex w-full flex-grow flex-col items-center justify-center py-6">
         <div className="relative flex w-full max-w-[22.5rem] flex-col gap-6">
           <FormHeader
-            heading="Setup your Plane Instance"
-            subHeading="Post setup you will be able to manage this Plane instance."
+            heading="Setup your Variance Instance"
+            subHeading="Post setup you will be able to manage this Variance instance."
           />
           {errorData.type &&
             errorData?.message &&
@@ -182,6 +182,7 @@ export function InstanceSetupForm() {
                       }
                     }}
                     autoComplete="off"
+                    // oxlint-disable-next-line jsx-a11y/no-autofocus -- first field of the one-time instance setup form
                     autoFocus
                     maxLength={50}
                   />
@@ -225,7 +226,7 @@ export function InstanceSetupForm() {
                   placeholder="name@company.com"
                   value={formData.email}
                   onChange={(e) => handleFormChange("email", e.target.value)}
-                  aria-invalid={errorData.type && errorData.type === EErrorCodes.INVALID_EMAIL ? true : false}
+                  aria-invalid={errorData.type === EErrorCodes.INVALID_EMAIL}
                   autoComplete="off"
                 />
               </InputGroup>
@@ -270,7 +271,7 @@ export function InstanceSetupForm() {
                   placeholder="New password"
                   value={formData.password}
                   onChange={(e) => handleFormChange("password", e.target.value)}
-                  aria-invalid={errorData.type && errorData.type === EErrorCodes.INVALID_PASSWORD ? true : false}
+                  aria-invalid={errorData.type === EErrorCodes.INVALID_PASSWORD}
                   onFocus={() => setIsPasswordInputFocused(true)}
                   onBlur={() => setIsPasswordInputFocused(false)}
                   autoComplete="new-password"
@@ -349,21 +350,13 @@ export function InstanceSetupForm() {
               <div>
                 <Checkbox
                   id="is_telemetry_enabled"
-                  aria-label="Allow Plane to anonymously collect usage events"
+                  aria-label="Allow Variance to anonymously collect usage events"
                   onCheckedChange={(checked) => handleFormChange("is_telemetry_enabled", checked)}
                   checked={formData.is_telemetry_enabled}
                 />
               </div>
               <label className="cursor-pointer text-13 font-medium text-tertiary" htmlFor="is_telemetry_enabled">
-                Allow Plane to anonymously collect usage events.{" "}
-                <a
-                  href="https://developers.plane.so/self-hosting/telemetry"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-500 hover:text-blue-600 flex-shrink-0 text-13 font-medium"
-                >
-                  See More
-                </a>
+                Allow Variance to anonymously collect usage events.
               </label>
             </div>
 

@@ -36,6 +36,6 @@ export function useProjectCrumbProps(
 
   return {
     crumbLabel: project?.name,
-    crumbHref: workspaceSlug && projectId ? `/${workspaceSlug}/projects/${projectId}/issues/` : undefined,
+    crumbHref: workspaceSlug && projectId ? `/${workspaceSlug}/projects/${projectId}/summary/` : undefined,
   };
 }

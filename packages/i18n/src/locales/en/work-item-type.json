@@ -367,7 +367,7 @@
         },
         "confirmation": {
           "title": "Once enabled, Project task Types can't be disabled.",
-          "description": "Plane's Project Task will become the default project task type for this project and will show up with its icon and background in this project.",
+          "description": "Variance's Project Task will become the default project task type for this project and will show up with its icon and background in this project.",
           "button": {
             "default": "Enable",
             "loading": "Setting up"

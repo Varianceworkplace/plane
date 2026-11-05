@@ -113,7 +113,7 @@ export const AccessPeopleTab = observer(function AccessPeopleTab(props: { worksp
           <thead>
             <tr className="border-b-[0.5px] border-subtle bg-layer-1 text-left text-caption-md-medium text-tertiary">
               <th className="px-4 py-2">Person</th>
-              <th className="px-3 py-2">Plane role</th>
+              <th className="px-3 py-2">Variance role</th>
               <th className="w-72 px-3 py-2">Roles</th>
               <th className="px-3 py-2">Teams</th>
             </tr>

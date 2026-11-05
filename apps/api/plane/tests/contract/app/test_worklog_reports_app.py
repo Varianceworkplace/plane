@@ -341,7 +341,9 @@ def test_download_xlsx_has_summary_and_worklogs(setup):
     response = setup["clients"]["ws_admin"].get(_url(setup, "download/"), {"type": "xlsx"})
     assert response.status_code == status.HTTP_200_OK
     workbook = load_workbook(io.BytesIO(response.content))
-    assert workbook.sheetnames == ["Summary", "Worklogs"]
+    # the report's own sheet first and its worklogs last, with the report analytics in between
+    assert workbook.sheetnames[0] == "Summary" and workbook.sheetnames[-1] == "Worklogs"
+    assert {"Overview", "Employees", "Projects", "Status"} <= set(workbook.sheetnames)
     summary = list(workbook["Summary"].iter_rows(values_only=True))
     assert summary[-1][0] == "Total" and summary[-1][4] == 5.75
     worklogs = list(workbook["Worklogs"].iter_rows(values_only=True))
@@ -497,7 +499,8 @@ def test_download_monthly_csv_and_xlsx(setup):
 
     response = client.get(_url(setup, "download/"), {"type": "xlsx", "view": "monthly"})
     workbook = load_workbook(io.BytesIO(response.content))
-    assert workbook.sheetnames == ["Monthly", "Worklogs"]
+    assert workbook.sheetnames[0] == "Monthly" and workbook.sheetnames[-1] == "Worklogs"
+    assert {"Overview", "Trend", "Employees"} <= set(workbook.sheetnames)
     monthly = list(workbook["Monthly"].iter_rows(values_only=True))
     assert monthly[-1][-1] == 11.75
     assert workbook["Monthly"]["B" + str(len(monthly) - 1)].font.bold  # vijay's subtotal row

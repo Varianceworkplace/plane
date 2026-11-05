@@ -9,6 +9,7 @@ import { useMemo, useCallback } from "react";
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import {
   CyclesOutline,
+  DashboardsOutline,
   IntakeOutline,
   MilestoneOutline,
   TimeTrackingOutline,
@@ -45,6 +46,16 @@ export const useNavigationItems = ({
   const baseNavigation = useCallback(
     // oxlint-disable-next-line no-shadow
     (workspaceSlug: string, projectId: string): TNavigationItem[] => [
+      {
+        i18n_key: "summary",
+        key: "summary",
+        name: "Summary",
+        href: `/${workspaceSlug}/projects/${projectId}/summary`,
+        icon: DashboardsOutline,
+        access: [EUserPermissions.ADMIN, EUserPermissions.MEMBER, EUserPermissions.GUEST],
+        shouldRender: true,
+        sortOrder: 0,
+      },
       {
         i18n_key: "sidebar.work_items",
         key: "work_items",

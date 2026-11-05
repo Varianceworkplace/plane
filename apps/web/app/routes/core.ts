@@ -252,6 +252,11 @@ export const coreRoutes: RouteConfigEntry[] = [
             ":workspaceSlug/projects/:projectId/worklogs",
             "./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/worklogs/page.tsx"
           ),
+          // Summary
+          route(
+            ":workspaceSlug/projects/:projectId/summary",
+            "./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/summary/page.tsx"
+          ),
           // Intake list
           layout("./(all)/[workspaceSlug]/(projects)/projects/(detail)/[projectId]/intake/layout.tsx", [
             route(
@@ -316,10 +321,6 @@ export const coreRoutes: RouteConfigEntry[] = [
           route(
             ":workspaceSlug/settings/groups",
             "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/groups/page.tsx"
-          ),
-          route(
-            ":workspaceSlug/settings/billing",
-            "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/billing/page.tsx"
           ),
           route(
             ":workspaceSlug/settings/exports",

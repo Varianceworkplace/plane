@@ -195,8 +195,8 @@
         "primary_button": {
           "text": "Create your first project task",
           "comic": {
-            "title": "Project tasks are building blocks in Plane.",
-            "description": "Redesign the Plane UI, Rebrand the company, or Launch the new fuel injection system are examples of project tasks that likely have sub-tasks."
+            "title": "Project tasks are building blocks in Variance.",
+            "description": "Redesign the Variance UI, Rebrand the company, or Launch the new fuel injection system are examples of project tasks that likely have sub-tasks."
           }
         }
       },
@@ -271,8 +271,8 @@
   "project_page": {
     "empty_state": {
       "general": {
-        "title": "Write a note, a doc, or a full knowledge base. Get Galileo, Plane's AI assistant, to help you get started",
-        "description": "Pages are thoughts potting space in Plane. Take down meeting notes, format them easily, embed project tasks, lay them out using a library of components, and keep them all in your project's context. To make short work of any doc, invoke Galileo, Plane's AI, with a shortcut or the click of a button.",
+        "title": "Write a note, a doc, or a full knowledge base. Get Galileo, Variance's AI assistant, to help you get started",
+        "description": "Pages are thoughts potting space in Variance. Take down meeting notes, format them easily, embed project tasks, lay them out using a library of components, and keep them all in your project's context. To make short work of any doc, invoke Galileo, Variance's AI, with a shortcut or the click of a button.",
         "primary_button": {
           "text": "Create your first page"
         }

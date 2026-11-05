@@ -5,13 +5,13 @@
  */
 
 import Link from "next/link";
-import { PlaneLockup } from "@/components/common/plane-lockup";
+import { VarianceLockup } from "@/components/common/variance-logo";
 
 export function AuthHeader() {
   return (
     <div className="sticky top-0 flex w-full flex-shrink-0 items-center justify-between gap-6">
       <Link href="/">
-        <PlaneLockup height={20} width={95} className="text-primary" />
+        <VarianceLockup className="h-8" />
       </Link>
     </div>
   );

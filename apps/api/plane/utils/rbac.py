@@ -325,9 +325,11 @@ class AccessProfile:
             )
         return Q()
 
-    def work_item_q(self, action):
-        """Filter on Issue: the work items `action` reaches. Q(pk__in=[]) when it reaches none."""
-        scopes = self.scopes("work_items", action)
+    def work_item_q(self, action, module="work_items"):
+        """Filter on Issue: the work items `action` reaches. Q(pk__in=[]) when it reaches none.
+
+        `module` picks whose scopes apply: reports count work items by the Analytics permission instead."""
+        scopes = self.scopes(module, action)
         if "all" in scopes:
             return Q()
         q = Q(pk__in=[])

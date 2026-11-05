@@ -8,7 +8,7 @@ import type { TStateGroups } from "@plane/types";
 // local imports
 import type { TWorklog, TWorklogUser } from "@/components/worklogs/types";
 
-export type TWorklogReportType = "project-wise" | "user-wise" | "monthly";
+export type TWorklogReportType = "project-wise" | "user-wise" | "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
 
 export type TWorklogReportFilters = {
   project: string[];
@@ -20,6 +20,12 @@ export type TWorklogReportFilters = {
   from_date?: string;
   /** YYYY-MM-DD, inclusive */
   to_date?: string;
+  /** departments (teams): their members */
+  team?: string[];
+  /** project managers: the members of the teams they lead */
+  pm?: string[];
+  /** member groups: their members */
+  group?: string[];
 };
 
 export type TWorklogReportTotals = {
@@ -59,6 +65,16 @@ export type TWorklogReportEntry = TWorklog & {
   /** YYYY-MM-DD in the user's timezone */
   work_date: string | null;
   state: { id: string; name: string; group: TStateGroups; color: string } | null;
+  /** the work item's assignees */
+  assignees?: TWorklogUser[];
+};
+
+export type TWorklogReportSortKey = "work_date" | "duration" | "user" | "project" | "task" | "status";
+
+/** Search and sort for the worklog list; ordering is a sort key, prefixed with - for descending */
+export type TWorklogReportListOptions = {
+  search?: string;
+  ordering?: TWorklogReportSortKey | `-${TWorklogReportSortKey}`;
 };
 
 export type TWorklogReportDay = TWorklogReportTotals & { date: string };
@@ -110,4 +126,128 @@ export type TWorklogMonthlyReport = {
   total_count: number;
   users: TWorklogMonthlyUser[];
   scope: TWorklogReportScope;
+};
+
+// ------------------------------------------------------------------ analytics (charts)
+
+export type TWorklogAnalyticsPeriod = "day" | "week" | "month" | "quarter" | "year";
+
+export type TWorklogAnalyticsBucket = {
+  /** start of the day / week / month / quarter / year, YYYY-MM-DD */
+  key: string;
+  start: string;
+  end: string;
+  worked_duration: number;
+  worklog_count: number;
+  employees: number;
+  tasks_completed: number;
+  tasks_created: number;
+  tickets_created: number;
+  tickets_resolved: number;
+  /** projects whose actual end date falls in the bucket */
+  projects_completed: number;
+  milestones_completed: number;
+};
+
+export type TWorklogAnalyticsEmployee = TWorklogUser & {
+  worked_duration: number;
+  worklog_count: number;
+  expected_duration: number;
+  tasks_assigned: number;
+  tasks_completed: number;
+  tasks_pending: number;
+  completed_expected_duration: number;
+  /** expected time of the work items completed in the range against the time logged in it; null without time */
+  productivity: number | null;
+};
+
+export type TWorklogAnalyticsProject = {
+  id: string;
+  name: string;
+  identifier: string;
+  worked_duration: number;
+  worklog_count: number;
+  employees: number;
+  people: { id: string; worked_duration: number }[];
+  tasks_total: number;
+  tasks_completed: number;
+  tasks_pending: number;
+  status_groups: Record<TStateGroups, number>;
+  /** per period bucket, with a period */
+  series: { key: string; worked_duration: number; tasks_completed: number }[];
+};
+
+/** A team (department): its members' numbers added up */
+export type TWorklogAnalyticsDepartment = {
+  id: string;
+  name: string;
+  employees: number;
+  worked_duration: number;
+  expected_duration: number;
+  tasks_assigned: number;
+  tasks_completed: number;
+  tasks_pending: number;
+  completed_expected_duration: number;
+  productivity: number | null;
+};
+
+export type TWorklogAnalyticsMilestone = {
+  id: string;
+  title: string;
+  project_id: string;
+  project_name: string;
+  status: string;
+  start_date: string | null;
+  target_date: string | null;
+  actual_completion_date: string | null;
+  total_items: number;
+  completed_items: number;
+  progress: number;
+  is_completed: boolean;
+  is_overdue: boolean;
+};
+
+export type TWorklogAnalytics = {
+  period: TWorklogAnalyticsPeriod | null;
+  from_date: string | null;
+  to_date: string | null;
+  summary: {
+    worked_duration: number;
+    worklog_count: number;
+    expected_duration: number;
+    employees: number;
+    active_employees: number;
+    projects: number;
+    tasks_total: number;
+    tasks_completed: number;
+    tasks_pending: number;
+    tasks_created: number;
+    projects_completed: number;
+    milestones: number;
+    milestones_completed: number;
+  };
+  series: TWorklogAnalyticsBucket[];
+  /** worked time Monday (1) to Sunday (7) */
+  weekdays: { weekday: number; worked_duration: number; worklog_count: number }[];
+  status_groups: Record<TStateGroups, number>;
+  priorities: Record<"urgent" | "high" | "medium" | "low" | "none", number>;
+  employees: TWorklogAnalyticsEmployee[];
+  projects: TWorklogAnalyticsProject[];
+  departments: TWorklogAnalyticsDepartment[];
+  milestones: TWorklogAnalyticsMilestone[];
+  /** null under a project filter: tickets aren't part of projects */
+  tickets: {
+    created: number;
+    resolved: number;
+    open: number;
+    average_resolution_hours: number | null;
+    statuses: Record<string, number>;
+  } | null;
+  scope: TWorklogReportScope;
+};
+
+export type TWorklogReportOptions = {
+  departments: { id: string; name: string }[];
+  project_managers: (TWorklogUser & { team_ids: string[] })[];
+  groups: { id: string; name: string }[];
 };
