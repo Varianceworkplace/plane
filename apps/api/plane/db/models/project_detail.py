@@ -32,6 +32,9 @@ class ProjectDetail(BaseModel):
     """The Workplace "Creating New Project" fields that Plane has no field for.
 
     Plane fields cover the rest of the form: name ("Project Name"), project lead ("Assigned To") and description.
+    As in vTiger, "Assigned To" can be a team instead of a person (`assigned_team`, the lead is then empty): the
+    team then works on the project as if it owned it (its leads manage it, its members are project members and
+    create tasks there; plane.utils.rbac).
     """
 
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="project_details")
@@ -50,6 +53,13 @@ class ProjectDetail(BaseModel):
     project_url = models.TextField(blank=True, default="")
     # percent in steps of 10
     progress = models.PositiveSmallIntegerField(null=True, blank=True)
+    assigned_team = models.ForeignKey(
+        "db.Team",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assigned_project_details",
+    )
 
     class Meta:
         verbose_name = "Project Detail"

@@ -38,7 +38,7 @@ type Props = {
   errors: TProjectDetailFormErrors;
   /** a field's red outline goes away as soon as it's changed */
   onClearError: (key: TProjectDetailFormKey) => void;
-  /** "Assigned To" is the project's lead */
+  /** "Assigned To" is the project's lead, or a team (`values.assigned_team`), never both */
   lead: string | null;
   onLeadChange: (lead: string | null) => void;
   /** limits "Assigned To" to the project's members (settings); the create form offers the whole workspace */
@@ -160,9 +160,19 @@ export const ProjectDetailFields = observer(function ProjectDetailFields(props: 
           value={lead}
           onChange={(id) => {
             onLeadChange(id || null);
+            if (id && values.assigned_team) onChange({ assigned_team: null });
             onClearError("project_lead");
           }}
-          placeholder="Select a person"
+          assigneeTeam={{
+            value: values.assigned_team,
+            onChange: (teamId) => {
+              onChange({ assigned_team: teamId });
+              if (!teamId) return;
+              onLeadChange(null);
+              onClearError("project_lead");
+            },
+          }}
+          placeholder="Select a person or team"
           clearable
           clearLabel="No one"
           disabled={disabled}

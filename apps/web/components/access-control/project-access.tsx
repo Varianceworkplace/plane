@@ -122,13 +122,14 @@ export const ProjectAccess = observer(function ProjectAccess(props: { workspaceS
       )}
 
       <section className="flex flex-col gap-2">
-        <h3 className="text-body-sm-medium text-primary">Teams that own this project</h3>
+        <h3 className="text-body-sm-medium text-primary">Teams of this project</h3>
         <p className="text-body-xs-regular text-tertiary">
-          Their leads (PMs) manage the project and see their team members' work in it. Change them in{" "}
+          The teams that own it, and the team it is assigned to. Their leads (PMs) manage the project and see their team
+          members' work in it; their members work in it. Change the owners in{" "}
           <Link href={`/${workspaceSlug}/settings/access-control`} className="text-accent-primary hover:underline">
             Workspace settings › Access control
-          </Link>
-          .
+          </Link>{" "}
+          and the assigned team in the project's Assigned to.
         </p>
         <div className="flex flex-wrap gap-2">
           {access.teams.length ? (
@@ -139,10 +140,11 @@ export const ProjectAccess = observer(function ProjectAccess(props: { workspaceS
               >
                 <MembersOutline className="size-3.5" />
                 {team.name}
+                {team.is_assigned && <span className="text-tertiary">(assigned)</span>}
               </span>
             ))
           ) : (
-            <span className="text-body-xs-regular text-placeholder">No team owns it yet</span>
+            <span className="text-body-xs-regular text-placeholder">No team owns it or is assigned to it yet</span>
           )}
         </div>
       </section>
@@ -150,8 +152,8 @@ export const ProjectAccess = observer(function ProjectAccess(props: { workspaceS
       <section className="flex flex-col gap-2">
         <h3 className="text-body-sm-medium text-primary">Shared with</h3>
         <p className="text-body-xs-regular text-tertiary">
-          Give a person or another team access: view only, or manage (edit the project and its work). A share can end on
-          a date.
+          Give a person or another team access: view only, or manage (work in the project and its tasks; only its
+          creator and workspace admins change the project itself). A share can end on a date.
         </p>
         <div className="flex flex-col rounded-lg border-[0.5px] border-subtle">
           {access.grants.length === 0 && (

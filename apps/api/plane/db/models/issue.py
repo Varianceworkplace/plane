@@ -126,7 +126,7 @@ class TicketIssueManager(SoftDeletionManager):
 
 
 class Issue(ChangeTrackerMixin, ProjectBaseModel):
-    TRACKED_FIELDS = ["state_id", "assignee_group_id"]
+    TRACKED_FIELDS = ["state_id", "assignee_team_id"]
 
     PRIORITY_CHOICES = (
         ("urgent", "Urgent"),
@@ -177,9 +177,10 @@ class Issue(ChangeTrackerMixin, ProjectBaseModel):
         through="IssueAssignee",
         through_fields=("issue", "assignee"),
     )
-    # assigned to a group instead of people (plane.db.models.member_group): then it has no assignees
-    assignee_group = models.ForeignKey(
-        "db.MemberGroup",
+    # assigned to a team instead of people (Access control › Teams): then it has no assignees, and everyone in the
+    # team works on it as if it were assigned to them
+    assignee_team = models.ForeignKey(
+        "db.Team",
         on_delete=models.SET_NULL,
         related_name="assigned_issues",
         null=True,

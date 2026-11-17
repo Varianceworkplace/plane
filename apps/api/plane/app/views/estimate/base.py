@@ -50,6 +50,8 @@ class BulkEstimatePointEndpoint(BaseViewSet):
     permission_classes = [ProjectEntityPermission]
     model = Estimate
     serializer_class = EstimateSerializer
+    # the estimate system is a project setting: with role-based access only its creator and workspace admins
+    rbac_project_actions = {"create": "edit", "partial_update": "edit", "destroy": "edit"}
 
     def list(self, request, slug, project_id):
         estimates = (
@@ -151,6 +153,8 @@ class BulkEstimatePointEndpoint(BaseViewSet):
 
 
 class EstimatePointEndpoint(BaseViewSet):
+    rbac_project_actions = {"create": "edit", "partial_update": "edit", "destroy": "edit"}
+
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER])
     def create(self, request, slug, project_id, estimate_id):
         #  TODO: add a key validation if the same key already exists

@@ -5,11 +5,12 @@
 """Role-based access, step 4: projects (plane.utils.rbac.sync_project_access, project views).
 
 The workspace is the plan's example (see plane/tests/unit/utils/test_rbac_engine.py). With RBAC on:
-  * project memberships follow the roles: HR is an admin of every project, a PM of their team projects, a view-only
-    share gives a guest membership; hand-made memberships are never removed and get their old role back;
-    switching RBAC off undoes all of it;
+  * project memberships follow the roles: HR works in every project, a PM in their team projects (as members), a
+    project's creator is its admin, a view-only share gives a guest membership; hand-made memberships are never
+    removed and get their old role back; switching RBAC off undoes all of it;
   * the project list and project pages show each person their scope; joining is limited to it, as a guest;
-  * creating, editing, deleting and archiving projects and managing their members follow the role;
+  * creating projects follows the role; editing, deleting and archiving them and managing their members is for
+    their creator and workspace admins only (as in Workplace);
   * a PM's new project belongs to the teams they lead.
 """
 
@@ -59,17 +60,32 @@ ALL_PROJECTS = {"a", "b", "shared", "open", "private"}
 
 @pytest.mark.contract
 class TestMembershipSync:
-    def test_hr_is_admin_of_every_project(self, rbac):
+    def test_hr_works_in_every_project_without_changing_them(self, rbac):
+        # only a project's creator and workspace admins change it, so HR is a member everywhere
         for project in ALL_PROJECTS:
             membership = _membership(rbac, project, "hr")
-            assert membership.role == 20 and membership.is_active and membership.rbac_managed, project
+            assert (membership.role, membership.is_active, membership.rbac_managed) == (15, True, True), project
 
-    def test_pms_are_admins_of_their_team_projects_only(self, rbac):
+    def test_pms_work_in_their_team_projects_only(self, rbac):
         for project in ("a", "shared"):
             membership = _membership(rbac, project, "pm_a")
-            # PM A was a member by hand: raised to admin, the old role kept
-            assert (membership.role, membership.rbac_managed, membership.rbac_original_role) == (20, False, 15)
+            # PM A was a member by hand: nothing to raise
+            assert (membership.role, membership.rbac_managed, membership.rbac_original_role) == (15, False, None)
         assert _membership(rbac, "b", "pm_a") is None
+
+    def test_a_creator_is_admin_of_their_project(self, rbac):
+        Project.objects.filter(pk=rbac["projects"]["b"].pk).update(created_by=rbac["people"]["pm_b"])
+        sync_project_access(rbac["workspace"].id)
+        assert _membership(rbac, "b", "pm_b").role == 20
+
+    def test_a_membership_the_sync_raised_comes_back_down(self, rbac):
+        # raised to admin by the earlier rule (PMs changed their team projects): a member again now
+        ProjectMember.objects.filter(project=rbac["projects"]["a"], member=rbac["people"]["pm_a"]).update(
+            role=20, rbac_original_role=15
+        )
+        sync_project_access(rbac["workspace"].id)
+        membership = _membership(rbac, "a", "pm_a")
+        assert (membership.role, membership.rbac_original_role) == (15, None)
 
     def test_employees_are_left_alone(self, rbac):
         assert _membership(rbac, "a", "a1").role == 15
@@ -103,7 +119,7 @@ class TestMembershipSync:
     def test_a_new_project_reaches_hr(self, rbac):
         project = Project.objects.create(name="Gamma", identifier="GAMMA", workspace=rbac["workspace"])
         sync_project_access(rbac["workspace"].id)
-        assert ProjectMember.objects.get(project=project, member=rbac["people"]["hr"]).role == 20
+        assert ProjectMember.objects.get(project=project, member=rbac["people"]["hr"]).role == 15
 
 
 @pytest.mark.contract
@@ -134,10 +150,13 @@ class TestProjectList:
         response = rbac["clients"]["a1"].post(url, {"project_ids": [str(rbac["projects"]["open"].id)]}, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN and response.json()["needs_approval"] is True
         assert _membership(rbac, "open", "a1") is None
-        # people who can manage it join directly (HR is already its admin through the sync)
-        response = rbac["clients"]["hr"].post(url, {"project_ids": [str(rbac["projects"]["open"].id)]}, format="json")
-        assert response.status_code == status.HTTP_201_CREATED, response.content
+        # HR already works in it through the sync; people who may change it (workspace admins) join directly
         assert _membership(rbac, "open", "hr").is_active
+        response = rbac["clients"]["admin"].post(
+            url, {"project_ids": [str(rbac["projects"]["open"].id)]}, format="json"
+        )
+        assert response.status_code == status.HTTP_201_CREATED, response.content
+        assert _membership(rbac, "open", "admin").is_active
         response = rbac["clients"]["pm_a"].post(url, {"project_ids": [str(rbac["projects"]["b"].id)]}, format="json")
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert _membership(rbac, "b", "pm_a") is None
@@ -178,24 +197,37 @@ class TestProjectChanges:
             rbac["teams"][0].id
         ]
 
-    def test_editing_follows_the_role_not_the_project_role(self, rbac):
+    def test_only_the_creator_and_workspace_admins_change_a_project(self, rbac):
         alpha = f"{_base(rbac)}{rbac['projects']['a'].id}/"
         # even as a project admin by hand, an employee can't change the project
         ProjectMember.objects.filter(project=rbac["projects"]["a"], member=rbac["people"]["a1"]).update(role=20)
         assert rbac["clients"]["a1"].patch(alpha, {"description": "x"}, format="json").status_code == 403
+        # nor can the team's PM or HR, unless they created it
+        assert rbac["clients"]["pm_a"].patch(alpha, {"description": "x"}, format="json").status_code == 403
+        assert rbac["clients"]["hr"].patch(alpha, {"description": "x"}, format="json").status_code == 403
+        Project.objects.filter(pk=rbac["projects"]["a"].pk).update(created_by=rbac["people"]["pm_a"])
+        sync_project_access(rbac["workspace"].id)
         assert rbac["clients"]["pm_a"].patch(alpha, {"description": "Team A"}, format="json").status_code == 200
         beta = f"{_base(rbac)}{rbac['projects']['b'].id}/"
         assert rbac["clients"]["pm_a"].patch(beta, {"description": "x"}, format="json").status_code == 403
+        assert rbac["clients"]["admin"].patch(beta, {"description": "x"}, format="json").status_code == 200
 
     def test_deleting_and_archiving(self, rbac):
         beta = rbac["projects"]["b"].id
         assert rbac["clients"]["pm_a"].delete(f"{_base(rbac)}{beta}/").status_code == status.HTTP_403_FORBIDDEN
         archive = f"{_base(rbac)}{rbac['projects']['a'].id}/archive/"
         assert rbac["clients"]["a1"].post(archive).status_code == status.HTTP_403_FORBIDDEN
+        # the team's PM can't delete a project someone else created; its creator can
+        assert rbac["clients"]["pm_b"].delete(f"{_base(rbac)}{beta}/").status_code == status.HTTP_403_FORBIDDEN
+        Project.objects.filter(pk=beta).update(created_by=rbac["people"]["pm_b"])
+        sync_project_access(rbac["workspace"].id)
         assert rbac["clients"]["pm_b"].delete(f"{_base(rbac)}{beta}/").status_code == status.HTTP_204_NO_CONTENT
 
     def test_managing_members_is_editing_the_project(self, rbac):
         members = f"{_base(rbac)}{rbac['projects']['a'].id}/members/"
         payload = {"members": [{"member_id": str(rbac["people"]["b1"].id), "role": 15}]}
         assert rbac["clients"]["a2"].post(members, payload, format="json").status_code == 403
+        assert rbac["clients"]["pm_a"].post(members, payload, format="json").status_code == 403
+        Project.objects.filter(pk=rbac["projects"]["a"].pk).update(created_by=rbac["people"]["pm_a"])
+        sync_project_access(rbac["workspace"].id)
         assert rbac["clients"]["pm_a"].post(members, payload, format="json").status_code == 201

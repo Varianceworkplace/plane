@@ -11,11 +11,13 @@ import { useParams } from "next/navigation";
 import {
   ClockOutline,
   DeleteOutline,
+  HideOutline,
   LinkOutline,
   LockOutline,
   NewTabOutline,
   RestoreOutline,
   SettingsOutline,
+  ShowOutline,
   TickOutline,
   UserPlusOutline,
 } from "@makeplane/propel/icons";
@@ -66,7 +68,7 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
   const { workspaceSlug } = useParams();
   // store hooks
   const { getUserDetails } = useMember();
-  const { addProjectToFavorites, removeProjectFromFavorites } = useProject();
+  const { addProjectToFavorites, removeProjectFromFavorites, setProjectInMyList } = useProject();
   const { allowPermissions, canOnProject } = useUserPermissions();
   const { data: currentUser } = useUser();
   // hooks
@@ -89,6 +91,9 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
   const canDelete = hasAdminRole && canOnProject("delete", project.id);
   // archive
   const isArchived = !!project.archived_at;
+  // the person's sidebar Projects list: the projects they're in can be shown there or hidden from it
+  const canChooseListing = isMemberOfProject && !isArchived;
+  const isInMyList = project.in_my_list !== false;
   // role-based access: people who can't manage the project ask their PM to let them join
   const needsApproval = !isMemberOfProject && !isArchived && !canOnProject("edit", project.id);
   const { joinRequests } = useProjectJoinRequests(needsApproval && workspaceSlug ? workspaceSlug.toString() : "");
@@ -142,6 +147,23 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
     });
   };
 
+  const handleListing = (show: boolean) => {
+    if (!workspaceSlug) return;
+    setProjectInMyList(workspaceSlug.toString(), project.id, show)
+      .then(() =>
+        setToast({
+          type: "success",
+          title: show ? "Shown in your list" : "Hidden from your list",
+          message: show
+            ? `${project.name} is now in your Projects list in the sidebar.`
+            : `${project.name} stays here on All Projects; Show in List brings it back.`,
+        })
+      )
+      .catch(() =>
+        setToast({ type: "error", title: "Not changed", message: "Something went wrong. Please try again." })
+      );
+  };
+
   const projectLink = `${workspaceSlug}/projects/${project.id}/summary`;
   const handleCopyText = () =>
     copyUrlToClipboard(projectLink).then(() =>
@@ -160,6 +182,20 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
       title: "Settings",
       icon: SettingsOutline,
       shouldRender: !isArchived && (hasAdminRole || hasMemberRole),
+    },
+    {
+      key: "show-in-list",
+      action: () => handleListing(true),
+      title: "Show in List",
+      icon: ShowOutline,
+      shouldRender: canChooseListing && !isInMyList,
+    },
+    {
+      key: "hide-from-list",
+      action: () => handleListing(false),
+      title: "Hide from List",
+      icon: HideOutline,
+      shouldRender: canChooseListing && isInMyList,
     },
     {
       key: "join",
@@ -243,6 +279,18 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
         <ContextMenu parentRef={projectCardRef} items={MENU_ITEMS} />
         <div className="relative h-[118px] w-full rounded-t">
           <div className="absolute inset-0 z-[1] bg-gradient-to-t from-black/60 to-transparent" />
+          {canChooseListing && (
+            // where the project is now: in the person's sidebar Projects list or not
+            <span
+              className={cn(
+                "absolute top-3 left-3 z-[2] flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-11 font-medium text-on-color",
+                isInMyList ? "bg-black/55" : "bg-black/40 opacity-90"
+              )}
+            >
+              {isInMyList ? <ShowOutline className="size-3" /> : <HideOutline className="size-3" />}
+              {isInMyList ? "In your list" : "Hidden from your list"}
+            </span>
+          )}
 
           <CoverImage
             src={project.cover_image_url}
@@ -368,7 +416,31 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
                 </div>
               )
             ) : (
-              <>
+              <div className="flex items-center gap-1">
+                {canChooseListing && (
+                  // the action (what clicking does); where the project is now shows on the cover
+                  <Tooltip
+                    label={
+                      isInMyList
+                        ? "Remove it from your Projects list in the sidebar. It stays here; nobody's access changes."
+                        : "Add it to your Projects list in the sidebar. Only for you; nobody's access changes."
+                    }
+                    disabled={isMobile}
+                  >
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      stretch="auto"
+                      label={isInMyList ? "Hide from List" : "Show in List"}
+                      aria-label={`${isInMyList ? "Hide from List" : "Show in List"}: ${project.name}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleListing(!isInMyList);
+                      }}
+                    />
+                  </Tooltip>
+                )}
                 {isMemberOfProject &&
                   (hasAdminRole || hasMemberRole ? (
                     <Link
@@ -407,7 +479,7 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
                     />
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         </div>

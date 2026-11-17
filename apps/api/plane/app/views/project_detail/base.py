@@ -5,8 +5,14 @@
 """
 Project details: the vTiger-style "Creating New Project" fields of a project (see plane/utils/project_details.py).
 
-  * Everyone in the project can read them; project admins (and workspace admins in the project) edit them.
+  * Everyone in the project can read them; project admins (and workspace admins in the project) edit them. With
+    role-based access that is only the project's creator and workspace admins (`rbac_project_actions`).
+  * Assigning the project to a team takes its lead off (a person or a team, never both); the team's members get, or
+    lose, their access to the project (plane.db.models.rbac.assigned_team_changed).
 """
+
+# Django imports
+from django.db import transaction
 
 # Third party imports
 from rest_framework import status
@@ -28,6 +34,8 @@ class ProjectDetailOptionsEndpoint(BaseAPIView):
 
 
 class ProjectDetailEndpoint(BaseAPIView):
+    rbac_project_actions = {"PATCH": "edit"}
+
     def get_project(self, slug, project_id):
         return Project.objects.filter(pk=project_id, workspace__slug=slug).first()
 
@@ -48,16 +56,19 @@ class ProjectDetailEndpoint(BaseAPIView):
             return Response({"error": "Archived projects cannot be updated"}, status=status.HTTP_400_BAD_REQUEST)
 
         detail = ProjectDetail.objects.filter(project=project).first()
-        cleaned, errors = parse_project_detail_payload(request.data, current=detail)
+        cleaned, errors = parse_project_detail_payload(request.data, current=detail, workspace_id=project.workspace_id)
         if errors:
             return Response(errors, status=status.HTTP_400_BAD_REQUEST)
 
-        if detail:
-            for field, value in cleaned.items():
-                setattr(detail, field, value)
-            detail.save()
-        else:
-            detail = ProjectDetail.objects.create(project=project, workspace_id=project.workspace_id, **cleaned)
+        with transaction.atomic():
+            if detail:
+                for field, value in cleaned.items():
+                    setattr(detail, field, value)
+                detail.save()
+            else:
+                detail = ProjectDetail.objects.create(project=project, workspace_id=project.workspace_id, **cleaned)
+            if detail.assigned_team_id and project.project_lead_id:
+                Project.objects.filter(pk=project.pk).update(project_lead=None)
         return Response(serialize_project_detail(detail), status=status.HTTP_200_OK)
 
 

@@ -17,6 +17,7 @@ import uuid
 
 # Django imports
 from django.db import IntegrityError, transaction
+from django.db.models.functions import Lower
 from django.utils.dateparse import parse_datetime
 
 # Third party imports
@@ -31,8 +32,8 @@ from plane.db.models import (
     RBAC_MODULES,
     RBAC_SCOPES,
     AccessGrant,
-    MemberGroupMember,
     Project,
+    ProjectDetail,
     ProjectMember,
     ProjectTeam,
     Role,
@@ -43,7 +44,7 @@ from plane.db.models import (
     Workspace,
     WorkspaceMember,
 )
-from plane.db.models.rbac import GRANT_LEVELS, TEAM_PERMISSION_SCOPES, schedule_project_access_sync
+from plane.db.models.rbac import GRANT_LEVELS, TEAM_LEVELS, TEAM_PERMISSION_SCOPES, schedule_project_access_sync
 from plane.db.models.workspace import Team
 from plane.utils.rbac import AccessProfile
 from plane.utils.rbac_rollout import rollout_preview
@@ -146,34 +147,59 @@ def save_permissions(role, rows):
     )
 
 
-def serialize_team(team, members_by_team, projects_by_team, permissions_by_team):
+def serialize_team(team, members_by_team, projects_by_team, assigned_by_team, permissions_by_team, project_names):
+    project_ids = projects_by_team.get(team.id, [])
+    assigned_project_ids = assigned_by_team.get(team.id, [])
     return {
         "id": str(team.id),
         "name": team.name,
         "description": team.description,
         "members": members_by_team.get(team.id, []),
-        "project_ids": projects_by_team.get(team.id, []),
+        # owned (picked here, in Access control › Teams)
+        "project_ids": project_ids,
+        # assigned to the team in the project's "Assigned To" (project details): worked on as if owned
+        "assigned_project_ids": assigned_project_ids,
+        # the names of both, also for projects the viewer isn't a member of (the app only knows its own projects)
+        "project_names": {
+            project_id: project_names.get(project_id, "") for project_id in project_ids + assigned_project_ids
+        },
         "lead_permissions": permissions_by_team.get(team.id, []),
     }
 
 
 def teams_payload(workspace, teams):
-    members_by_team, projects_by_team, permissions_by_team = {}, {}, {}
-    for team_id, member_id, is_lead in TeamMember.objects.filter(team__in=teams).values_list(
-        "team_id", "member_id", "is_lead"
+    members_by_team, projects_by_team, assigned_by_team, permissions_by_team = {}, {}, {}, {}
+    for team_id, member_id, is_lead, level in TeamMember.objects.filter(team__in=teams).values_list(
+        "team_id", "member_id", "is_lead", "level"
     ):
-        members_by_team.setdefault(team_id, []).append({"member_id": str(member_id), "is_lead": is_lead})
+        members_by_team.setdefault(team_id, []).append(
+            {"member_id": str(member_id), "is_lead": is_lead, "level": level}
+        )
     for team_id, project_id in ProjectTeam.objects.filter(team__in=teams).values_list("team_id", "project_id"):
         projects_by_team.setdefault(team_id, []).append(str(project_id))
+    for team_id, project_id in ProjectDetail.objects.filter(
+        assigned_team__in=teams, project__archived_at__isnull=True
+    ).values_list("assigned_team_id", "project_id"):
+        assigned_by_team.setdefault(team_id, []).append(str(project_id))
+    project_names = {
+        str(project_id): name
+        for project_id, name in Project.objects.filter(
+            pk__in={*sum(projects_by_team.values(), []), *sum(assigned_by_team.values(), [])}
+        ).values_list("id", "name")
+    }
     for team_id, module, action, scope in TeamPermission.objects.filter(team__in=teams).values_list(
         "team_id", "module", "action", "scope"
     ):
         permissions_by_team.setdefault(team_id, []).append({"module": module, "action": action, "scope": scope})
-    return [serialize_team(team, members_by_team, projects_by_team, permissions_by_team) for team in teams]
+    return [
+        serialize_team(team, members_by_team, projects_by_team, assigned_by_team, permissions_by_team, project_names)
+        for team in teams
+    ]
 
 
 def parse_team_members(workspace, value):
-    """Returns (rows, error): [(member_id, is_lead)] of active workspace members, each once."""
+    """Returns (rows, error): [(member_id, is_lead, level)] of active workspace members, each once. The level
+    (TEAM_LEVELS) is optional and starts at Junior; it doesn't matter for leads, who are above every level."""
     if not isinstance(value, list):
         return None, "Send the members as a list."
     allowed, rows, seen = active_member_ids(workspace), [], set()
@@ -184,7 +210,10 @@ def parse_team_members(workspace, value):
         if member_id in seen:
             return None, "A person is listed twice."
         seen.add(member_id)
-        rows.append((member_id, bool(item.get("is_lead"))))
+        level = item.get("level") or "junior"
+        if level not in TEAM_LEVELS:
+            return None, f"Pick a level: {', '.join(TEAM_LEVELS.values())}."
+        rows.append((member_id, bool(item.get("is_lead")), level))
     return rows, None
 
 
@@ -211,8 +240,8 @@ def save_team_links(workspace, team, members, project_ids, lead_permissions=None
         )
     if members is not None:
         TeamMember.objects.filter(team=team).delete(soft=False)
-        for member_id, is_lead in members:
-            TeamMember.objects.create(workspace=workspace, team=team, member_id=member_id, is_lead=is_lead)
+        for member_id, is_lead, level in members:
+            TeamMember.objects.create(workspace=workspace, team=team, member_id=member_id, is_lead=is_lead, level=level)
     if project_ids is not None:
         ProjectTeam.objects.filter(team=team).exclude(project_id__in=project_ids).delete(soft=False)
         existing = set(ProjectTeam.objects.filter(team=team).values_list("project_id", flat=True))
@@ -236,6 +265,8 @@ class AccessControlEndpoint(BaseAPIView):
                 "modules": [{"key": key, "label": label} for key, label in RBAC_MODULES.items()],
                 "actions": RBAC_ACTIONS,
                 "scopes": RBAC_SCOPES,
+                # a team member's seniority, lowest first (timesheets: the levels above see the levels below)
+                "team_levels": [{"key": key, "label": label} for key, label in TEAM_LEVELS.items()],
             },
             status=status.HTTP_200_OK,
         )
@@ -327,12 +358,12 @@ class MyAccessEndpoint(BaseAPIView):
                     "teamed_member_ids": ids(
                         TeamMember.objects.filter(workspace=workspace).values_list("member_id", flat=True)
                     ),
-                    # the groups I'm in (I see their tasks), and the ones with people of the teams I lead
-                    "group_ids": ids(profile.group_ids),
-                    "led_group_ids": ids(
-                        MemberGroupMember.objects.filter(
-                            workspace=workspace, member_id__in=profile.led_member_ids, group__deleted_at__isnull=True
-                        ).values_list("group_id", flat=True)
+                    # the teams I'm in (their tasks are mine too), and the ones with people of the teams I lead
+                    "team_ids": ids(profile.team_ids),
+                    "led_team_ids": ids(
+                        TeamMember.objects.filter(
+                            workspace=workspace, member_id__in=profile.led_member_ids, team__deleted_at__isnull=True
+                        ).values_list("team_id", flat=True)
                     ),
                 },
             }
@@ -534,6 +565,25 @@ class TeamListCreateEndpoint(BaseAPIView):
         return Response(teams_payload(workspace, [team])[0], status=status.HTTP_201_CREATED)
 
 
+class TeamOptionsEndpoint(BaseAPIView):
+    """The workspace's teams for the "Assigned to" dropdowns of projects and tasks: every member may list them (only
+    access managers see and change the rest, above)."""
+
+    @allow_permission(WORKSPACE_ROLES, level="WORKSPACE")
+    def get(self, request, slug):
+        teams = {
+            team.id: {"id": str(team.id), "name": team.name, "member_ids": [], "lead_ids": []}
+            for team in Team.objects.filter(workspace__slug=slug).order_by(Lower("name"))
+        }
+        for team_id, member_id, is_lead in TeamMember.objects.filter(team_id__in=teams).values_list(
+            "team_id", "member_id", "is_lead"
+        ):
+            teams[team_id]["member_ids"].append(str(member_id))
+            if is_lead:
+                teams[team_id]["lead_ids"].append(str(member_id))
+        return Response(list(teams.values()), status=status.HTTP_200_OK)
+
+
 class TeamDetailEndpoint(BaseAPIView):
     @allow_permission(WORKSPACE_ROLES, level="WORKSPACE")
     def patch(self, request, slug, pk):
@@ -676,6 +726,24 @@ def serialize_grant(grant):
     }
 
 
+def project_teams(project):
+    """The teams that own the project, and the team it's assigned to (Assigned To), each once."""
+    teams = {
+        team_id: {"id": str(team_id), "name": name, "is_owner": True, "is_assigned": False}
+        for team_id, name in ProjectTeam.objects.filter(project=project).values_list("team_id", "team__name")
+    }
+    assigned = (
+        ProjectDetail.objects.filter(project=project, assigned_team__isnull=False)
+        .values_list("assigned_team_id", "assigned_team__name")
+        .first()
+    )
+    if assigned:
+        team_id, name = assigned
+        teams.setdefault(team_id, {"id": str(team_id), "name": name, "is_owner": False, "is_assigned": False})
+        teams[team_id]["is_assigned"] = True
+    return list(teams.values())
+
+
 class ProjectAccessEndpoint(BaseAPIView):
     """A project's owning teams and its shares (project settings, Access)."""
 
@@ -689,12 +757,7 @@ class ProjectAccessEndpoint(BaseAPIView):
             {
                 "is_rbac_enabled": workspace.is_rbac_enabled,
                 "can_share": can_share(request.user, workspace, project_id),
-                "teams": [
-                    {"id": str(team_id), "name": name}
-                    for team_id, name in ProjectTeam.objects.filter(project=project).values_list(
-                        "team_id", "team__name"
-                    )
-                ],
+                "teams": project_teams(project),
                 "grants": [serialize_grant(g) for g in AccessGrant.objects.filter(project=project)],
             },
             status=status.HTTP_200_OK,

@@ -17,6 +17,7 @@ import { AddOutline, DeleteOutline, EditOutline, LockOutline, MoreHorizontalOutl
 import { EmptyStateCompact } from "@plane/blocks/empty-state";
 import type { ProjectOption } from "@plane/blocks/property-select";
 import { ProjectSelect } from "@plane/blocks/property-select";
+import { Select } from "@plane/blocks/select";
 import { setToast } from "@plane/blocks/toast";
 // components
 import { MemberSelect } from "@/components/dropdowns/member/member-select";
@@ -35,7 +36,7 @@ import {
 import type { TPermissionMatrix } from "./helpers";
 import { Person, usePersonName } from "./person";
 import { PermissionGrid } from "./roles-tab";
-import type { TAccessControl, TRbacAction, TTeam, TTeamScope } from "./types";
+import type { TAccessControl, TRbacAction, TTeam, TTeamLevel, TTeamScope } from "./types";
 
 const useProjectOptions = () => {
   const { workspaceProjectIds, getProjectById } = useProject();
@@ -75,17 +76,52 @@ function Field(props: { label: string; hint: string; children: React.ReactNode }
   );
 }
 
+type TLevelOption = { key: TTeamLevel; label: string };
+
+/** A member's level in the team; the levels above see the timesheets of the levels below. */
+function LevelSelect(props: {
+  levels: TLevelOption[];
+  value: TTeamLevel;
+  onChange: (level: TTeamLevel) => void;
+  name: string;
+}) {
+  const { levels, value, onChange, name } = props;
+  const selected = levels.find((level) => level.key === value) ?? null;
+  return (
+    <Select<TLevelOption>
+      getValues={() => levels}
+      value={selected}
+      onChange={(key) => onChange(key as TTeamLevel)}
+      // names the picker for screen readers: "Level of <person>, <level>"
+      placeholder={`Level of ${name}`}
+      getOptionValue={(level) => level.key}
+      getOptionLabel={(level) => level.label}
+      showSearch={false}
+      pinSelected={false}
+    >
+      <Select.Trigger<TLevelOption> variant="select-md" className="w-36" aria-label={`Level of ${name}`}>
+        <span className="truncate text-left">{selected?.label ?? "Junior"}</span>
+      </Select.Trigger>
+    </Select>
+  );
+}
+
 function TeamEditor(props: {
   open: boolean;
   workspaceSlug: string;
+  overview: TAccessControl;
   team: TTeam | null;
   onClose: (saved: boolean) => void;
 }) {
-  const { open, workspaceSlug, team, onClose } = props;
+  const { open, workspaceSlug, overview, team, onClose } = props;
+  const personName = usePersonName();
+  const levelOptions = overview.team_levels ?? [];
   const { options: projectOptions, getValues } = useProjectOptions();
   const [name, setName] = useState("");
   const [leads, setLeads] = useState<string[]>([]);
   const [members, setMembers] = useState<string[]>([]);
+  // member -> level (Junior unless set)
+  const [levels, setLevels] = useState<Record<string, TTeamLevel>>({});
   const [projectIds, setProjectIds] = useState<string[]>([]);
   const [nameError, setNameError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -95,6 +131,7 @@ function TeamEditor(props: {
     setName(team?.name ?? "");
     setLeads((team?.members ?? []).filter((m) => m.is_lead).map((m) => m.member_id));
     setMembers((team?.members ?? []).filter((m) => !m.is_lead).map((m) => m.member_id));
+    setLevels(Object.fromEntries((team?.members ?? []).map((m) => [m.member_id, m.level ?? "junior"])));
     setProjectIds(team?.project_ids ?? []);
     setNameError("");
   }, [open, team]);
@@ -111,7 +148,9 @@ function TeamEditor(props: {
         // a lead picked as a member too stays a lead
         members: [
           ...leads.map((member_id) => ({ member_id, is_lead: true })),
-          ...members.filter((id) => !leads.includes(id)).map((member_id) => ({ member_id, is_lead: false })),
+          ...members
+            .filter((id) => !leads.includes(id))
+            .map((member_id) => ({ member_id, is_lead: false, level: levels[member_id] ?? "junior" })),
         ],
         project_ids: projectIds,
       };
@@ -178,6 +217,35 @@ function TeamEditor(props: {
                 className="w-full"
               />
             </Field>
+            {members.filter((id) => !leads.includes(id)).length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-body-xs-medium text-secondary">Member levels</span>
+                <div className="flex flex-col rounded-md border-[0.5px] border-subtle">
+                  {members
+                    .filter((id) => !leads.includes(id))
+                    .map((memberId) => (
+                      <div
+                        key={memberId}
+                        className="flex items-center justify-between gap-3 border-b-[0.5px] border-subtle px-3 py-1.5 last:border-b-0"
+                      >
+                        <span className="truncate text-body-xs-regular text-primary">{personName(memberId)}</span>
+                        <div className="rounded-md border-[0.5px] border-subtle">
+                          <LevelSelect
+                            levels={levelOptions}
+                            value={levels[memberId] ?? "junior"}
+                            onChange={(level) => setLevels((previous) => ({ ...previous, [memberId]: level }))}
+                            name={personName(memberId)}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                </div>
+                <span className="text-caption-md-regular text-tertiary">
+                  Timesheets: in this team, each level sees the time of the levels below it (Senior › Mid-level ›
+                  Junior); the leads see everyone&apos;s. Nobody sees another team&apos;s.
+                </span>
+              </div>
+            )}
             <Field label="Projects the team owns" hint="Several teams can own the same project.">
               <ProjectSelect
                 multiple
@@ -286,6 +354,8 @@ export const AccessTeamsTab = observer(function AccessTeamsTab(props: {
   overview: TAccessControl;
 }) {
   const { workspaceSlug, overview } = props;
+  const levelLabel = (level: TTeamLevel | undefined) =>
+    overview.team_levels?.find((option) => option.key === (level ?? "junior"))?.label ?? "Junior";
   const { teams, mutate } = useTeams(workspaceSlug);
   const { getProjectById } = useProject();
   const personName = usePersonName();
@@ -317,7 +387,9 @@ export const AccessTeamsTab = observer(function AccessTeamsTab(props: {
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
         <p className="text-body-xs-regular text-tertiary">
-          A team's leads are its PMs: they see the team members' work and manage the projects the team owns.
+          A team's leads are its PMs: they see the team members' work and manage the projects the team owns or is
+          assigned to. Its members work in those projects. Projects and tasks are assigned to a team in their Assigned
+          to field.
         </p>
         <Button
           stretch="auto"
@@ -343,7 +415,10 @@ export const AccessTeamsTab = observer(function AccessTeamsTab(props: {
         <div className="flex flex-col rounded-lg border-[0.5px] border-subtle">
           {(teams ?? []).map((team) => {
             const leads = team.members.filter((m) => m.is_lead);
-            const projects = team.project_ids.map((id) => getProjectById(id)?.name).filter(Boolean);
+            // the server sends the names: the viewer needn't be a member of the projects
+            const projectName = (id: string) => team.project_names?.[id] || getProjectById(id)?.name;
+            const projects = team.project_ids.map(projectName).filter(Boolean);
+            const assigned = (team.assigned_project_ids ?? []).map(projectName).filter(Boolean);
             return (
               <div
                 key={team.id}
@@ -370,12 +445,15 @@ export const AccessTeamsTab = observer(function AccessTeamsTab(props: {
                     {team.members.length - leads.length > 0 &&
                       `: ${team.members
                         .filter((m) => !m.is_lead)
-                        .map((m) => personName(m.member_id))
+                        .map((m) => `${personName(m.member_id)} (${levelLabel(m.level)})`)
                         .join(", ")}`}
                   </span>
                   <span className="text-caption-md-regular text-tertiary">
                     Owns: {projects.length ? projects.join(", ") : "no projects yet"}
                   </span>
+                  {assigned.length > 0 && (
+                    <span className="text-caption-md-regular text-tertiary">Assigned to it: {assigned.join(", ")}</span>
+                  )}
                   {team.lead_permissions.length > 0 && (
                     <button
                       type="button"
@@ -415,6 +493,7 @@ export const AccessTeamsTab = observer(function AccessTeamsTab(props: {
       <TeamEditor
         open={editing !== undefined}
         workspaceSlug={workspaceSlug}
+        overview={overview}
         team={editing ?? null}
         onClose={(saved) => {
           setEditing(undefined);

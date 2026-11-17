@@ -115,6 +115,8 @@ class ProjectLiteSerializer(BaseSerializer):
 class ProjectListSerializer(DynamicBaseSerializer):
     is_favorite = serializers.BooleanField(read_only=True)
     sort_order = serializers.FloatField(read_only=True)
+    # in the person's sidebar Projects list (plane.utils.project_list); left out where it isn't worked out
+    in_my_list = serializers.BooleanField(read_only=True)
     member_role = serializers.IntegerField(read_only=True)
     anchor = serializers.CharField(read_only=True)
     members = serializers.SerializerMethodField()

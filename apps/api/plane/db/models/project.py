@@ -382,6 +382,9 @@ class ProjectUserProperty(ProjectBaseModel):
     rich_filters = models.JSONField(default=dict)
     preferences = models.JSONField(default=get_default_preferences)
     sort_order = models.FloatField(default=65535)
+    # the person's own choice to show the project in their sidebar Projects list ("Show in List" / "Hide from List");
+    # None = not chosen, the default applies (plane.utils.project_list). Only the list: no access changes with it.
+    show_in_list = models.BooleanField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Project User Property"

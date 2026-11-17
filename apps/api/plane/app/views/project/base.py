@@ -44,10 +44,12 @@ from plane.db.models import (
 )
 from plane.db.models.intake import IntakeIssueStatus
 from plane.utils.host import base_host
-from plane.utils.project_details import LEAD_REQUIRED_ERROR, parse_project_detail_payload
+from plane.utils.project_details import LEAD_OR_TEAM_ERROR, LEAD_REQUIRED_ERROR, parse_project_detail_payload
 from plane.utils.task_details import NEW_PROJECT_FEATURES
 from plane.utils.order_queryset import PROJECT_ORDER_BY_ALLOWLIST, sanitize_order_by
-from plane.utils.rbac import rbac_profile
+from plane.db.models.rbac import schedule_project_access_sync
+from plane.utils.project_list import in_my_list_annotation
+from plane.utils.rbac import is_rbac_enabled, rbac_profile
 
 
 class ProjectViewSet(BaseViewSet):
@@ -95,6 +97,8 @@ class ProjectViewSet(BaseViewSet):
                 ).values("anchor")
             )
             .annotate(sort_order=Subquery(sort_order))
+            # the person's sidebar Projects list (Show in List / Hide from List)
+            .annotate(in_my_list=in_my_list_annotation(self.request, self.kwargs.get("slug")))
             .prefetch_related(
                 Prefetch(
                     "project_projectmember",
@@ -185,12 +189,14 @@ class ProjectViewSet(BaseViewSet):
             )
             .annotate(inbox_view=F("intake_view"))
             .annotate(sort_order=Subquery(sort_order))
+            .annotate(in_my_list=in_my_list_annotation(request, slug))
             .distinct()
         ).values(
             "id",
             "name",
             "identifier",
             "sort_order",
+            "in_my_list",
             "logo_props",
             "member_role",
             "intake_count",
@@ -289,9 +295,15 @@ class ProjectViewSet(BaseViewSet):
         project_data = {key: value for key, value in request.data.items() if key != "project_details"}
         details = None
         if "project_details" in request.data:
-            details, errors = parse_project_detail_payload(request.data.get("project_details"), require_all=True)
-            if not project_data.get("project_lead"):
+            details, errors = parse_project_detail_payload(
+                request.data.get("project_details"), require_all=True, workspace_id=workspace.id
+            )
+            # "Assigned To" is a person (the lead) or a team, never both
+            team_id = details.get("assigned_team_id")
+            if not project_data.get("project_lead") and not team_id and "assigned_team" not in errors:
                 errors["project_lead"] = LEAD_REQUIRED_ERROR
+            elif project_data.get("project_lead") and team_id:
+                errors["project_lead"] = LEAD_OR_TEAM_ERROR
             if errors:
                 return Response({"project_details": errors}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -313,10 +325,12 @@ class ProjectViewSet(BaseViewSet):
                 if serializer.data["project_lead"] is not None and str(serializer.data["project_lead"]) != str(
                     request.user.id
                 ):
+                    # with role-based access only the creator and workspace admins edit a project, so the lead
+                    # works in it as a member
                     ProjectMember.objects.create(
                         project_id=serializer.data["id"],
                         member_id=serializer.data["project_lead"],
-                        role=ROLE.ADMIN.value,
+                        role=ROLE.MEMBER.value if is_rbac_enabled(workspace.id) else ROLE.ADMIN.value,
                     )
 
                 State.objects.bulk_create(
@@ -409,6 +423,11 @@ class ProjectViewSet(BaseViewSet):
 
         if serializer.is_valid():
             serializer.save()
+            # a project is assigned to a person or a team: picking a lead takes the team off it
+            if request.data.get("project_lead") and ProjectDetail.objects.filter(
+                project=project, assigned_team__isnull=False
+            ).update(assigned_team=None):
+                schedule_project_access_sync(project.workspace_id)
             if intake_view:
                 intake = Intake.objects.filter(project=project, is_default=True).first()
                 if not intake:
@@ -593,6 +612,8 @@ class DeployBoardViewSet(BaseViewSet):
     permission_classes = [ProjectMemberPermission]
     serializer_class = DeployBoardSerializer
     model = DeployBoard
+    # publishing is changing the project: with role-based access only its creator and workspace admins
+    rbac_project_actions = {"create": "edit", "partial_update": "edit", "destroy": "edit"}
 
     def list(self, request, slug, project_id):
         project_deploy_board = DeployBoard.objects.filter(

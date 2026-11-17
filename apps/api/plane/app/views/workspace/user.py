@@ -60,7 +60,7 @@ from plane.utils.grouper import (
     issue_on_results,
     issue_queryset_grouper,
 )
-from plane.db.models.member_group import groups_of
+from plane.db.models.rbac import teams_of
 from plane.utils.issue_filters import filter_valid_uuids, issue_filters
 from plane.utils.order_queryset import ACTIVITY_ORDER_BY_ALLOWLIST, order_issue_queryset, sanitize_order_by
 from plane.utils.paginator import GroupedOffsetPaginator, SubGroupedOffsetPaginator
@@ -142,7 +142,7 @@ class WorkspaceUserProfileIssuesEndpoint(BaseAPIView):
         issue_queryset = Issue.issue_objects.filter(
             id__in=Issue.issue_objects.filter(
                 Q(assignees__in=[user_id])
-                | Q(assignee_group__in=groups_of([user_id]))
+                | Q(assignee_team__in=teams_of([user_id]))
                 | Q(created_by_id=user_id)
                 | Q(issue_subscribers__subscriber_id=user_id),
                 workspace__slug=slug,
@@ -151,12 +151,12 @@ class WorkspaceUserProfileIssuesEndpoint(BaseAPIView):
             project__project_projectmember__member=request.user,
             project__project_projectmember__is_active=True,
         )
-        # the "Assigned" tab: assigned to the person, or to a group they're in
+        # the "Assigned" tab: assigned to the person, or to a team they're in
         assigned_to = filter_valid_uuids([request.GET.get("assigned_to", "")])
         if assigned_to:
             issue_queryset = issue_queryset.filter(
                 Exists(IssueAssignee.objects.filter(issue_id=OuterRef("pk"), assignee_id=assigned_to[0]))
-                | Q(assignee_group__in=groups_of(assigned_to))
+                | Q(assignee_team__in=teams_of(assigned_to))
             )
 
         # Apply filtering from filterset

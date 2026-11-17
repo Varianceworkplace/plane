@@ -15,11 +15,18 @@ export type TProjectOrderByOptions =
 
 export type TProjectDisplayFilters = {
   my_projects?: boolean;
+  /** projects in / hidden from the person's sidebar Projects list */
+  in_my_list?: boolean;
+  hidden_from_my_list?: boolean;
   archived_projects?: boolean;
   order_by?: TProjectOrderByOptions;
 };
 
-export type TProjectAppliedDisplayFilterKeys = "my_projects" | "archived_projects";
+export type TProjectAppliedDisplayFilterKeys =
+  | "my_projects"
+  | "in_my_list"
+  | "hidden_from_my_list"
+  | "archived_projects";
 
 export type TProjectFilters = {
   access?: string[] | null;

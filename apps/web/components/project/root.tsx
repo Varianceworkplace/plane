@@ -8,7 +8,6 @@ import { useCallback, useEffect } from "react";
 import { observer } from "mobx-react";
 import { useParams, usePathname } from "next/navigation";
 // plane imports
-import { useTranslation } from "@plane/i18n";
 import type { TProjectAppliedDisplayFilterKeys, TProjectFilters } from "@plane/types";
 import { calculateTotalFilters } from "@plane/utils";
 // components
@@ -25,7 +24,6 @@ export const ProjectRoot = observer(function ProjectRoot() {
   const { currentWorkspace } = useWorkspace();
   const { workspaceSlug } = useParams();
   const pathname = usePathname();
-  const { t } = useTranslation();
   // store
   const { totalProjectIds, filteredProjectIds } = useProject();
   const {
@@ -37,9 +35,7 @@ export const ProjectRoot = observer(function ProjectRoot() {
     updateDisplayFilters,
   } = useProjectFilter();
   // derived values
-  const pageTitle = currentWorkspace?.name
-    ? `${currentWorkspace?.name} - ${t("workspace_projects.label", { count: 2 })}`
-    : undefined;
+  const pageTitle = currentWorkspace?.name ? `${currentWorkspace?.name} - All Projects` : undefined;
 
   const isArchived = pathname.includes("/archives");
 
@@ -72,10 +68,12 @@ export const ProjectRoot = observer(function ProjectRoot() {
     clearAllFilters(workspaceSlug.toString());
     clearAllAppliedDisplayFilters(workspaceSlug.toString());
     if (isArchived) updateDisplayFilters(workspaceSlug.toString(), { archived_projects: true });
+    // oxlint-disable-next-line eslint-plugin-react-hooks/exhaustive-deps
   }, [clearAllFilters, clearAllAppliedDisplayFilters, workspaceSlug]);
 
   useEffect(() => {
     updateDisplayFilters(workspaceSlug.toString(), { archived_projects: isArchived });
+    // oxlint-disable-next-line eslint-plugin-react-hooks/exhaustive-deps
   }, [pathname]);
 
   return (

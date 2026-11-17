@@ -32,11 +32,13 @@ export const EMPTY_PROJECT_DETAIL_FORM: TProjectDetailFormValues = {
   salesforce_org_id: "",
   project_url: "",
   progress: null,
+  assigned_team: null,
 };
 
 /** Labels as on the Workplace "Creating New Project" form. */
 export const PROJECT_DETAIL_LABELS: Record<TProjectDetailFormKey, string> = {
   project_lead: "Assigned to",
+  assigned_team: "Assigned to",
   start_date: "Start date",
   target_end_date: "Target end date",
   actual_end_date: "Actual end date",
@@ -86,7 +88,8 @@ export const validateProjectDetailForm = (
 ): TProjectDetailFormErrors => {
   const errors: TProjectDetailFormErrors = {};
   for (const key of REQUIRED_PROJECT_DETAIL_FIELDS) {
-    const value = key === "project_lead" ? projectLead : values[key];
+    // "Assigned to" is a person (the lead) or a team
+    const value = key === "project_lead" ? projectLead || values.assigned_team : values[key];
     if (value === null || value === undefined || (typeof value === "string" && value.trim() === ""))
       errors[key] = `${PROJECT_DETAIL_LABELS[key]} is required`;
   }

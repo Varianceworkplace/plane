@@ -45,6 +45,7 @@ export const ProjectFiltersSelection = observer(function ProjectFiltersSelection
             placeholder="Search"
             value={filtersSearchQuery}
             onChange={(e) => setFiltersSearchQuery(e.target.value)}
+            // oxlint-disable-next-line jsx_a11y/no-autofocus
             autoFocus={!isMobile}
           />
           {filtersSearchQuery !== "" && (
@@ -64,6 +65,24 @@ export const ProjectFiltersSelection = observer(function ProjectFiltersSelection
               })
             }
             title="My projects"
+          />
+          {/* the person's sidebar Projects list (Show in List / Hide from List); one or the other */}
+          <FilterOption
+            isChecked={!!displayFilters.in_my_list}
+            onClick={() =>
+              handleDisplayFiltersUpdate({ in_my_list: !displayFilters.in_my_list, hidden_from_my_list: false })
+            }
+            title="In my list"
+          />
+          <FilterOption
+            isChecked={!!displayFilters.hidden_from_my_list}
+            onClick={() =>
+              handleDisplayFiltersUpdate({
+                hidden_from_my_list: !displayFilters.hidden_from_my_list,
+                in_my_list: false,
+              })
+            }
+            title="Hidden from my list"
           />
         </div>
 

@@ -219,7 +219,8 @@ class TestProjects:
     @pytest.mark.parametrize("name", ["hr", "admin"])
     def test_hr_and_admins_see_every_project_including_private_ones(self, org, name):
         assert _visible_projects(org, name) == ALL_PROJECTS
-        assert _visible_projects(org, name, "delete") == ALL_PROJECTS
+        # changing or deleting a project is for its creator and workspace admins (as in Workplace)
+        assert _visible_projects(org, name, "delete") == (ALL_PROJECTS if name == "admin" else set())
 
     @pytest.mark.django_db
     def test_employees_see_projects_but_private_ones_only_as_members(self, org):
@@ -231,13 +232,15 @@ class TestProjects:
             assert _visible_projects(org, "a1", action) == set()
 
     @pytest.mark.django_db
-    def test_pms_manage_their_team_projects_only(self, org):
+    def test_pms_see_their_team_projects_and_change_only_the_ones_they_created(self, org):
         assert _visible_projects(org, "pm_a") == {"a", "shared"}
-        assert _visible_projects(org, "pm_a", "edit") == {"a", "shared"}
-        assert _visible_projects(org, "pm_b", "delete") == {"b", "shared"}
+        assert _visible_projects(org, "pm_a", "edit") == set()
+        assert _visible_projects(org, "pm_b", "delete") == set()
         pm_a = _profile(org, "pm_a")
         assert pm_a.can("projects", "create")
         assert not pm_a.can_on_project("edit", org["projects"]["b"])
+        Project.objects.filter(pk=org["projects"]["a"].pk).update(created_by=org["people"]["pm_a"])
+        assert _visible_projects(org, "pm_a", "edit") == {"a"}
 
     @pytest.mark.django_db
     def test_sharing_with_a_pm(self, org):
@@ -249,13 +252,15 @@ class TestProjects:
         assert "b_b1" not in _visible_issues(org, "pm_a")
         grant.level = "manage"
         grant.save()
-        assert "b" in _visible_projects(org, "pm_a", "edit")
+        # manage: PM A works in Beta (its tasks are in their team scope), changing it stays with its creator
+        assert beta.id in _profile(org, "pm_a").team_project_ids("edit")
+        assert "b" not in _visible_projects(org, "pm_a", "edit")
 
     @pytest.mark.django_db
     def test_sharing_with_a_team_and_expiry(self, org):
         w, beta = org["workspace"], org["projects"]["b"]
         grant = AccessGrant.objects.create(workspace=w, project=beta, team=org["teams"][0], level="manage")
-        assert "b" in _visible_projects(org, "pm_a", "edit")
+        assert beta.id in _profile(org, "pm_a").team_project_ids("edit")
         grant.expires_at = timezone.now() - timedelta(minutes=1)
         grant.save()
         assert "b" not in _visible_projects(org, "pm_a")
@@ -264,7 +269,9 @@ class TestProjects:
     def test_private_project_reaches_the_pm_of_a_team_that_owns_it(self, org):
         ProjectTeam.objects.create(workspace=org["workspace"], project=org["projects"]["private"], team=org["teams"][0])
         assert "private" in _visible_projects(org, "pm_a")
-        assert "private" not in _visible_projects(org, "a2")
+        # the team's members work in its projects, private or not; other teams don't see it
+        assert "private" in _visible_projects(org, "a2")
+        assert "private" not in _visible_projects(org, "pm_b")
 
 
 @pytest.mark.unit
@@ -288,8 +295,8 @@ class TestRolesAddUp:
     def test_role_edits_apply(self, org):
         employee = org["roles"]["employee"]
         employee.permissions.filter(module="work_items", action="view").update(scope="member")
-        # A2 now sees every work item in the projects they're a member of (Alpha)
-        assert _visible_issues(org, "a2") == {"a_a2"}
+        # A2 now sees every work item in the projects they're a member of (Alpha, and Shared through Team A)
+        assert _visible_issues(org, "a2") == {"a_a2", "shared_a1", "shared_b1", "shared_new", "shared_loner"}
         assert _visible_issues(org, "a1") == {
             "shared_a1",
             "shared_b1",

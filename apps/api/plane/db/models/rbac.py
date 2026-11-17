@@ -11,6 +11,8 @@ Role-based access: the data model (step 1 of the RBAC plan).
   * People hold roles (several at once: what they grant adds up), belong to teams (as Lead, i.e. the PM, or
     Member), teams own projects (several teams can share one), and a project can be shared with a person or team.
   * A team can change what its leads may do (TeamPermission): its setting replaces their roles' for that action.
+  * A project ("Assigned To", ProjectDetail.assigned_team) or a project task (Issue.assignee_team) can be assigned
+    to a team instead of a person; what that gives is in plane.utils.rbac.
   * Nothing here changes what anyone can see or do yet: that comes with the rules engine, and only for workspaces
     with `Workspace.is_rbac_enabled` on.
 """
@@ -37,7 +39,6 @@ RBAC_MODULES = {
     "tickets": "Tickets",
     "analytics": "Analytics and dashboards",
     "teams": "Teams",
-    "groups": "Groups",
     "role_management": "Role management",
 }
 RBAC_ACTIONS = ["view", "create", "edit", "delete"]
@@ -46,17 +47,18 @@ RBAC_ACTIONS = ["view", "create", "edit", "delete"]
 #   member - in projects I'm a member of
 #   team   - in projects owned by teams I lead or shared with me or my teams, plus my team members' work items
 #   all    - the whole workspace
-# Groups (Workspace settings › Groups) know only two: All = every group, any other scope = the groups I created.
 RBAC_SCOPES = ["own", "member", "team", "all"]
 # A team's setting for its leads (TeamPermission) replaces their roles' for that action, so it can also take it away
 TEAM_PERMISSION_SCOPES = RBAC_SCOPES + ["none"]
 GRANT_LEVELS = ["view", "manage"]
+# A team member's seniority, lowest first (the team's leads are above every level). In their teams, people see the
+# timesheets of the levels below theirs (plane.utils.rbac.AccessProfile.junior_member_ids).
+TEAM_LEVELS = {"junior": "Junior", "mid": "Mid-level", "senior": "Senior"}
+TEAM_LEVEL_RANKS = {level: rank for rank, level in enumerate(TEAM_LEVELS, start=1)}
 
 ALL = {action: "all" for action in RBAC_ACTIONS}
 TEAM = {action: "team" for action in RBAC_ACTIONS}
 OWN_TICKETS = {"view": "own", "create": "own", "edit": "own"}  # tickets can't be deleted
-# PMs see every group and manage the ones they created
-OWN_GROUPS = {"view": "all", "create": "own", "edit": "own", "delete": "own"}
 # A member nobody has given a role yet: no projects, work items or reports until they get one. Tickets keep their own
 # creator / assignee rules, so everyone can still raise and follow their own.
 NO_ROLE_PERMISSIONS = {"tickets": OWN_TICKETS}
@@ -75,7 +77,6 @@ SYSTEM_ROLES = {
             "tickets": OWN_TICKETS,
             "analytics": {"view": "all"},
             "teams": ALL,
-            "groups": ALL,
             "role_management": ALL,
         },
     ),
@@ -93,7 +94,6 @@ SYSTEM_ROLES = {
             "tickets": OWN_TICKETS,
             "analytics": {"view": "team"},
             "teams": {"view": "team"},
-            "groups": OWN_GROUPS,
         },
     ),
     "employee": (
@@ -232,12 +232,15 @@ class UserRole(BaseModel):
 
 
 class TeamMember(BaseModel):
-    """A person in a team: its Lead (the PM; a team can have several) or a Member."""
+    """A person in a team: its Lead (the PM; a team can have several) or a Member, at a level (TEAM_LEVELS)."""
 
     workspace = models.ForeignKey("db.Workspace", on_delete=models.CASCADE, related_name="team_members")
     team = models.ForeignKey("db.Team", on_delete=models.CASCADE, related_name="team_members")
     member = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="team_memberships")
     is_lead = models.BooleanField(default=False)
+    level = models.CharField(
+        max_length=10, choices=[(level, label) for level, label in TEAM_LEVELS.items()], default="junior"
+    )
 
     class Meta:
         verbose_name = "Team Member"
@@ -453,6 +456,11 @@ def create_system_roles(sender, instance, created, **kwargs):
 # ---------------------------------------------------------------- keeping project memberships in step
 
 
+def teams_of(user_ids):
+    """Subquery: the live teams these people are in."""
+    return TeamMember.objects.filter(member_id__in=user_ids, team__deleted_at__isnull=True).values("team_id")
+
+
 def schedule_project_access_sync(workspace_id):
     """Project memberships follow role-based access (plane.utils.rbac.sync_project_access), once the change is saved."""
     from plane.bgtasks.rbac_sync_task import sync_project_access_task
@@ -495,6 +503,29 @@ def remember_rbac_switch(sender, instance, **kwargs):
 def rbac_switch_changed(sender, instance, created, **kwargs):
     if not created and getattr(instance, "_rbac_was_enabled", None) not in (None, instance.is_rbac_enabled):
         schedule_project_access_sync(instance.id)
+
+
+@receiver(post_save, sender="db.Issue")
+def team_task_changed(sender, instance, created, **kwargs):
+    # the team's members get (or lose) access to the task's project
+    if instance.assignee_team_id if created else instance.has_changed("assignee_team_id"):
+        schedule_project_access_sync(instance.workspace_id)
+
+
+@receiver(pre_save, sender="db.ProjectDetail")
+def remember_assigned_team(sender, instance, **kwargs):
+    instance._assigned_team_was = (
+        sender.all_objects.filter(pk=instance.pk).values_list("assigned_team_id", flat=True).first()
+        if instance.pk
+        else None
+    )
+
+
+@receiver(post_save, sender="db.ProjectDetail")
+def assigned_team_changed(sender, instance, **kwargs):
+    # the team a project is assigned to works on it (plane.utils.rbac): its members get (or lose) access
+    if getattr(instance, "_assigned_team_was", None) != instance.assigned_team_id:
+        schedule_project_access_sync(instance.workspace_id)
 
 
 @receiver(post_save, sender="db.Project")

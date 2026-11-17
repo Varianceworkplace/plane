@@ -98,7 +98,6 @@ export const useReportPdfExport = (workspaceSlug: string, filters: TWorklogRepor
           options?.project_managers.map((pm) => ({ id: pm.id, name: pm.display_name }))
         )
       ),
-      ...named("Groups", pick(filters.group, options?.groups)),
       ...named(
         "Task status",
         filters.state_group.map((group) => STATE_GROUPS[group]?.label)

@@ -54,6 +54,7 @@ export const SidebarItemBase = observer(function SidebarItemBase({
     "projects",
     "project_milestones",
     "tickets",
+    "timesheet",
     "reports",
     "your_work",
     "stickies",

@@ -20,6 +20,8 @@ export type TProjectDetail = {
   project_url: string;
   /** percent, in steps of 10 */
   progress: number | null;
+  /** "Assigned To" a team instead of a person (the project lead): its leads manage the project, its members work in it */
+  assigned_team: string | null;
 };
 
 /** Picklist values, served by the API so both sides accept the same ones. */

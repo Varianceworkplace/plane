@@ -34,6 +34,7 @@ export interface IProjectStore {
   archivedProjectIds: string[] | undefined;
   totalProjectIds: string[] | undefined;
   joinedProjectIds: string[];
+  sidebarProjectIds: string[];
   favoriteProjectIds: string[];
   currentProjectDetails: TProject | undefined;
   currentProjectNextSequenceId: number | undefined;
@@ -67,6 +68,7 @@ export interface IProjectStore {
   removeProjectFromFavorites: (workspaceSlug: string, projectId: string) => Promise<any>;
   // project-view action
   updateProjectView: (workspaceSlug: string, projectId: string, viewProps: any) => Promise<any>;
+  setProjectInMyList: (workspaceSlug: string, projectId: string, show: boolean) => Promise<void>;
   // CRUD actions
   createProject: (workspaceSlug: string, data: Partial<TProject>) => Promise<TProject>;
   updateProject: (workspaceSlug: string, projectId: string, data: Partial<TProject>) => Promise<TProject>;
@@ -113,6 +115,7 @@ export class ProjectStore implements IProjectStore {
       totalProjectIds: computed,
       currentProjectDetails: computed,
       joinedProjectIds: computed,
+      sidebarProjectIds: computed,
       favoriteProjectIds: computed,
       currentProjectNextSequenceId: computed,
       // helper actions
@@ -127,6 +130,7 @@ export class ProjectStore implements IProjectStore {
       removeProjectFromFavorites: action,
       // project-view action
       updateProjectView: action,
+      setProjectInMyList: action,
       // CRUD actions
       createProject: action,
       updateProject: action,
@@ -247,6 +251,14 @@ export class ProjectStore implements IProjectStore {
       .filter((project) => project.workspace === currentWorkspace.id && !!project.member_role && !project.archived_at)
       .map((project) => project.id);
     return projectIds;
+  }
+
+  /**
+   * The sidebar Projects list: the joined projects the person hasn't hidden ("Hide from List"). Only the sidebar
+   * uses it; everything else (pickers, filters, search) keeps every joined project.
+   */
+  get sidebarProjectIds() {
+    return this.joinedProjectIds.filter((projectId) => this.projectMap?.[projectId]?.in_my_list !== false);
   }
 
   /**
@@ -503,6 +515,25 @@ export class ProjectStore implements IProjectStore {
   };
 
   /**
+   * Show the project in, or hide it from, the person's sidebar Projects list. Only the list changes: nothing about
+   * the project or anyone's access.
+   */
+  setProjectInMyList = async (workspaceSlug: string, projectId: string, show: boolean) => {
+    const previous = this.projectMap?.[projectId]?.in_my_list;
+    runInAction(() => {
+      set(this.projectMap, [projectId, "in_my_list"], show);
+    });
+    try {
+      await this.projectService.updateProjectUserProperties(workspaceSlug, projectId, { show_in_list: show });
+    } catch (error) {
+      runInAction(() => {
+        set(this.projectMap, [projectId, "in_my_list"], previous);
+      });
+      throw error;
+    }
+  };
+
+  /**
    * Updates the project view
    * @param workspaceSlug
    * @param projectId
@@ -604,6 +635,7 @@ export class ProjectStore implements IProjectStore {
   archiveProject = async (workspaceSlug: string, projectId: string) => {
     await this.projectArchiveService
       .archiveProject(workspaceSlug, projectId)
+      // oxlint-disable-next-line promise/always-return
       .then((response) => {
         runInAction(() => {
           set(this.projectMap, [projectId, "archived_at"], response.archived_at);
@@ -625,6 +657,7 @@ export class ProjectStore implements IProjectStore {
   restoreProject = async (workspaceSlug: string, projectId: string) => {
     await this.projectArchiveService
       .restoreProject(workspaceSlug, projectId)
+      // oxlint-disable-next-line promise/always-return
       .then(() => {
         runInAction(() => {
           set(this.projectMap, [projectId, "archived_at"], null);

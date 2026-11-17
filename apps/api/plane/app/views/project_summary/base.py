@@ -8,7 +8,8 @@ Project summary: the dashboard a project opens on.
   * Work item counts for the project (open, due, completed, by priority), expected hours and worked hours.
   * Every member of the project sees the whole project, whatever their role: being in the project is what opens
     its summary (joining, or a join request being approved). People outside the project get a 403.
-  * Team summary: one row per project member, plus anyone else with work items or time in the project.
+  * Team summary: one row per person who works on the project: work items assigned to them or time logged in it.
+    Members with neither (such as HR or PMs the role sync adds) are left out.
 """
 
 # Python imports
@@ -27,7 +28,7 @@ from plane.app.permissions import ROLE, allow_permission
 from plane.app.views.base import BaseAPIView
 from plane.app.views.worklog.base import serialize_user, worklog_queryset
 from plane.app.views.worklog.report import user_timezone
-from plane.db.models import Issue, IssueAssignee, IssueTimeEstimate, Project, ProjectMember, User
+from plane.db.models import Issue, IssueAssignee, IssueTimeEstimate, Project, User
 from plane.utils.work_item_visibility import all_work_items
 
 # open work items due within this many days count as due, next to the overdue ones
@@ -83,20 +84,11 @@ def team_summary(project, issue_ids, worklogs):
         for row in worklogs.order_by().values("logged_by_id").annotate(worked=Sum("duration"))
     }
 
-    people_ids = {
-        *assigned,
-        *worked,
-        *ProjectMember.objects.filter(
-            project_id=project.id,
-            is_active=True,
-            member__isnull=False,
-            member__is_bot=False,
-            role__gte=ROLE.MEMBER.value,
-        ).values_list("member_id", flat=True),
-    }
+    # the people who work on the project: membership alone doesn't put someone in the team summary
+    people_ids = {*assigned, *worked}
 
     rows = []
-    for user in User.objects.filter(id__in=people_ids):
+    for user in User.objects.filter(id__in=people_ids, is_bot=False):
         row = assigned.get(user.id, {})
         rows.append(
             {

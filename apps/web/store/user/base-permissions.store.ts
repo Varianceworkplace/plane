@@ -88,7 +88,7 @@ export interface IBaseUserPermissionStore {
   canChangeMemberRole: (memberId: string, workspaceSlug?: string) => boolean;
   canOnWorkItem: (
     rbacAction: TRbacAction,
-    issue: Pick<TIssue, "project_id" | "assignee_ids" | "assignee_group_id" | "created_by"> | undefined,
+    issue: Pick<TIssue, "project_id" | "assignee_ids" | "assignee_team_id" | "created_by"> | undefined,
     workspaceSlug?: string
   ) => boolean;
 }
@@ -187,8 +187,14 @@ export class BaseUserPermissionStore implements IBaseUserPermissionStore {
    * @returns { EUserPermissions | undefined }
    */
   getProjectRoleByWorkspaceSlugAndProjectId = computedFn(
-    (workspaceSlug: string, projectId?: string): EUserPermissions | undefined =>
-      this.getProjectRole(workspaceSlug, projectId)
+    (workspaceSlug: string, projectId?: string): EUserPermissions | undefined => {
+      const role = this.getProjectRole(workspaceSlug, projectId);
+      // with role-based access only a project's creator and workspace admins change it (the server's rule), so an
+      // admin membership anyone else holds works like a member one
+      if (Number(role) === EUserPermissions.ADMIN && !this.canOnProject("edit", projectId, workspaceSlug))
+        return EUserPermissions.MEMBER;
+      return role;
+    }
   );
 
   /**
@@ -338,7 +344,7 @@ export class BaseUserPermissionStore implements IBaseUserPermissionStore {
   /** The server's rule (plane.utils.rbac.AccessProfile.work_item_q) for one work item. */
   canOnWorkItem = (
     rbacAction: TRbacAction,
-    issue: Pick<TIssue, "project_id" | "assignee_ids" | "assignee_group_id" | "created_by"> | undefined,
+    issue: Pick<TIssue, "project_id" | "assignee_ids" | "assignee_team_id" | "created_by"> | undefined,
     workspaceSlug?: string
   ) => {
     const access = this.rbacAccess(workspaceSlug);
@@ -346,19 +352,19 @@ export class BaseUserPermissionStore implements IBaseUserPermissionStore {
     const scopes = this.scopes(access, "work_items", rbacAction);
     if (scopes.includes("all")) return true;
     if (!scopes.length || !access.work_items) return false;
-    const { member_project_ids, team_project_ids, led_member_ids, teamed_member_ids, group_ids, led_group_ids } =
+    const { member_project_ids, team_project_ids, led_member_ids, teamed_member_ids, team_ids, led_team_ids } =
       access.work_items;
     const me = this.store.user.data?.id;
     const assignees = issue.assignee_ids ?? [];
     const projectId = issue.project_id ?? "";
-    const groupId = issue.assignee_group_id ?? "";
-    // own: assigned to me, or unassigned and created by me; a task of my group I may only see
+    const teamId = issue.assignee_team_id ?? "";
+    // own: assigned to me or to a team I'm in, or unassigned and created by me
     if (me && (assignees.includes(me) || (!assignees.length && issue.created_by === me))) return true;
-    if (rbacAction === "view" && groupId && group_ids?.includes(groupId)) return true;
+    if (teamId && team_ids?.includes(teamId)) return true;
     if (scopes.includes("member") && member_project_ids.includes(projectId)) return true;
     if (scopes.includes("team")) {
       if (assignees.some((id) => led_member_ids.includes(id))) return true;
-      if (groupId && led_group_ids?.includes(groupId)) return true;
+      if (teamId && led_team_ids?.includes(teamId)) return true;
       // in my team projects, the work items no team claims
       if (team_project_ids[rbacAction]?.includes(projectId) && !assignees.some((id) => teamed_member_ids.includes(id)))
         return true;

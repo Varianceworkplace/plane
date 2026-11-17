@@ -24,8 +24,6 @@ export type TWorklogReportFilters = {
   team?: string[];
   /** project managers: the members of the teams they lead */
   pm?: string[];
-  /** member groups: their members */
-  group?: string[];
 };
 
 export type TWorklogReportTotals = {
@@ -249,5 +247,4 @@ export type TWorklogAnalytics = {
 export type TWorklogReportOptions = {
   departments: { id: string; name: string }[];
   project_managers: (TWorklogUser & { team_ids: string[] })[];
-  groups: { id: string; name: string }[];
 };

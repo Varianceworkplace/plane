@@ -16,6 +16,8 @@ export type TAccessControl = {
   modules: { key: string; label: string }[];
   actions: TRbacAction[];
   scopes: TRbacScope[];
+  /** a team member's seniority, lowest first: in their teams, people see the timesheets of the levels below */
+  team_levels: { key: TTeamLevel; label: string }[];
 };
 
 /** project ids; null = every project */
@@ -42,9 +44,9 @@ export type TMyAccess = {
     led_member_ids: string[];
     /** people in any team */
     teamed_member_ids: string[];
-    // the groups I'm in (I see their tasks), and the ones with people of the teams I lead
-    group_ids?: string[];
-    led_group_ids?: string[];
+    /** the teams I'm in (their tasks are mine too), and the ones with people of the teams I lead */
+    team_ids?: string[];
+    led_team_ids?: string[];
   };
 };
 
@@ -108,7 +110,10 @@ export type TRole = {
 
 export type TRolePayload = { name?: string; description?: string; permissions?: TRolePermission[] };
 
-export type TTeamMember = { member_id: string; is_lead: boolean };
+export type TTeamLevel = "junior" | "mid" | "senior";
+
+/** A team's lead (its PM) or member; a member's level decides whose timesheets they see in the team. */
+export type TTeamMember = { member_id: string; is_lead: boolean; level?: TTeamLevel };
 
 export type TTeamPermission = { module: string; action: TRbacAction; scope: TTeamScope };
 
@@ -117,9 +122,22 @@ export type TTeam = {
   name: string;
   description: string;
   members: TTeamMember[];
+  /** the projects the team owns (picked here) */
   project_ids: string[];
+  /** the projects assigned to the team in their "Assigned to": worked on as if the team owned them */
+  assigned_project_ids: string[];
+  /** project id -> name, for both lists (also projects the viewer isn't a member of) */
+  project_names: Record<string, string>;
   /** what the team's leads may do instead of what their roles grant; not listed = their roles decide */
   lead_permissions: TTeamPermission[];
+};
+
+/** A team as the "Assigned to" dropdowns offer it (every workspace member may list them). */
+export type TTeamOption = {
+  id: string;
+  name: string;
+  member_ids: string[];
+  lead_ids: string[];
 };
 
 export type TTeamPayload = {
@@ -162,7 +180,8 @@ export type TAccessGrant = {
 export type TProjectAccess = {
   is_rbac_enabled: boolean;
   can_share: boolean;
-  teams: { id: string; name: string }[];
+  /** the teams that own the project, and the one it's assigned to */
+  teams: { id: string; name: string; is_owner: boolean; is_assigned: boolean }[];
   grants: TAccessGrant[];
 };
 

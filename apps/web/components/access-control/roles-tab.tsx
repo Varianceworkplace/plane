@@ -120,6 +120,10 @@ export function PermissionGrid<S extends string>(props: {
           </div>
         ))}
       </dl>
+      <p className="text-caption-md-regular text-tertiary">
+        Projects › Edit and Delete only reach the projects the person created, whatever the scope: only a project&apos;s
+        creator and workspace admins change it.
+      </p>
     </>
   );
 }

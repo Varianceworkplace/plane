@@ -187,6 +187,8 @@
     },
     "scope": {
       "my_projects": "My projects",
+      "in_my_list": "In my list",
+      "hidden_from_my_list": "Hidden from my list",
       "archived_projects": "Archived"
     },
     "common": {

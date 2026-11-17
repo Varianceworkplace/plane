@@ -4,7 +4,8 @@
  * See the LICENSE file for details.
  */
 
-import useSWR from "swr";
+import { useCallback } from "react";
+import useSWR, { mutate as globalMutate } from "swr";
 // plane imports
 import { setToast } from "@plane/blocks/toast";
 // services
@@ -70,6 +71,8 @@ export const accessKeys = {
   overview: (slug: string) => `ACCESS_CONTROL_${slug}`,
   roles: (slug: string) => `ACCESS_ROLES_${slug}`,
   teams: (slug: string) => `ACCESS_TEAMS_${slug}`,
+  // the teams the Assigned to dropdowns offer
+  teamOptions: (slug: string) => `ACCESS_TEAM_OPTIONS_${slug}`,
   members: (slug: string) => `ACCESS_MEMBERS_${slug}`,
   project: (projectId: string) => `PROJECT_ACCESS_${projectId}`,
   preview: (slug: string) => `ACCESS_PREVIEW_${slug}`,
@@ -94,7 +97,12 @@ export const useTeams = (workspaceSlug: string, enabled = true) => {
   const { data, mutate } = useSWR(enabled && workspaceSlug ? accessKeys.teams(workspaceSlug) : null, () =>
     accessControlService.teams(workspaceSlug)
   );
-  return { teams: data, mutate };
+  // a change to the teams also changes what the Assigned to dropdowns offer
+  const refresh = useCallback(() => {
+    void globalMutate(accessKeys.teamOptions(workspaceSlug));
+    return mutate();
+  }, [mutate, workspaceSlug]);
+  return { teams: data, mutate: refresh };
 };
 
 export const useAccessMembers = (workspaceSlug: string, enabled = true) => {

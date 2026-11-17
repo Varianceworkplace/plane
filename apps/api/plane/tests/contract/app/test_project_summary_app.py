@@ -177,16 +177,16 @@ class TestProjectSummary:
             "worked_duration": 425,  # everyone's time in this project, not Beta's
         }
 
-    def test_team_lists_every_member_with_their_work(self, setup):
+    def test_team_lists_the_people_who_work_on_the_project(self, setup):
         team = _team(_summary(setup, "ws_admin"))
-        assert set(team) >= {"hiral", "vijay", "idle"}
+        # a member with no work items and no time isn't part of the team summary
+        assert set(team) >= {"hiral", "vijay"} and "idle" not in team
         assert {key: team["hiral"][key] for key in ("expected_duration", "worked_duration")} == {
             "expected_duration": 420,
             "worked_duration": 350,
         }
         assert (team["hiral"]["work_items"], team["hiral"]["completed_work_items"]) == (2, 1)
         assert (team["vijay"]["work_items"], team["vijay"]["worked_duration"]) == (1, 45)
-        assert (team["idle"]["work_items"], team["idle"]["worked_duration"]) == (0, 0)
 
     @pytest.mark.parametrize("who", ["hiral", "vijay", "idle"])
     def test_every_member_sees_the_whole_project(self, setup, who):
@@ -204,7 +204,8 @@ class TestProjectSummary:
         ProjectMember.objects.create(project=setup["project"], member=setup["people"]["outsider"], role=15)
         summary = _summary(setup, "outsider")
         assert summary["work_items"] == FULL_WORK_ITEMS
-        assert "outsider" in _team(summary)
+        # in the team summary once they work on the project, not just for joining it
+        assert "outsider" not in _team(summary)
 
     def test_numbers_follow_changes(self, setup):
         hiral_open = Issue.all_objects.get(name="Hiral open")

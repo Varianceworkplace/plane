@@ -5,9 +5,12 @@
  */
 
 import { observer } from "mobx-react";
+import { useLocation, useNavigate } from "react-router";
 // plane imports
 import { useTranslation } from "@plane/i18n";
-import { InboxOutline } from "@makeplane/propel/icons";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { ArrowNarrowLeftOutline, InboxOutline } from "@makeplane/propel/icons";
 import { Breadcrumbs } from "@plane/blocks/breadcrumb";
 import { Header } from "@plane/blocks/layout";
 // components
@@ -24,11 +27,27 @@ export const NotificationSidebarHeader = observer(function NotificationSidebarHe
 ) {
   const { workspaceSlug } = props;
   const { t } = useTranslation();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // The app sidebar is hidden on this page, so this is the way out. React Router keys the first
+  // page of a visit "default": with nothing to go back to, go to the workspace home instead.
+  const handleBack = () => {
+    if (location.key !== "default") void navigate(-1);
+    else void navigate(`/${workspaceSlug}/`);
+  };
 
   if (!workspaceSlug) return <></>;
   return (
     <Header className="my-auto bg-surface-1">
       <Header.LeftItem>
+        <IconButton
+          variant="ghost"
+          size="sm"
+          icon={<Icon icon={ArrowNarrowLeftOutline} />}
+          aria-label={t("common.go_back")}
+          onClick={handleBack}
+        />
         <Breadcrumbs>
           <Breadcrumbs.Item
             component={

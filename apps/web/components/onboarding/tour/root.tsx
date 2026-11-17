@@ -18,7 +18,7 @@ import ViewsTour from "@/app/assets/onboarding/views.webp?url";
 // hooks
 import { VarianceLockup } from "@/components/common/variance-logo";
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
-import { useUser } from "@/hooks/store/user";
+import { useUser, useUserPermissions } from "@/hooks/store/user";
 // local imports
 import { TourSidebar } from "./sidebar";
 
@@ -86,6 +86,9 @@ export const TourRoot = observer(function TourRoot(props: TOnboardingTourProps) 
   // store hooks
   const { toggleCreateProjectModal } = useCommandPalette();
   const { data: currentUser } = useUser();
+  const { canAccess } = useUserPermissions();
+  // with role-based access, creating projects follows the role (Employees can't)
+  const canCreateProject = canAccess("projects", "create");
 
   const currentStepIndex = TOUR_STEPS.findIndex((tourStep) => tourStep.key === step);
   const currentStep = TOUR_STEPS[currentStepIndex];
@@ -178,10 +181,10 @@ export const TourRoot = observer(function TourRoot(props: TOnboardingTourProps) 
                     variant="primary"
                     size="sm"
                     stretch="auto"
-                    label="Create your first project"
+                    label={canCreateProject ? "Create your first project" : "Get started"}
                     onClick={() => {
                       onComplete();
-                      toggleCreateProjectModal(true);
+                      if (canCreateProject) toggleCreateProjectModal(true);
                     }}
                   />
                 )}

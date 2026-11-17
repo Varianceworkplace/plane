@@ -37,7 +37,7 @@ export const WorkspaceDraftIssuesRoot = observer(function WorkspaceDraftIssuesRo
   const { loader, paginationInfo, fetchIssues, issueIds } = useWorkspaceDraftIssues();
   const { workspaceProjectIds } = useProject();
   const { toggleCreateProjectModal } = useCommandPalette();
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canAccess } = useUserPermissions();
   // derived values
   const hasMemberLevelPermission = allowPermissions(
     [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
@@ -77,7 +77,8 @@ export const WorkspaceDraftIssuesRoot = observer(function WorkspaceDraftIssuesRo
             onClick: () => {
               toggleCreateProjectModal(true);
             },
-            disabled: !hasMemberLevelPermission,
+            // with role-based access, creating projects follows the role (Employees can't)
+            disabled: !hasMemberLevelPermission || !canAccess("projects", "create"),
             variant: "primary",
           },
         ]}

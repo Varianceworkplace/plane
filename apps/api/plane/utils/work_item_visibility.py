@@ -7,7 +7,7 @@ Private work items: a work item is only visible to the people it belongs to.
 
   * Assigned work items: only their assignee(s). Admins and the creator don't see them either.
   * Unassigned work items: their creator, project admins and workspace admins.
-  * Work items assigned to a group (plane.db.models.member_group): as unassigned, plus everyone in the group.
+  * Work items assigned to a team (Issue.assignee_team): as unassigned, plus everyone in the team.
 
 Enforced in two places, like ticket isolation (plane.utils.ticket_isolation):
   * the Issue managers (`objects`, `issue_objects`) filter every work item query made while a request is served,
@@ -77,7 +77,7 @@ def make_viewer(user, workspace_id=None, request=None):
 def visible_to(user):
     """Q for the work items `user` may see."""
     from plane.db.models import IssueAssignee, ProjectMember, WorkspaceMember
-    from plane.db.models.member_group import groups_of
+    from plane.db.models.rbac import teams_of
 
     assignees = IssueAssignee.all_objects.filter(issue_id=OuterRef("pk"), deleted_at__isnull=True)
     admin_projects = ProjectMember.objects.filter(member_id=user.id, role=ROLE_ADMIN, is_active=True).values(
@@ -92,7 +92,7 @@ def visible_to(user):
             ~Q(Exists(assignees))
             & (Q(created_by_id=user.id) | Q(project_id__in=admin_projects) | Q(workspace_id__in=admin_workspaces))
         )
-        | Q(assignee_group_id__in=groups_of([user.id]))
+        | Q(assignee_team_id__in=teams_of([user.id]))
     )
 
 

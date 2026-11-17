@@ -58,8 +58,8 @@ export const expectedMinutes = (values: TTaskDetailsFormValues): number | null =
 
 type TWorkItemFields = {
   assigneeIds: string[] | undefined;
-  // or a group instead of the person
-  assigneeGroupId: string | null | undefined;
+  // or a team instead of the person
+  assigneeTeamId: string | null | undefined;
   priority: string | null | undefined;
   startDate: string | null | undefined;
   targetDate: string | null | undefined;
@@ -96,8 +96,8 @@ export const validateTaskDetailsForm = (
     errors.priority = "Pick a priority.";
     missing.push("Priority");
   }
-  if ((workItem.assigneeIds ?? []).length !== 1 && !workItem.assigneeGroupId) {
-    errors.assignee_ids = "Pick the person or group this task is assigned to.";
+  if ((workItem.assigneeIds ?? []).length !== 1 && !workItem.assigneeTeamId) {
+    errors.assignee_ids = "Pick the person or team this task is assigned to.";
     missing.push("Assigned to");
   }
   if (!workItem.startDate) {
