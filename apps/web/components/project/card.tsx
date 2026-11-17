@@ -282,7 +282,6 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
           {canChooseListing && (
             // where the project is now: in the person's sidebar Projects list or not
             <span
-              data-testid="project-list-status"
               className={cn(
                 "absolute top-3 left-3 z-[2] flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-11 font-medium text-on-color",
                 isInMyList ? "bg-black/55" : "bg-black/40 opacity-90"
