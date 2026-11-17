@@ -162,7 +162,7 @@ class SubIssuesEndpoint(BaseAPIView):
                 "module_ids",
                 "label_ids",
                 "assignee_ids",
-                "assignee_group_id",
+                "assignee_team_id",
                 "sub_issues_count",
                 "created_at",
                 "updated_at",

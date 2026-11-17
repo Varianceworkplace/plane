@@ -65,7 +65,7 @@ export const IssueModalProvider = observer(function IssueModalProvider(props: TI
       readTaskDetailsForm(issuePropertyValues),
       {
         assigneeIds: watch("assignee_ids"),
-        assigneeGroupId: watch("assignee_group_id"),
+        assigneeTeamId: watch("assignee_team_id"),
         priority: watch("priority"),
         startDate: watch("start_date"),
         targetDate: watch("target_date"),

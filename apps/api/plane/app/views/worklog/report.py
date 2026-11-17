@@ -13,9 +13,9 @@ Worklog reports (Reports > Project-wise / User-wise).
       - project members: only the time they logged themselves
       - guests: nothing
   * Filters: ?project=&logged_by=&issue=&state_group=&state= (comma separated) and ?from_date=&to_date= (YYYY-MM-DD,
-    both inclusive, in the requesting user's timezone). ?team= (departments), ?pm= (the teams a project manager
-    leads) and ?group= (member groups) narrow to the people in them, together with ?logged_by=. The date is when the
-    work started (timer entries) or when it was logged (manual entries).
+    both inclusive, in the requesting user's timezone). ?team= (departments) and ?pm= (the teams a project manager
+    leads) narrow to the people in them, together with ?logged_by=. The date is when the work started (timer
+    entries) or when it was logged (manual entries).
   * ?group_by=work_item lists worklogs work item by work item (newest first within each) instead of newest first.
 """
 
@@ -43,7 +43,6 @@ from plane.app.views.base import BaseAPIView
 from plane.db.models import (
     Issue,
     IssueAssignee,
-    MemberGroupMember,
     Project,
     ProjectMember,
     StateGroup,
@@ -117,7 +116,7 @@ def visible_worklogs(user, slug, scope):
 
 
 def report_people(request, slug):
-    """The people ?logged_by=, ?team=, ?pm= and ?group= narrow a report to (all of them that are given), or None."""
+    """The people ?logged_by=, ?team= and ?pm= narrow a report to (all of them that are given), or None."""
     sets = []
     users = _uuid_list(request.GET.get("logged_by"))
     if users:
@@ -132,15 +131,6 @@ def report_people(request, slug):
         led = TeamMember.objects.filter(workspace__slug=slug, member_id__in=managers, is_lead=True).values("team_id")
         sets.append(
             set(TeamMember.objects.filter(workspace__slug=slug, team_id__in=led).values_list("member_id", flat=True))
-        )
-    groups = _uuid_list(request.GET.get("group"))
-    if groups:
-        sets.append(
-            set(
-                MemberGroupMember.objects.filter(workspace__slug=slug, group_id__in=groups).values_list(
-                    "member_id", flat=True
-                )
-            )
         )
     if not sets:
         return None
@@ -215,8 +205,8 @@ def serialize_scope(scope):
         scopes = profile.scopes("worklogs", "view")
         return {
             "is_workspace_admin": "all" in scopes,
-            # anything wider than "own" reaches other people's time
-            "can_view_others": bool(scopes - {"own"}),
+            # anything wider than "own", or people below them in their teams, reaches other people's time
+            "can_view_others": bool(scopes - {"own"}) or bool(scopes and profile.junior_member_ids),
             "admin_project_ids": sorted(str(pk) for pk in profile.team_project_ids("edit")),
         }
     return {

@@ -40,7 +40,7 @@ from plane.app.serializers import (
     IssueSerializer,
     ProjectUserPropertySerializer,
 )
-from plane.app.serializers.issue import assigns_group
+from plane.app.serializers.issue import assigns_team
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.bgtasks.issue_description_version_task import issue_description_version_task
 from plane.bgtasks.recent_visited_task import recent_visited_task
@@ -191,7 +191,7 @@ class IssueListEndpoint(BaseAPIView):
                 "module_ids",
                 "label_ids",
                 "assignee_ids",
-                "assignee_group_id",
+                "assignee_team_id",
                 "sub_issues_count",
                 "created_at",
                 "updated_at",
@@ -433,7 +433,7 @@ class IssueViewSet(BaseViewSet):
                 current_instance=None,
                 epoch=int(timezone.now().timestamp()),
                 # nobody is notified about a task given to a group
-                notification=not assigns_group(request.data),
+                notification=not assigns_team(request.data),
                 origin=base_host(request=request, is_app=True),
             )
             # the creator may have assigned it to someone else, and then no longer sees it: still answer with it
@@ -463,7 +463,7 @@ class IssueViewSet(BaseViewSet):
                         "module_ids",
                         "label_ids",
                         "assignee_ids",
-                        "assignee_group_id",
+                        "assignee_team_id",
                         "sub_issues_count",
                         "created_at",
                         "updated_at",
@@ -685,8 +685,8 @@ class IssueViewSet(BaseViewSet):
             return Response({"error": "Issue not found"}, status=status.HTTP_404_NOT_FOUND)
 
         current_instance = json.dumps(IssueDetailSerializer(issue).data, cls=DjangoJSONEncoder)
-        # nobody is notified about a task given to a group
-        notification = not assigns_group(request.data, issue.assignee_group_id)
+        # nobody is notified about a task given to a team
+        notification = not assigns_team(request.data, issue.assignee_team_id)
 
         requested_data = json.dumps(self.request.data, cls=DjangoJSONEncoder)
         serializer = IssueCreateSerializer(issue, data=request.data, partial=True, context={"project_id": project_id})
@@ -898,7 +898,7 @@ class IssuePaginatedViewSet(BaseViewSet):
             "module_ids",
             "label_ids",
             "assignee_ids",
-            "assignee_group_id",
+            "assignee_team_id",
             "link_count",
             "attachment_count",
             "sub_issues_count",

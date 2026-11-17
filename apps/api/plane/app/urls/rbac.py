@@ -17,6 +17,7 @@ from plane.app.views.rbac.base import (
     RolloutPreviewEndpoint,
     TeamDetailEndpoint,
     TeamListCreateEndpoint,
+    TeamOptionsEndpoint,
 )
 from plane.app.views.rbac.join_request import ProjectJoinRequestDetailEndpoint, ProjectJoinRequestEndpoint
 
@@ -46,6 +47,11 @@ urlpatterns = [
         name="access-check",
     ),
     path("workspaces/<str:slug>/access-control/teams/", TeamListCreateEndpoint.as_view(), name="access-teams"),
+    path(
+        "workspaces/<str:slug>/access-control/teams/options/",
+        TeamOptionsEndpoint.as_view(),
+        name="access-team-options",
+    ),
     path(
         "workspaces/<str:slug>/access-control/teams/<uuid:pk>/",
         TeamDetailEndpoint.as_view(),

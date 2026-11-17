@@ -29,7 +29,7 @@ import {
 import { CycleSelect } from "@/components/dropdowns/cycle/cycle-select";
 import { EstimateSelect } from "@/components/dropdowns/estimate/estimate-select";
 import { MemberSelect } from "@/components/dropdowns/member/member-select";
-import { assigneeGroupUpdate, assigneesUpdate } from "@/components/member-groups/helpers";
+import { assigneeTeamUpdate, assigneesUpdate } from "@/components/access-control/team-assignment";
 import { ModuleSelect } from "@/components/dropdowns/module/module-select";
 import { PrioritySelect } from "@/components/dropdowns/priority/priority-select";
 import { StateSelect } from "@/components/dropdowns/state/state-select";
@@ -120,11 +120,11 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
   };
 
   const handleAssignee = async (ids: string[]) => {
-    if (updateIssue) await updateIssue(issue.project_id, issue.id, assigneesUpdate(ids, issue.assignee_group_id));
+    if (updateIssue) await updateIssue(issue.project_id, issue.id, assigneesUpdate(ids, issue.assignee_team_id));
   };
 
-  const handleAssigneeGroup = async (groupId: string | null) => {
-    if (updateIssue) await updateIssue(issue.project_id, issue.id, assigneeGroupUpdate(groupId));
+  const handleAssigneeTeam = async (teamId: string | null) => {
+    if (updateIssue) await updateIssue(issue.project_id, issue.id, assigneeTeamUpdate(teamId));
   };
 
   const handleModule = useCallback(
@@ -328,7 +328,7 @@ export const IssueProperties = observer(function IssueProperties(props: IIssuePr
             projectId={issue?.project_id ?? undefined}
             value={issue?.assignee_ids ?? []}
             onChange={handleAssignee}
-            assigneeGroup={{ value: issue.assignee_group_id, onChange: handleAssigneeGroup }}
+            assigneeTeam={{ value: issue.assignee_team_id, onChange: handleAssigneeTeam }}
             disabled={isReadOnly}
             multiple
             variant={issue.assignee_ids?.length ? "avatar-group-sm" : "pill-sm"}

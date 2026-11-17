@@ -37,7 +37,7 @@ function AnalyticsPage({ params }: Route.ComponentProps) {
   const { toggleCreateProjectModal } = useCommandPalette();
   const { workspaceProjectIds, loader } = useProject();
   const { currentWorkspace } = useWorkspace();
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canAccess } = useUserPermissions();
 
   const pageTitle = currentWorkspace?.name
     ? t(`workspace_analytics.page_label`, { workspace: currentWorkspace?.name })
@@ -113,7 +113,7 @@ function AnalyticsPage({ params }: Route.ComponentProps) {
                   onClick: () => {
                     toggleCreateProjectModal(true);
                   },
-                  disabled: !canPerformEmptyStateActions,
+                  disabled: !canPerformEmptyStateActions || !canAccess("projects", "create"),
                 },
               ]}
             />

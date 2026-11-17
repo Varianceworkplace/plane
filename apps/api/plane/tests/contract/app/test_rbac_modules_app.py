@@ -188,8 +188,9 @@ class TestWorklogReports:
         "who, seen",
         [
             ("hr", {"a1", "b1", "loner", "a2"}),
-            ("pm_a", {"a1", "a2", "loner"}),  # B1 is Team B's
-            ("pm_b", {"b1", "loner"}),
+            # B1 is Team B's; the loner is in no team: only HR sees their time, also in the PMs' projects
+            ("pm_a", {"a1", "a2"}),
+            ("pm_b", {"b1"}),
             ("a1", {"a1"}),
         ],
     )

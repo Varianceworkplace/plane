@@ -45,7 +45,8 @@ export const ProjectsBaseHeader = observer(function ProjectsBaseHeader() {
           <Breadcrumbs.Item
             component={
               <BreadcrumbLink
-                label={t("workspace_projects.label", { count: 2 })}
+                // every project the person may see; the sidebar Projects list is their own selection of them
+                label="All Projects"
                 icon={<ProjectsOutline className="h-4 w-4 text-tertiary" />}
               />
             }

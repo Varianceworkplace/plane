@@ -15,14 +15,14 @@ import { useTranslation } from "@plane/i18n";
 import type { TPaginatedResponse } from "@plane/types";
 import { getFileURL } from "@plane/utils";
 // components
-import { useMemberGroups } from "@/components/member-groups/helpers";
+import { useTeamOptions } from "@/components/access-control/team-assignment";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useUser } from "@/hooks/store/user";
 
-// group options share the list with people: their ids carry this prefix
-const GROUP_PREFIX = "group:";
-const groupIdOf = (id: string) => (id.startsWith(GROUP_PREFIX) ? id.slice(GROUP_PREFIX.length) : undefined);
+// team options share the list with people: their ids carry this prefix
+const TEAM_PREFIX = "team:";
+const teamIdOf = (id: string) => (id.startsWith(TEAM_PREFIX) ? id.slice(TEAM_PREFIX.length) : undefined);
 
 type MemberSelectWebCommonProps = {
   /** value-agnostic e2e selector — forwarded to the block's trigger as data-testid */
@@ -51,12 +51,12 @@ type MemberSelectWebCommonProps = {
   /** Tab order of the trigger, for forms that sequence focus explicitly (`ETabIndices`). */
   tabIndex?: number;
   /**
-   * A work item's Assigned to: the workspace's groups are offered after the people, and it holds people or one
-   * group. Picking a group calls this `onChange` (the caller clears the people with it); picking a person while a
-   * group is selected calls the main `onChange` (the caller clears the group with it); unpicking the group calls this
-   * `onChange(null)`.
+   * Assigned to a team or a person (a work item's or a project's): the workspace's teams are offered after the people,
+   * and it holds people or one team. Picking a team calls this `onChange` (the caller clears the people with it);
+   * picking a person while a team is selected calls the main `onChange` (the caller clears the team with it);
+   * unpicking the team calls this `onChange(null)`.
    */
-  assigneeGroup?: { value: string | null | undefined; onChange: (groupId: string | null) => void };
+  assigneeTeam?: { value: string | null | undefined; onChange: (teamId: string | null) => void };
 };
 
 export type MemberSelectWebProps = MemberSelectWebCommonProps &
@@ -93,13 +93,13 @@ export const MemberSelect = observer(function MemberSelect(props: MemberSelectWe
     tooltip,
     testId,
     tabIndex,
-    assigneeGroup,
+    assigneeTeam,
   } = props;
   // router params
   const { workspaceSlug } = useParams();
   const slug = workspaceSlug?.toString();
-  // groups, only for a work item's Assigned to
-  const { groups, getGroup } = useMemberGroups(assigneeGroup ? slug : undefined);
+  // teams, only for an Assigned to that takes one
+  const { teams, getTeam } = useTeamOptions(assigneeTeam ? slug : undefined);
   // store hooks
   const {
     getUserDetails,
@@ -137,14 +137,15 @@ export const MemberSelect = observer(function MemberSelect(props: MemberSelectWe
     [getUserDetails, currentUser?.id, youLabel, slug, isUserSuspended]
   );
 
-  const toGroupOption = useCallback(
-    (groupId: string): MemberOption => {
-      const name = getGroup(groupId)?.name ?? "Group";
-      return { id: `${GROUP_PREFIX}${groupId}`, display_name: name, name, isGroup: true };
+  const toTeamOption = useCallback(
+    (teamId: string): MemberOption => {
+      const name = getTeam(teamId)?.name ?? "Team";
+      // shown with the group icon instead of an avatar
+      return { id: `${TEAM_PREFIX}${teamId}`, display_name: name, name, isGroup: true };
     },
-    [getGroup]
+    [getTeam]
   );
-  const selectedGroupId = assigneeGroup?.value || undefined;
+  const selectedTeamId = assigneeTeam?.value || undefined;
 
   const getValues = useCallback(
     async ({ search }: SelectPaginationParams): Promise<TPaginatedResponse<MemberOption[]>> => {
@@ -164,16 +165,16 @@ export const MemberSelect = observer(function MemberSelect(props: MemberSelectWe
         if (id === currentUser?.id) results.unshift(toOption(id));
         else results.push(toOption(id));
       }
-      // then the groups, whoever is in the project
-      if (assigneeGroup)
-        for (const group of groups ?? [])
-          if (!query || group.name.toLowerCase().includes(query)) results.push(toGroupOption(group.id));
+      // then the teams, whoever is in the project
+      if (assigneeTeam)
+        for (const team of teams ?? [])
+          if (!query || team.name.toLowerCase().includes(query)) results.push(toTeamOption(team.id));
       return { results, next_page_results: false };
     },
     [
-      assigneeGroup,
-      groups,
-      toGroupOption,
+      assigneeTeam,
+      teams,
+      toTeamOption,
       memberIds,
       projectId,
       slug,
@@ -191,11 +192,11 @@ export const MemberSelect = observer(function MemberSelect(props: MemberSelectWe
   if (props.multiple) {
     const { onChange } = props;
     const handleChange = (ids: string[]) => {
-      const people = ids.filter((id) => !groupIdOf(id));
-      const pickedGroup = ids.map(groupIdOf).find((groupId) => groupId && groupId !== selectedGroupId);
-      if (assigneeGroup && pickedGroup) assigneeGroup.onChange(pickedGroup);
-      else if (assigneeGroup && selectedGroupId && !people.length) {
-        if (!ids.length) assigneeGroup.onChange(null);
+      const people = ids.filter((id) => !teamIdOf(id));
+      const pickedTeam = ids.map(teamIdOf).find((teamId) => teamId && teamId !== selectedTeamId);
+      if (assigneeTeam && pickedTeam) assigneeTeam.onChange(pickedTeam);
+      else if (assigneeTeam && selectedTeamId && !people.length) {
+        if (!ids.length) assigneeTeam.onChange(null);
       } else onChange(people);
     };
     return (
@@ -204,7 +205,7 @@ export const MemberSelect = observer(function MemberSelect(props: MemberSelectWe
         testId={testId}
         getValues={getValues}
         // Resolved in the observer render so MobX re-renders once the members load.
-        value={selectedGroupId ? [toGroupOption(selectedGroupId)] : props.value.map(toOption)}
+        value={selectedTeamId ? [toTeamOption(selectedTeamId)] : props.value.map(toOption)}
         onChange={handleChange}
         variant={variant}
         showLabel={showLabel}
@@ -220,9 +221,9 @@ export const MemberSelect = observer(function MemberSelect(props: MemberSelectWe
   }
   const { onChange } = props;
   const handleChange = (id: string) => {
-    const pickedGroup = groupIdOf(id);
-    if (assigneeGroup && pickedGroup) assigneeGroup.onChange(pickedGroup);
-    else if (assigneeGroup && selectedGroupId && !id) assigneeGroup.onChange(null);
+    const pickedTeam = teamIdOf(id);
+    if (assigneeTeam && pickedTeam) assigneeTeam.onChange(pickedTeam);
+    else if (assigneeTeam && selectedTeamId && !id) assigneeTeam.onChange(null);
     else onChange(id);
   };
   return (
@@ -230,7 +231,7 @@ export const MemberSelect = observer(function MemberSelect(props: MemberSelectWe
       multiple={false}
       testId={testId}
       getValues={getValues}
-      value={selectedGroupId ? toGroupOption(selectedGroupId) : props.value ? toOption(props.value) : null}
+      value={selectedTeamId ? toTeamOption(selectedTeamId) : props.value ? toOption(props.value) : null}
       onChange={handleChange}
       variant={variant}
       showLabel={showLabel}

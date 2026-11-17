@@ -46,7 +46,6 @@ from plane.db.models import (
     Issue,
     IssueAssignee,
     IssueTimeEstimate,
-    MemberGroup,
     Project,
     ProjectDetail,
     ProjectMember,
@@ -792,7 +791,7 @@ class WorkLogReportAnalyticsEndpoint(ReportBaseEndpoint):
 
 
 class WorkLogReportOptionsEndpoint(ReportBaseEndpoint):
-    """The departments (teams), project managers (team leads) and member groups the report filters offer."""
+    """The departments (teams) and project managers (team leads) the report filters offer."""
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
     def get(self, request, slug):
@@ -803,12 +802,10 @@ class WorkLogReportOptionsEndpoint(ReportBaseEndpoint):
             managers.setdefault(lead.member_id, {**serialize_user(lead.member), "team_ids": []})["team_ids"].append(
                 str(lead.team_id)
             )
-        groups = MemberGroup.objects.filter(workspace__slug=slug).order_by("name")
         return Response(
             {
                 "departments": [{"id": str(team.id), "name": team.name} for team in teams],
                 "project_managers": sorted(managers.values(), key=lambda m: (m["display_name"] or "").lower()),
-                "groups": [{"id": str(group.id), "name": group.name} for group in groups],
             },
             status=status.HTTP_200_OK,
         )

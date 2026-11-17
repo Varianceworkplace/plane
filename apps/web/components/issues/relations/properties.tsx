@@ -12,7 +12,7 @@ import type { TIssuePriorities, TIssueServiceType } from "@plane/types";
 import { EIssueServiceType } from "@plane/types";
 // components
 import { MemberSelect } from "@/components/dropdowns/member/member-select";
-import { assigneeGroupUpdate, assigneesUpdate } from "@/components/member-groups/helpers";
+import { assigneeTeamUpdate, assigneesUpdate } from "@/components/access-control/team-assignment";
 import { PrioritySelect } from "@/components/dropdowns/priority/priority-select";
 import { StateSelect } from "@/components/dropdowns/state/state-select";
 // hooks
@@ -57,10 +57,10 @@ export const RelationIssueProperty = observer(function RelationIssueProperty(pro
 
   const handleAssigneeChange = (val: string[]) =>
     issue.project_id &&
-    issueOperations.update(workspaceSlug, issue.project_id, issueId, assigneesUpdate(val, issue.assignee_group_id));
+    issueOperations.update(workspaceSlug, issue.project_id, issueId, assigneesUpdate(val, issue.assignee_team_id));
 
-  const handleAssigneeGroupChange = (groupId: string | null) =>
-    issue.project_id && issueOperations.update(workspaceSlug, issue.project_id, issueId, assigneeGroupUpdate(groupId));
+  const handleAssigneeTeamChange = (teamId: string | null) =>
+    issue.project_id && issueOperations.update(workspaceSlug, issue.project_id, issueId, assigneeTeamUpdate(teamId));
 
   return (
     <div className="relative flex items-center gap-2">
@@ -85,9 +85,9 @@ export const RelationIssueProperty = observer(function RelationIssueProperty(pro
         value={issue.assignee_ids ?? []}
         projectId={issue.project_id ?? undefined}
         onChange={handleAssigneeChange}
-        assigneeGroup={{
-          value: issue.assignee_group_id,
-          onChange: (groupId) => void handleAssigneeGroupChange(groupId),
+        assigneeTeam={{
+          value: issue.assignee_team_id,
+          onChange: (teamId) => void handleAssigneeTeamChange(teamId),
         }}
         disabled={disabled}
         multiple

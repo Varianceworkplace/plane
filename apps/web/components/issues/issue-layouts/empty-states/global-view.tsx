@@ -21,7 +21,7 @@ export const GlobalViewEmptyState = observer(function GlobalViewEmptyState() {
   // store hooks
   const { workspaceProjectIds } = useProject();
   const { toggleCreateIssueModal, toggleCreateProjectModal } = useCommandPalette();
-  const { allowPermissions } = useUserPermissions();
+  const { allowPermissions, canAccess } = useUserPermissions();
   // derived values
   const hasMemberLevelPermission = allowPermissions(
     [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
@@ -41,7 +41,8 @@ export const GlobalViewEmptyState = observer(function GlobalViewEmptyState() {
             onClick: () => {
               toggleCreateProjectModal(true);
             },
-            disabled: !hasMemberLevelPermission,
+            // with role-based access, creating projects follows the role (Employees can't)
+            disabled: !hasMemberLevelPermission || !canAccess("projects", "create"),
             variant: "primary",
           },
         ]}

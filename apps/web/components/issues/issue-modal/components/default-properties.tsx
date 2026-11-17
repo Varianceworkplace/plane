@@ -67,8 +67,8 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
   } = props;
   // states
   const [parentIssueListModalOpen, setParentIssueListModalOpen] = useState(false);
-  // Assigned to holds people or one group (not for drafts, which keep only people)
-  const { field: groupField } = useController({ control, name: "assignee_group_id" });
+  // Assigned to holds people or one team (not for drafts, which keep only people)
+  const { field: teamField } = useController({ control, name: "assignee_team_id" });
   // store hooks
   const { t } = useTranslation();
   const { areEstimateEnabledByProjectId } = useProjectEstimates();
@@ -127,19 +127,19 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
         control={control}
         name="assignee_ids"
         render={({ field: { value, onChange } }) => {
-          const assigneeGroup = isDraft
+          const assigneeTeam = isDraft
             ? undefined
             : {
-                value: groupField.value,
-                onChange: (groupId: string | null) => {
-                  groupField.onChange(groupId);
-                  if (groupId) onChange([]);
+                value: teamField.value,
+                onChange: (teamId: string | null) => {
+                  teamField.onChange(teamId);
+                  if (teamId) onChange([]);
                   handleFormChange();
                 },
               };
           const setPeople = (assigneeIds: string[]) => {
             onChange(assigneeIds);
-            if (groupField.value) groupField.onChange(null);
+            if (teamField.value) teamField.onChange(null);
             handleFormChange();
           };
           // projects with task details: one person, the "Assigned To" of the Project Task form
@@ -149,7 +149,7 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
               projectId={projectId ?? undefined}
               value={value?.[0] ?? null}
               onChange={(assigneeId) => setPeople(assigneeId ? [assigneeId] : [])}
-              assigneeGroup={assigneeGroup}
+              assigneeTeam={assigneeTeam}
               placeholder="Assigned to"
               clearable
               clearLabel="No assignee"
@@ -162,7 +162,7 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
               projectId={projectId ?? undefined}
               value={value}
               onChange={setPeople}
-              assigneeGroup={assigneeGroup}
+              assigneeTeam={assigneeTeam}
               placeholder={t("assignees")}
               multiple
               variant={value?.length ? "avatar-group-md" : "pill-md"}

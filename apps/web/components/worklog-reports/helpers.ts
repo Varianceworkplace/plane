@@ -112,7 +112,6 @@ export const hasWorklogReportFilters = (filters: TWorklogReportFilters) =>
   filters.state_group.length > 0 ||
   !!filters.team?.length ||
   !!filters.pm?.length ||
-  !!filters.group?.length ||
   !!filters.from_date ||
   !!filters.to_date;
 

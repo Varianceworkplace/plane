@@ -17,6 +17,7 @@ import scrollIntoView from "smooth-scroll-into-view-if-needed";
 import {
   ArchiveOutline,
   ChevronRightOutline,
+  HideOutline,
   LinkOutline,
   LogOutOutline,
   MoreHorizontalOutline,
@@ -33,6 +34,7 @@ import { Icon } from "@makeplane/propel/components/icon";
 import { Tooltip } from "@makeplane/propel/components/tooltip";
 import { ControlLink } from "@plane/blocks/layout";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@makeplane/propel/components/menu";
+import { setToast } from "@plane/blocks/toast";
 import { DropIndicator, DragHandle } from "@plane/blocks/common";
 import { cn } from "@plane/utils";
 // components
@@ -80,7 +82,7 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
   } = props;
   // store hooks
   const { t } = useTranslation();
-  const { getPartialProjectById } = useProject();
+  const { getPartialProjectById, setProjectInMyList } = useProject();
   const { isMobile } = usePlatformOS();
   const { allowPermissions } = useUserPermissions();
   const { getIsProjectListOpen, toggleProjectListOpen } = useCommandPalette();
@@ -140,6 +142,21 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
 
   const handleLeaveProject = () => {
     setLeaveProjectModal(true);
+  };
+
+  const handleHideFromList = () => {
+    if (!project) return;
+    setProjectInMyList(workspaceSlug.toString(), project.id, false)
+      .then(() =>
+        setToast({
+          type: "success",
+          title: "Hidden from your list",
+          message: `${project.name} is still on All Projects; Show in List brings it back.`,
+        })
+      )
+      .catch(() =>
+        setToast({ type: "error", title: "Not hidden", message: "Something went wrong. Please try again." })
+      );
   };
 
   useEffect(() => {
@@ -388,6 +405,12 @@ export const SidebarProjectsListItem = observer(function SidebarProjectsListItem
                         />
                       )}
                       <MenuItem icon={<Icon icon={LinkOutline} />} label={t("copy_link")} onClick={handleCopyText} />
+                      {/* only the person's own list: the project stays on All Projects, access doesn't change */}
+                      <MenuItem
+                        icon={<Icon icon={HideOutline} />}
+                        label="Hide from List"
+                        onClick={handleHideFromList}
+                      />
                       {isAuthorized && (
                         <MenuItem
                           icon={<Icon icon={ArchiveOutline} />}

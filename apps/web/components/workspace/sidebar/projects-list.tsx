@@ -8,9 +8,10 @@ import { useState, useRef, useEffect } from "react";
 import { combine } from "@atlaskit/pragmatic-drag-and-drop/combine";
 import { autoScrollForElements } from "@atlaskit/pragmatic-drag-and-drop-auto-scroll/element";
 import { observer } from "mobx-react";
+import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { Collapsible } from "@makeplane/propel/components/collapsible";
-import { AddOutline, MoreHorizontalOutline } from "@makeplane/propel/icons";
+import { AddOutline, HideOutline, MoreHorizontalOutline } from "@makeplane/propel/icons";
 // plane imports
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
@@ -27,6 +28,7 @@ import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
 import { useProject } from "@/hooks/store/use-project";
+import { useProjectFilter } from "@/hooks/store/use-project-filter";
 import { useUserPermissions } from "@/hooks/store/user";
 import { useProjectNavigationPreferences } from "@/hooks/use-navigation-preferences";
 // plane web imports
@@ -48,7 +50,16 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
   const { preferences: projectPreferences } = useProjectNavigationPreferences();
   const { isExtendedProjectSidebarOpened, toggleExtendedProjectSidebar } = useAppTheme();
 
-  const { loader, getPartialProjectById, joinedProjectIds: joinedProjects, updateProjectView } = useProject();
+  // the person's own list (Show in List / Hide from List); hidden projects stay on All Projects
+  const {
+    loader,
+    getPartialProjectById,
+    sidebarProjectIds: joinedProjects,
+    joinedProjectIds,
+    updateProjectView,
+  } = useProject();
+  const hiddenCount = joinedProjectIds.length - joinedProjects.length;
+  const { updateDisplayFilters } = useProjectFilter();
   // router params
   const { workspaceSlug } = useParams();
   const pathname = usePathname();
@@ -234,11 +245,30 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
                   </button>
                 </SidebarNavItem>
               )}
+              {loader !== "init-loader" && hiddenCount > 0 && (
+                <SidebarNavItem>
+                  <Link
+                    href={`/${workspaceSlug}/projects/`}
+                    // All Projects opens on the hidden ones, ready for Show in List
+                    onClick={() =>
+                      updateDisplayFilters(workspaceSlug.toString(), { in_my_list: false, hidden_from_my_list: true })
+                    }
+                    className="flex flex-grow items-center gap-1.5 text-13 font-medium text-tertiary"
+                  >
+                    <HideOutline className="size-4 flex-shrink-0" />
+                    <span className="truncate">
+                      {joinedProjects.length === 0
+                        ? `All ${hiddenCount} hidden · Show some`
+                        : `${hiddenCount} hidden · All projects`}
+                    </span>
+                  </Link>
+                </SidebarNavItem>
+              )}
             </div>
           </Collapsible>
         </>
 
-        {isAuthorizedUser && joinedProjects?.length === 0 && (
+        {isAuthorizedUser && joinedProjectIds.length === 0 && (
           <button
             type="button"
             className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-13 leading-5 font-medium text-secondary hover:bg-surface-2"

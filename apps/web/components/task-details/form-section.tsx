@@ -154,7 +154,7 @@ export const TaskDetailsFormSection = observer(function TaskDetailsFormSection(p
           <div
             className={cn("rounded-md border-[0.5px]", errors.assignee_ids ? "border-danger-strong" : "border-subtle")}
           >
-            {/* the work item's assignee or group: the same value as the "Assigned to" pill under the form */}
+            {/* the work item's assignee or team: the same value as the "Assigned to" pill under the form */}
             <Controller
               control={control}
               name="assignee_ids"
@@ -164,19 +164,19 @@ export const TaskDetailsFormSection = observer(function TaskDetailsFormSection(p
                   value={value?.[0] ?? null}
                   onChange={(assigneeId) => {
                     onChange(assigneeId ? [assigneeId] : []);
-                    if (getValues("assignee_group_id")) setValue("assignee_group_id", null);
+                    if (getValues("assignee_team_id")) setValue("assignee_team_id", null);
                     if (assigneeId) clearError("assignee_ids");
                   }}
-                  assigneeGroup={{
-                    value: watch("assignee_group_id"),
-                    onChange: (groupId) => {
-                      setValue("assignee_group_id", groupId);
-                      if (!groupId) return;
+                  assigneeTeam={{
+                    value: watch("assignee_team_id"),
+                    onChange: (teamId) => {
+                      setValue("assignee_team_id", teamId);
+                      if (!teamId) return;
                       onChange([]);
                       clearError("assignee_ids");
                     },
                   }}
-                  placeholder="Select a person or group"
+                  placeholder="Select a person or team"
                   clearable
                   clearLabel="No assignee"
                   variant="select-md"

@@ -126,6 +126,11 @@ export const coreRoutes: RouteConfigEntry[] = [
           ),
         ]),
 
+        // Time Sheet (time entries: own, team's, the levels below)
+        layout("./(all)/[workspaceSlug]/(projects)/timesheet/layout.tsx", [
+          route(":workspaceSlug/timesheet", "./(all)/[workspaceSlug]/(projects)/timesheet/page.tsx"),
+        ]),
+
         // Reports (worklog charts)
         layout("./(all)/[workspaceSlug]/(projects)/reports/layout.tsx", [
           route(
@@ -317,10 +322,6 @@ export const coreRoutes: RouteConfigEntry[] = [
           route(
             ":workspaceSlug/settings/access-control",
             "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/access-control/page.tsx"
-          ),
-          route(
-            ":workspaceSlug/settings/groups",
-            "./(all)/[workspaceSlug]/(settings)/settings/(workspace)/groups/page.tsx"
           ),
           route(
             ":workspaceSlug/settings/exports",

@@ -93,7 +93,6 @@ from .worklog import IssueTimeEstimate, IssueWorkLog, IssueWorkLogTimer, MAX_WOR
 from .task_detail import IssueTaskDetail, TASK_DETAIL_CHOICES, PROGRESS_VALUES
 from .project_detail import ProjectDetail, PROJECT_DETAIL_CHOICES
 from .milestone import Milestone, MilestoneWorkItem, MILESTONE_STATUSES, MILESTONE_TYPES
-from .member_group import MemberGroup, MemberGroupMember
 from .rbac import (
     AccessGrant,
     ProjectJoinRequest,

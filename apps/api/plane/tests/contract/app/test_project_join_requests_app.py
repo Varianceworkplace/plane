@@ -92,10 +92,11 @@ class TestAsking:
         assert "Ask HR to add you to a team" in response.json()["error"]
         assert ProjectJoinRequest.objects.count() == 0
 
-    def test_people_who_can_manage_the_project_join_directly(self, setup):
-        assert _ask(setup, "hr").status_code == status.HTTP_400_BAD_REQUEST
-        assert _join_directly(setup, "hr").status_code == status.HTTP_201_CREATED
-        assert _member(setup, "hr") is not None
+    def test_people_who_may_change_the_project_join_directly(self, setup):
+        # its creator and workspace admins (HR works in every project through the role sync instead)
+        assert _ask(setup, "admin").status_code == status.HTTP_400_BAD_REQUEST
+        assert _join_directly(setup, "admin").status_code == status.HTTP_201_CREATED
+        assert _member(setup, "admin") is not None
 
     def test_members_and_projects_they_cant_see(self, setup):
         assert _ask(setup, "a1", "a").status_code == status.HTTP_400_BAD_REQUEST  # already a member

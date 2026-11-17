@@ -16,7 +16,7 @@ import type { IIssueDisplayProperties, TIssue } from "@plane/types";
 import { cn, getDate, renderFormattedPayloadDate, shouldHighlightIssueDueDate } from "@plane/utils";
 // components
 import { MemberSelect } from "@/components/dropdowns/member/member-select";
-import { assigneeGroupUpdate, assigneesUpdate } from "@/components/member-groups/helpers";
+import { assigneeTeamUpdate, assigneesUpdate } from "@/components/access-control/team-assignment";
 import { PrioritySelect } from "@/components/dropdowns/priority/priority-select";
 import { StateSelect } from "@/components/dropdowns/state/state-select";
 // hooks
@@ -47,6 +47,7 @@ export const SubIssuesListItemProperties = observer(function SubIssuesListItemPr
   const { getStateById } = useProjectState();
   const { data: userProfile } = useUserProfile();
 
+  // oxlint-disable-next-line unicorn/consistent-function-scoping
   const handleEventPropagation = (e: SyntheticEvent<HTMLDivElement>) => {
     e.stopPropagation();
     e.preventDefault();
@@ -219,14 +220,14 @@ export const SubIssuesListItemProperties = observer(function SubIssuesListItemPr
               issue.project_id,
               parentIssueId,
               issueId,
-              assigneesUpdate(val, issue.assignee_group_id)
+              assigneesUpdate(val, issue.assignee_team_id)
             )
           }
-          assigneeGroup={{
-            value: issue.assignee_group_id,
-            onChange: (groupId) =>
+          assigneeTeam={{
+            value: issue.assignee_team_id,
+            onChange: (teamId) =>
               issue.project_id &&
-              updateSubIssue(workspaceSlug, issue.project_id, parentIssueId, issueId, assigneeGroupUpdate(groupId)),
+              updateSubIssue(workspaceSlug, issue.project_id, parentIssueId, issueId, assigneeTeamUpdate(teamId)),
           }}
           disabled={!canEdit}
           multiple

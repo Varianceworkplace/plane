@@ -29,7 +29,7 @@ import { cn, getDate, renderFormattedPayloadDate, shouldHighlightIssueDueDate } 
 import { EstimateSelect } from "@/components/dropdowns/estimate/estimate-select";
 import { ButtonAvatars } from "@/components/dropdowns/member/avatar";
 import { MemberSelect } from "@/components/dropdowns/member/member-select";
-import { assigneeGroupUpdate, assigneesUpdate } from "@/components/member-groups/helpers";
+import { assigneeTeamUpdate, assigneesUpdate } from "@/components/access-control/team-assignment";
 import { PrioritySelect } from "@/components/dropdowns/priority/priority-select";
 import { StateSelect } from "@/components/dropdowns/state/state-select";
 import { SidebarPropertyListItem } from "@/components/common/layout/sidebar/property-list-item";
@@ -109,13 +109,13 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
                   workspaceSlug,
                   projectId,
                   issueId,
-                  assigneesUpdate(val ? [val] : [], issue?.assignee_group_id)
+                  assigneesUpdate(val ? [val] : [], issue?.assignee_team_id)
                 )
               }
-              assigneeGroup={{
-                value: issue?.assignee_group_id,
-                onChange: (groupId) =>
-                  issueOperations.update(workspaceSlug, projectId, issueId, assigneeGroupUpdate(groupId)),
+              assigneeTeam={{
+                value: issue?.assignee_team_id,
+                onChange: (teamId) =>
+                  issueOperations.update(workspaceSlug, projectId, issueId, assigneeTeamUpdate(teamId)),
               }}
               disabled={disabled}
               projectId={projectId}
@@ -132,17 +132,12 @@ export const PeekOverviewProperties = observer(function PeekOverviewProperties(p
               testId="work-item-assignee-select"
               value={issue?.assignee_ids ?? []}
               onChange={(val) =>
-                issueOperations.update(
-                  workspaceSlug,
-                  projectId,
-                  issueId,
-                  assigneesUpdate(val, issue?.assignee_group_id)
-                )
+                issueOperations.update(workspaceSlug, projectId, issueId, assigneesUpdate(val, issue?.assignee_team_id))
               }
-              assigneeGroup={{
-                value: issue?.assignee_group_id,
-                onChange: (groupId) =>
-                  issueOperations.update(workspaceSlug, projectId, issueId, assigneeGroupUpdate(groupId)),
+              assigneeTeam={{
+                value: issue?.assignee_team_id,
+                onChange: (teamId) =>
+                  issueOperations.update(workspaceSlug, projectId, issueId, assigneeTeamUpdate(teamId)),
               }}
               disabled={disabled}
               projectId={projectId}

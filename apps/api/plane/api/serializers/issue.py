@@ -70,8 +70,8 @@ class IssueSerializer(BaseSerializer):
 
     class Meta:
         model = Issue
-        # groups are set in the app (Assigned to); here they're only shown
-        read_only_fields = ["id", "workspace", "project", "updated_by", "updated_at", "completed_at", "assignee_group"]
+        # teams are set in the app (Assigned to); here they're only shown
+        read_only_fields = ["id", "workspace", "project", "updated_by", "updated_at", "completed_at", "assignee_team"]
         exclude = ["description_json", "description_stripped"]
 
     def validate(self, data):
@@ -129,9 +129,9 @@ class IssueSerializer(BaseSerializer):
         # Validate labels are from project
         if data.get("labels", []):
             valid_label_ids = set(
-                Label.objects.filter(
-                    project_id=self.context.get("project_id"), id__in=data["labels"]
-                ).values_list("id", flat=True)
+                Label.objects.filter(project_id=self.context.get("project_id"), id__in=data["labels"]).values_list(
+                    "id", flat=True
+                )
             )
             invalid_label_ids = set(data["labels"]) - valid_label_ids
             if invalid_label_ids:
@@ -262,8 +262,8 @@ class IssueSerializer(BaseSerializer):
         updated_by_id = instance.updated_by_id
 
         if assignees:
-            # assigning people takes the task away from its group
-            validated_data["assignee_group"] = None
+            # assigning people takes the task away from its team
+            validated_data["assignee_team"] = None
         if assignees is not None:
             IssueAssignee.objects.filter(issue=instance).delete()
             try:

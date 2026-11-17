@@ -42,9 +42,6 @@
       "access_control": {
         "title": "Access control"
       },
-      "groups": {
-        "title": "Groups"
-      },
       "members": {
         "title": "Members",
         "add_member": "Add member",

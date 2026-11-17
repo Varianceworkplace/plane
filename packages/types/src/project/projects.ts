@@ -21,6 +21,8 @@ export interface IPartialProject {
   name: string;
   identifier: string;
   sort_order: number | null;
+  /** in the person's sidebar Projects list ("Show in List" / "Hide from List"); only the list, not access */
+  in_my_list?: boolean;
   logo_props: TLogoProps;
   member_role?: TUserPermissions | EUserProjectRoles | null;
   archived_at: string | null;

@@ -10,7 +10,7 @@ import { observer } from "mobx-react";
 import type { TIssue } from "@plane/types";
 // components
 import { MemberSelect } from "@/components/dropdowns/member/member-select";
-import { assigneeGroupUpdate, assigneesUpdate } from "@/components/member-groups/helpers";
+import { assigneeTeamUpdate, assigneesUpdate } from "@/components/access-control/team-assignment";
 
 type Props = {
   issue: TIssue;
@@ -27,17 +27,17 @@ export const SpreadsheetAssigneeColumn = observer(function SpreadsheetAssigneeCo
       <MemberSelect
         value={issue?.assignee_ids ?? []}
         onChange={(data) => {
-          onChange(issue, assigneesUpdate(data, issue.assignee_group_id), {
+          onChange(issue, assigneesUpdate(data, issue.assignee_team_id), {
             changed_property: "assignees",
             change_details: data,
           });
         }}
-        assigneeGroup={{
-          value: issue.assignee_group_id,
-          onChange: (groupId) =>
-            onChange(issue, assigneeGroupUpdate(groupId), {
-              changed_property: "assignee_group",
-              change_details: groupId,
+        assigneeTeam={{
+          value: issue.assignee_team_id,
+          onChange: (teamId) =>
+            onChange(issue, assigneeTeamUpdate(teamId), {
+              changed_property: "assignee_team",
+              change_details: teamId,
             }),
         }}
         projectId={issue?.project_id ?? undefined}

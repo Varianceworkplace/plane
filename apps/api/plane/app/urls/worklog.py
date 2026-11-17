@@ -16,6 +16,7 @@ from plane.app.views.worklog.base import (
     WorkspaceWorkLogTimerStopEndpoint,
 )
 from plane.app.views.worklog.estimate import IssueTimeEstimateEndpoint, ProjectTimeEstimatesEndpoint
+from plane.app.views.worklog.timesheet import TimesheetDownloadEndpoint, TimesheetEndpoint
 from plane.app.views.worklog.analytics import WorkLogReportAnalyticsEndpoint, WorkLogReportOptionsEndpoint
 from plane.app.views.worklog.report import (
     WorkLogReportDetailEndpoint,
@@ -72,6 +73,10 @@ urlpatterns = [
         WorkspaceWorkLogDownloadEndpoint.as_view(),
         name="workspace-worklogs-download",
     ),
+    # Time Sheet: time entries one by one (own, team members' as a PM, and the levels below in the same team)
+    path("workspaces/<str:slug>/timesheet/", TimesheetEndpoint.as_view(), name="timesheet"),
+    # Export Entry: the rows picked, or every entry the filters show (csv / xlsx)
+    path("workspaces/<str:slug>/timesheet/download/", TimesheetDownloadEndpoint.as_view(), name="timesheet-download"),
     path("workspaces/<str:slug>/worklog-reports/", WorkLogReportEndpoint.as_view(), name="worklog-reports"),
     path(
         "workspaces/<str:slug>/worklog-reports/analytics/",

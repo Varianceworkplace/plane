@@ -24,6 +24,7 @@ from rest_framework.test import APIClient
 from plane.db.models import (
     AccessGrant,
     Issue,
+    Project,
     ProjectMember,
     ProjectTeam,
     Role,
@@ -208,7 +209,8 @@ def test_check_access_explains_a_persons_rights(setup):
     assert body["roles"] == ["Project Manager"]
     assert body["teams"] == [{"name": "Team A", "is_lead": True}]
     assert body["permissions"]["projects"]["edit"] == ["team"]
-    assert body["projects"]["edit"] == ["Alpha", "Shared"]
+    # only a project's creator and workspace admins change it: PM A created none of them
+    assert body["projects"]["edit"] == []
     loner = _get(setup, "hr", f"members/{setup['people']['loner'].id}/check/").json()
     assert loner["roles"] == ["No role yet: no projects until one is given"]
 
@@ -222,8 +224,13 @@ class TestProjectSharing:
         setup["workspace"].is_rbac_enabled = True
         setup["workspace"].save(update_fields=["is_rbac_enabled"])
         pm_a, url = setup["clients"]["pm_a"], self._url(setup)
+        # sharing is changing the project: PM A may share Alpha once they created it
+        assert pm_a.get(url).json()["can_share"] is False
+        Project.objects.filter(pk=setup["projects"]["a"].pk).update(created_by=setup["people"]["pm_a"])
         assert pm_a.get(url).json()["can_share"] is True
-        assert pm_a.get(url).json()["teams"] == [{"id": str(setup["teams"][0].id), "name": "Team A"}]
+        assert pm_a.get(url).json()["teams"] == [
+            {"id": str(setup["teams"][0].id), "name": "Team A", "is_owner": True, "is_assigned": False}
+        ]
         share = {"member_id": str(setup["people"]["b1"].id), "level": "view"}
         created = pm_a.post(url, share, format="json")
         assert created.status_code == status.HTTP_201_CREATED, created.content
@@ -296,7 +303,8 @@ class TestMyAccess:
         assert set(a1["work_items"]["create_project_ids"]) == {projects["a"], projects["b"], projects["shared"]}
 
         pm_a = self._me(setup, "pm_a").json()
-        assert set(pm_a["projects"]["edit"]) == {projects["a"], projects["shared"]}
+        # their team projects are for working in; only the creator and workspace admins change a project
+        assert pm_a["projects"]["edit"] == []
         assert pm_a["permissions"]["projects"]["create"] == ["team"]
 
         hr = self._me(setup, "hr").json()
@@ -357,8 +365,8 @@ class TestRolloutPreview:
         assert preview["is_rbac_enabled"] is False
         pm_a = self._person(preview, setup, "pm_a")
         assert pm_a["work_items"] == {"now": 0, "after": 5}
-        assert pm_a["projects"] == {"view": 2, "edit": 2}  # their team projects
-        assert pm_a["memberships"] == {"added": 0, "raised": 2}  # admin of Alpha and Shared
+        assert pm_a["projects"] == {"view": 2, "edit": 0}  # their team projects, to work in
+        assert pm_a["memberships"] == {"added": 0, "raised": 0}  # already members of Alpha and Shared
         hr = self._person(preview, setup, "hr")
         assert hr["memberships"] == {"added": 5, "raised": 0} and hr["roles"] == ["HR"]
         a1 = self._person(preview, setup, "a1")
@@ -444,7 +452,7 @@ class TestDemoCommand:
             "Beta: help from A1 (Team A's member)",
             "Shared: A1's task",
         }
-        assert ProjectMember.objects.filter(member=people["hr"], workspace=workspace, role=20).count() == 5
+        assert ProjectMember.objects.filter(member=people["hr"], workspace=workspace, role=15).count() == 5
 
         call_command("rbac_demo", "--remove", stdout=StringIO())
         assert not Workspace.all_objects.filter(slug="rbac-demo").exists()

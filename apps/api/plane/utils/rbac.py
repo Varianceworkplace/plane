@@ -15,6 +15,8 @@ Who gets what
     a role see no projects, work items or reports until one is given; they keep their own tickets.
   * A team's leads: where the team sets Lead permissions (plane.db.models.rbac.TeamPermission), that setting replaces
     what their roles grant for the action, more or less ("none" = not allowed); leading several teams adds them up.
+  * Seniority in a team (TeamMember.level: Junior < Mid-level < Senior < the team's leads): people see the timesheets
+    (worklogs) of the members below them in the same team, never another team's (AccessProfile.worklog_q).
 
 Scopes (plane.db.models.rbac.RBAC_SCOPES) per kind of record
   Work items
@@ -24,16 +26,25 @@ Scopes (plane.db.models.rbac.RBAC_SCOPES) per kind of record
             work items no team claims (unassigned, or assigned only to people in no team). A work item assigned to
             another team's member stays theirs, also in a project two teams share.
     all     every work item
-    A task assigned to a group (plane.db.models.member_group) has no assignees, so the rules above treat it as
-    unassigned; on top of that everyone in the group may see it (only see: own = view), and team also reaches the
-    group tasks of the people in the teams I lead.
+    A task assigned to a team (Issue.assignee_team) has no assignees: everyone in the team works on it as if it
+    were assigned to them (it is "own" for them), team also reaches the team tasks of the people in the teams I
+    lead, and otherwise the rules above treat it as unassigned (its creator, the project's PMs).
   Projects
     own     created by me
     member  projects I'm a member of
     team    owned by the teams I lead + shared with me or my teams to manage; for viewing also the projects shared
             to view and the ones I'm a member of (membership alone never lets a PM change a project)
-    all     every project, except that private projects stay with their members, their teams' PMs and people who
-            may edit every project (HR, admins)
+    all     every project, except that private projects stay with their members, their teams' PMs and people whose
+            role grants editing All (HR, admins)
+    Changing or deleting a project goes further, as in Variance's Workplace (vTiger): only its creator (if their
+    role allows the action at all) and workspace admins, whatever scope the role sets. Everyone else works in a
+    project as a member.
+
+Team projects
+  A project a team owns (Access control › Teams) or is assigned to (ProjectDetail.assigned_team, vTiger's "Assigned
+  To" a team) is the team's: its leads (PMs) have it in their team scope, and its members are members of it (they
+  see it, private or not, and create work items there). The projects of the tasks assigned to my teams are visible
+  to me too, so I can open those tasks.
 """
 
 # Python imports
@@ -55,6 +66,8 @@ class AccessProfile:
     is_admin: bool = False
     # holds at least one role (without one: only their own tickets, see NO_ROLE_PERMISSIONS)
     has_role: bool = False
+    # the built-in roles held ("hr", "pm", "employee"); roles admins added have no key
+    role_keys: set = field(default_factory=set)
     # module -> action -> the scopes the person's roles grant for it (or the teams they lead, see below)
     permissions: dict = field(default_factory=dict)
     # module -> action -> the teams I lead whose Lead permissions replaced my roles' for it
@@ -63,13 +76,19 @@ class AccessProfile:
     team_ids: set = field(default_factory=set)
     # people in the teams I lead (me included)
     led_member_ids: set = field(default_factory=set)
+    # people below me in the teams I'm in (TeamMember.level; a team's leads are above every level): I see their
+    # timesheets
+    junior_member_ids: set = field(default_factory=set)
+    # the projects I'm a member of: the memberships people gave me and my teams' projects
     member_project_ids: set = field(default_factory=set)
-    # guest memberships the sync raised to Member (for a group task): still no creating work items there
+    # guest memberships the sync raised to Member (for a team task): still no creating work items there
     raised_guest_project_ids: set = field(default_factory=set)
+    # owned by or assigned to the teams I lead
     led_project_ids: set = field(default_factory=set)
-    # the groups I'm in, and the projects their tasks are in
-    group_ids: set = field(default_factory=set)
-    group_project_ids: set = field(default_factory=set)
+    # owned by or assigned to a team I'm in: I work in them as a member
+    team_work_project_ids: set = field(default_factory=set)
+    # the projects of the tasks assigned to my teams
+    team_task_project_ids: set = field(default_factory=set)
     # shared with me or a team I'm in: view-only and manage
     view_grant_project_ids: set = field(default_factory=set)
     manage_grant_project_ids: set = field(default_factory=set)
@@ -82,7 +101,7 @@ class AccessProfile:
         from plane.db.models import (
             AccessGrant,
             Issue,
-            MemberGroupMember,
+            ProjectDetail,
             ProjectMember,
             ProjectTeam,
             RolePermission,
@@ -91,18 +110,22 @@ class AccessProfile:
             UserRole,
             WorkspaceMember,
         )
-        from plane.db.models.rbac import NO_ROLE_PERMISSIONS
+        from plane.db.models.rbac import NO_ROLE_PERMISSIONS, TEAM_LEVEL_RANKS
+
+        lead_rank = len(TEAM_LEVEL_RANKS) + 1  # a team's leads are above every level
 
         profile = cls(user_id=user.id, workspace_id=workspace_id)
         profile.is_admin = WorkspaceMember.objects.filter(
             workspace_id=workspace_id, member_id=user.id, role=ROLE_ADMIN, is_active=True
         ).exists()
 
-        role_ids = list(
+        held = list(
             UserRole.objects.filter(
                 workspace_id=workspace_id, member_id=user.id, role__deleted_at__isnull=True
-            ).values_list("role_id", flat=True)
+            ).values_list("role_id", "role__key")
         )
+        role_ids = [role_id for role_id, _ in held]
+        profile.role_keys = {key for _, key in held if key}
         profile.has_role = bool(role_ids)
         if role_ids:
             for module, action, scope in RolePermission.objects.filter(role_id__in=role_ids).values_list(
@@ -115,12 +138,22 @@ class AccessProfile:
                 for action, scope in actions.items():
                     profile.permissions.setdefault(module, {}).setdefault(action, set()).add(scope)
 
-        for team_id, is_lead in TeamMember.objects.filter(
+        my_ranks = {}
+        for team_id, is_lead, level in TeamMember.objects.filter(
             workspace_id=workspace_id, member_id=user.id, team__deleted_at__isnull=True
-        ).values_list("team_id", "is_lead"):
+        ).values_list("team_id", "is_lead", "level"):
             profile.team_ids.add(team_id)
             if is_lead:
                 profile.led_team_ids.add(team_id)
+            my_ranks[team_id] = lead_rank if is_lead else TEAM_LEVEL_RANKS.get(level, 1)
+        # in each of my teams, the members at a lower level than mine (never another team's people)
+        for team_id, member_id, level in (
+            TeamMember.objects.filter(team_id__in=my_ranks, is_lead=False)
+            .exclude(member_id=user.id)
+            .values_list("team_id", "member_id", "level")
+        ):
+            if TEAM_LEVEL_RANKS.get(level, 1) < my_ranks[team_id]:
+                profile.junior_member_ids.add(member_id)
         # what the teams I lead set for their leads replaces what my roles grant for that action (several teams add up)
         if profile.has_role and profile.led_team_ids:
             replaced = {}
@@ -134,14 +167,31 @@ class AccessProfile:
         profile.led_member_ids = set(
             TeamMember.objects.filter(team_id__in=profile.led_team_ids).values_list("member_id", flat=True)
         )
-        profile.led_project_ids = set(
-            ProjectTeam.objects.filter(team_id__in=profile.led_team_ids).values_list("project_id", flat=True)
-        )
+        if profile.team_ids:
+            owned = ProjectTeam.objects.filter(team_id__in=profile.team_ids).values_list("team_id", "project_id")
+            assigned = ProjectDetail.objects.filter(
+                workspace_id=workspace_id, assigned_team_id__in=profile.team_ids
+            ).values_list("assigned_team_id", "project_id")
+            for team_id, project_id in [*owned, *assigned]:
+                profile.team_work_project_ids.add(project_id)
+                if team_id in profile.led_team_ids:
+                    profile.led_project_ids.add(project_id)
+            profile.team_task_project_ids = set(
+                Issue.all_objects.filter(
+                    workspace_id=workspace_id,
+                    assignee_team_id__in=profile.team_ids,
+                    deleted_at__isnull=True,
+                    is_draft=False,
+                ).values_list("project_id", flat=True)
+            )
         # memberships people were given, not the ones the sync made from these rules (they'd feed back into them)
-        profile.member_project_ids = set(
-            ProjectMember.objects.filter(
-                workspace_id=workspace_id, member_id=user.id, is_active=True, rbac_managed=False
-            ).values_list("project_id", flat=True)
+        profile.member_project_ids = (
+            set(
+                ProjectMember.objects.filter(
+                    workspace_id=workspace_id, member_id=user.id, is_active=True, rbac_managed=False
+                ).values_list("project_id", flat=True)
+            )
+            | profile.team_work_project_ids
         )
         profile.raised_guest_project_ids = set(
             ProjectMember.objects.filter(
@@ -152,20 +202,6 @@ class AccessProfile:
                 rbac_original_role=ROLE_GUEST,
             ).values_list("project_id", flat=True)
         )
-        profile.group_ids = set(
-            MemberGroupMember.objects.filter(
-                workspace_id=workspace_id, member_id=user.id, group__deleted_at__isnull=True
-            ).values_list("group_id", flat=True)
-        )
-        if profile.group_ids:
-            profile.group_project_ids = set(
-                Issue.all_objects.filter(
-                    workspace_id=workspace_id,
-                    assignee_group_id__in=profile.group_ids,
-                    deleted_at__isnull=True,
-                    is_draft=False,
-                ).values_list("project_id", flat=True)
-            )
         for project_id, level in (
             AccessGrant.objects.active()
             .filter(workspace_id=workspace_id)
@@ -187,6 +223,12 @@ class AccessProfile:
         """Allowed at all (somewhere)? For buttons and for actions that aren't about one record."""
         return bool(self.scopes(module, action))
 
+    @property
+    def uses_own_project_list(self):
+        """Project Managers' sidebar Projects list starts with only their own projects (plane.utils.project_list);
+        HR and workspace admins keep every project in it."""
+        return not self.is_admin and "pm" in self.role_keys and "hr" not in self.role_keys
+
     # ------------------------------------------------------------ projects
 
     def team_project_ids(self, action):
@@ -204,12 +246,20 @@ class AccessProfile:
     def project_q(self, action):
         """Filter on Project: the projects `action` reaches. Q(pk__in=[]) when it reaches none."""
         scopes = self.scopes("projects", action)
+        if action in ("edit", "delete"):
+            # as in Workplace: only a project's creator (if their role allows the action at all) and workspace
+            # admins change or delete it
+            if self.is_admin:
+                return Q()
+            return Q(created_by_id=self.user_id) if scopes else Q(pk__in=[])
         if "all" in scopes:
             if self.is_admin or "all" in self.scopes("projects", "edit"):
                 return Q()
             # private projects stay with their members, their teams' PMs and whoever may edit every project
-            return ~Q(network=SECRET_NETWORK) | Q(pk__in=self.team_project_ids("view") | self._group_view_ids(action))
-        q = Q(pk__in=list(self._group_view_ids(action)))
+            return ~Q(network=SECRET_NETWORK) | Q(
+                pk__in=self.team_project_ids("view") | self._team_task_view_ids(action)
+            )
+        q = Q(pk__in=list(self._team_task_view_ids(action)))
         if "own" in scopes:
             q |= Q(created_by_id=self.user_id)
         if "member" in scopes:
@@ -218,9 +268,9 @@ class AccessProfile:
             q |= Q(pk__in=self.team_project_ids(action))
         return q
 
-    def _group_view_ids(self, action):
-        """Viewing reaches the projects my groups' tasks are in, so I can open those tasks."""
-        return self.group_project_ids if action == "view" and self.scopes("projects", "view") else set()
+    def _team_task_view_ids(self, action):
+        """Viewing reaches the projects my teams' tasks are in, so I can open those tasks."""
+        return self.team_task_project_ids if action == "view" and self.scopes("projects", "view") else set()
 
     def can_on_project(self, action, project):
         """May the person do `action` on this project?"""
@@ -281,35 +331,50 @@ class AccessProfile:
     # ------------------------------------------------------------ worklogs
 
     def worklog_q(self, action):
-        """Filter on IssueWorkLog, like work items: own = logged by me; member = in my projects; team = mine, my team
-        members', and in my team projects the time of people in no team; all = everyone's."""
-        from plane.db.models import TeamMember
+        """Filter on IssueWorkLog: own = logged by me; member = in my projects; team = mine and the people's in the
+        teams I lead (time is a person's: a team scope never reaches people outside my teams, also not in my team
+        projects); all = everyone's.
 
+        Viewing also reaches the time of the people below me in my teams (junior_member_ids), whatever my scope,
+        as long as my roles let me view worklogs at all."""
         scopes = self.scopes("worklogs", action)
         if "all" in scopes:
             return Q()
         q = Q(pk__in=[])
         if scopes:
             q |= Q(logged_by_id=self.user_id)
+        if scopes and action == "view" and self.junior_member_ids:
+            q |= Q(logged_by_id__in=self.junior_member_ids)
         if "member" in scopes:
             q |= Q(project_id__in=self.member_project_ids)
         if "team" in scopes:
-            in_teams = TeamMember.objects.filter(workspace_id=self.workspace_id).values("member_id")
-            q |= Q(logged_by_id__in=self.led_member_ids) | (
-                Q(project_id__in=self.team_project_ids(action)) & ~Q(logged_by_id__in=in_teams)
-            )
+            q |= Q(logged_by_id__in=self.led_member_ids)
         return q
+
+    def worklog_people_ids(self):
+        """The people whose time I may see (worklog_q("view")), or None for everyone. People whose time I see only
+        in some projects (Member scope) count once they have time there."""
+        scopes = self.scopes("worklogs", "view")
+        if "all" in scopes:
+            return None
+        ids = {self.user_id}
+        if scopes:
+            ids |= self.junior_member_ids
+        if "team" in scopes:
+            ids |= self.led_member_ids
+        return ids
 
     # ------------------------------------------------------------ work items
 
     def _work_item_scope_q(self, scope, action):
         from plane.db.models import IssueAssignee, TeamMember
-        from plane.db.models.member_group import groups_of
+        from plane.db.models.rbac import teams_of
 
         assignees = IssueAssignee.all_objects.filter(issue_id=OuterRef("pk"), deleted_at__isnull=True)
         own = Exists(assignees.filter(assignee_id=self.user_id)) | (~Exists(assignees) & Q(created_by_id=self.user_id))
-        if action == "view" and self.group_ids:
-            own |= Q(assignee_group_id__in=self.group_ids)
+        if self.team_ids:
+            # a task assigned to my team is mine as well
+            own |= Q(assignee_team_id__in=self.team_ids)
         if scope == "own":
             return own
         if scope == "member":
@@ -320,7 +385,7 @@ class AccessProfile:
             return (
                 own
                 | Exists(assignees.filter(assignee_id__in=self.led_member_ids))
-                | Q(assignee_group_id__in=groups_of(self.led_member_ids))
+                | Q(assignee_team_id__in=teams_of(self.led_member_ids))
                 | (Q(project_id__in=self.team_project_ids(action)) & ~claimed)
             )
         return Q()
@@ -356,8 +421,9 @@ class AccessProfile:
 
     @property
     def create_member_project_ids(self):
-        """My projects for creating work items: not the guest memberships raised only for a group task."""
-        return self.member_project_ids - self.raised_guest_project_ids
+        """My projects for creating work items: my teams' projects and my memberships, but not the guest memberships
+        raised only for a team task."""
+        return (self.member_project_ids - self.raised_guest_project_ids) | self.team_work_project_ids
 
 
 def is_rbac_enabled(workspace_id):
@@ -402,49 +468,85 @@ def pm_ids(workspace_id, member_id):
 # ---------------------------------------------------------------- project memberships
 
 
-def desired_project_roles(workspace_id):
-    """(project_id, user_id) -> the project role role-based access gives: Admin where people may edit a project
-    (HR everywhere, PMs in their team projects and manage shares), Guest where a project is only shared to view.
+def team_assigned_project_roles(workspace_id):
+    """(project_id, user_id) -> Member for everyone in the team a project or one of its tasks is assigned to, so they
+    can work on it. Used while role-based access is off (with it on, desired_project_roles gives this and more)."""
+    from plane.db.models import Issue, Project, ProjectDetail, TeamMember, WorkspaceMember
 
-    Workspace admins and workspace guests are left to Plane's own rules; Employees get nothing here (they see
-    projects through the project list and join them as guests), except Member where a task of their group is (Plane
-    hides other people's work items from guests; this membership doesn't let them create work items there).
+    live_projects = Project.objects.filter(workspace_id=workspace_id, archived_at__isnull=True).values("id")
+    links = set(
+        ProjectDetail.objects.filter(
+            workspace_id=workspace_id, assigned_team__isnull=False, project_id__in=live_projects
+        ).values_list("project_id", "assigned_team_id")
+    ) | set(
+        Issue.all_objects.filter(
+            workspace_id=workspace_id,
+            assignee_team__isnull=False,
+            deleted_at__isnull=True,
+            is_draft=False,
+            project_id__in=live_projects,
+        ).values_list("project_id", "assignee_team_id")
+    )
+    if not links:
+        return {}
+    members = WorkspaceMember.objects.filter(workspace_id=workspace_id, is_active=True, role=ROLE_MEMBER)
+    team_members = {}
+    for team_id, member_id in TeamMember.objects.filter(
+        workspace_id=workspace_id, team__deleted_at__isnull=True, member_id__in=members.values("member_id")
+    ).values_list("team_id", "member_id"):
+        team_members.setdefault(team_id, set()).add(member_id)
+    return {
+        (project_id, member_id): ROLE_MEMBER
+        for project_id, team_id in links
+        for member_id in team_members.get(team_id, ())
+    }
+
+
+def desired_project_roles(workspace_id):
+    """(project_id, user_id) -> the project role role-based access gives:
+
+    * Admin in the projects people may change: the ones they created (see AccessProfile.project_q).
+    * Member where their role lets them work on others' project tasks: every project they see for All (HR), their
+      team projects for Team (PMs), and projects shared with them to manage.
+    * Member in their teams' projects (owned by or assigned to a team they're in) and where a task of their team
+      is (Plane hides other people's work items from guests; the latter doesn't let them create work items there).
+    * Guest where a project is only shared to view.
+
+    Workspace admins and workspace guests are left to Plane's own rules; Employees get nothing else here (they see
+    projects through the project list and ask to join).
     """
-    from plane.db.models import MemberGroupMember, Project, User, WorkspaceMember
+    from plane.db.models import Project, User, WorkspaceMember
 
     projects = Project.objects.filter(workspace_id=workspace_id, archived_at__isnull=True)
+    live_ids = set(projects.values_list("id", flat=True))
     people = User.objects.filter(
         pk__in=WorkspaceMember.objects.filter(workspace_id=workspace_id, is_active=True, role=ROLE_MEMBER).values(
             "member_id"
         )
     )
-    group_projects = {}
-    for project_id, member_id in (
-        MemberGroupMember.objects.filter(
-            workspace_id=workspace_id,
-            group__deleted_at__isnull=True,
-            group__assigned_issues__deleted_at__isnull=True,
-            group__assigned_issues__is_draft=False,
-            group__assigned_issues__project__archived_at__isnull=True,
-            group__assigned_issues__project__deleted_at__isnull=True,
-        )
-        .values_list("group__assigned_issues__project_id", "member_id")
-        .distinct()
-    ):
-        group_projects.setdefault(member_id, set()).add(project_id)
     desired = {}
+
+    def give(project_ids, user_id, role):
+        for project_id in project_ids:
+            if desired.get((project_id, user_id), 0) < role:
+                desired[(project_id, user_id)] = role
+
     for user in people:
         profile = AccessProfile.load(user, workspace_id)
-        edit_ids = set(projects.filter(profile.project_q("edit")).values_list("id", flat=True))
-        view_ids = set(projects.filter(pk__in=profile.view_grant_project_ids).values_list("id", flat=True))
-        for project_id in edit_ids:
-            desired[(project_id, user.id)] = ROLE_ADMIN
-        for project_id in view_ids - edit_ids:
-            desired[(project_id, user.id)] = ROLE_GUEST
+        visible_ids = set(projects.filter(profile.project_q("view")).values_list("id", flat=True))
+        work_scopes = profile.scopes("work_items", "create") | profile.scopes("work_items", "edit")
+        if "all" in work_scopes:
+            work_ids = set(visible_ids)
+        elif "team" in work_scopes:
+            work_ids = visible_ids & profile.team_project_ids("edit")
+        else:
+            work_ids = set()
+        work_ids |= visible_ids & profile.manage_grant_project_ids
+        give(projects.filter(pk__in=profile.view_grant_project_ids).values_list("id", flat=True), user.id, ROLE_GUEST)
+        give(work_ids, user.id, ROLE_MEMBER)
         if profile.scopes("work_items", "view"):
-            for project_id in group_projects.get(user.id, ()):
-                if desired.get((project_id, user.id), 0) < ROLE_MEMBER:
-                    desired[(project_id, user.id)] = ROLE_MEMBER
+            give(live_ids & (profile.team_work_project_ids | profile.team_task_project_ids), user.id, ROLE_MEMBER)
+        give(projects.filter(profile.project_q("edit")).values_list("id", flat=True), user.id, ROLE_ADMIN)
     return desired
 
 
@@ -453,13 +555,14 @@ def sync_project_access(workspace_id):
 
     * Missing memberships are created (marked `rbac_managed`), and removed again when the access ends.
     * A hand-made membership is never removed; if its role is too low it is raised and its old role kept in
-      `rbac_original_role`, then restored when the access ends.
-    * With role-based access off, every change the sync made is undone.
+      `rbac_original_role`, then lowered again (never below that role) when the access shrinks or ends.
+    * With role-based access off, every change the sync made is undone, except the membership that a project or
+      a task assigned to a team gives the team's members (team_assigned_project_roles).
     """
     from plane.db.models import ProjectMember, ProjectUserProperty, Workspace
 
     enabled = Workspace.objects.filter(pk=workspace_id, is_rbac_enabled=True).exists()
-    desired = desired_project_roles(workspace_id) if enabled else {}
+    desired = desired_project_roles(workspace_id) if enabled else team_assigned_project_roles(workspace_id)
     rows = {
         (row.project_id, row.member_id): row
         for row in ProjectMember.objects.filter(workspace_id=workspace_id, member__isnull=False)
@@ -487,6 +590,12 @@ def sync_project_access(workspace_id):
             if row.rbac_original_role is None:
                 row.rbac_original_role = row.role
             row.role = role
+            changed.append(row)
+        elif row.rbac_original_role is not None and row.role > max(role, row.rbac_original_role):
+            # raised by the sync before, to more than it gives now: lowered again, never below the person's own role
+            row.role = max(role, row.rbac_original_role)
+            if row.role == row.rbac_original_role:
+                row.rbac_original_role = None
             changed.append(row)
     for key, row in rows.items():
         if key in desired:

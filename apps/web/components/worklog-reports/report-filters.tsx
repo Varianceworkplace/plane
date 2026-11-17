@@ -11,14 +11,7 @@ import { useParams } from "next/navigation";
 // plane imports
 import { Icon } from "@makeplane/propel/components/icon";
 import { IconButton } from "@makeplane/propel/components/icon-button";
-import {
-  BuildingOutline,
-  CalendarOutline,
-  CloseOutline,
-  GroupOutline,
-  StateOutline,
-  UserCogOutline,
-} from "@makeplane/propel/icons";
+import { BuildingOutline, CalendarOutline, CloseOutline, StateOutline, UserCogOutline } from "@makeplane/propel/icons";
 import { StateGroupIcon } from "@plane/blocks/icons";
 import type { MemberOption, ProjectOption } from "@plane/blocks/property-select";
 import { DateSelect, MemberSelect, ProjectSelect } from "@plane/blocks/property-select";
@@ -45,7 +38,7 @@ const STATE_GROUP_OPTIONS = Object.values(STATE_GROUPS);
 
 type NamedOption = { id: string; name: string };
 
-/** A multi-select pill over named options (departments, project managers, groups). */
+/** A multi-select pill over named options (departments, project managers). */
 function NamedOptionFilter(props: {
   label: string;
   plural: string;
@@ -219,16 +212,6 @@ export const WorklogReportFilters = observer(function WorklogReportFilters(props
           options={managerOptions}
           value={filters.pm ?? []}
           onChange={(ids) => update({ pm: ids })}
-        />
-      )}
-      {canViewOthers && !!peopleOptions?.groups.length && (
-        <NamedOptionFilter
-          label="Group"
-          plural="groups"
-          icon={GroupOutline}
-          options={peopleOptions.groups}
-          value={filters.group ?? []}
-          onChange={(ids) => update({ group: ids })}
         />
       )}
       <Select<StateGroupOption>

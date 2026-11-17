@@ -21,6 +21,7 @@ import type {
   TRolePayload,
   TRolloutPreview,
   TTeam,
+  TTeamOption,
   TTeamPayload,
 } from "@/components/access-control/types";
 // services
@@ -90,6 +91,11 @@ export class AccessControlService extends APIService {
 
   teams(workspaceSlug: string): Promise<TTeam[]> {
     return this.unwrap(this.get(`${this.base(workspaceSlug)}teams/`));
+  }
+
+  /** The teams for the "Assigned to" dropdowns: open to every workspace member. */
+  teamOptions(workspaceSlug: string): Promise<TTeamOption[]> {
+    return this.unwrap(this.get(`${this.base(workspaceSlug)}teams/options/`));
   }
 
   createTeam(workspaceSlug: string, data: TTeamPayload): Promise<TTeam> {

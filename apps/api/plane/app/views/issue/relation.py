@@ -167,7 +167,7 @@ class IssueRelationViewSet(BaseViewSet):
             "project_id",
             "label_ids",
             "assignee_ids",
-            "assignee_group_id",
+            "assignee_team_id",
             "created_at",
             "updated_at",
             "created_by",

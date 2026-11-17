@@ -205,6 +205,8 @@ export interface IIssueFiltersResponse {
 
 export interface IProjectUserPropertiesResponse extends IIssueFiltersResponse {
   sort_order: number;
+  /** the person's own Show in List / Hide from List choice; null = not chosen (the default applies) */
+  show_in_list?: boolean | null;
   preferences: {
     pages: {
       block_display: boolean;

@@ -27,8 +27,6 @@ from plane.db.models import (
     IssueAssignee,
     IssueTimeEstimate,
     IssueWorkLog,
-    MemberGroup,
-    MemberGroupMember,
     Milestone,
     Project,
     ProjectDetail,
@@ -230,34 +228,36 @@ class TestNumbers:
 
 @pytest.mark.contract
 class TestPeopleFilters:
-    def test_department_project_manager_and_group(self, setup):
+    def test_department_and_project_manager(self, setup):
         workspace, people = setup["workspace"], setup["people"]
         team = Team.objects.create(name="Delivery", workspace=workspace)
         TeamMember.objects.create(workspace=workspace, team=team, member=people["ws_admin"], is_lead=True)
         TeamMember.objects.create(workspace=workspace, team=team, member=people["hiral"])
-        group = MemberGroup.objects.create(workspace=workspace, name="QA")
-        MemberGroupMember.objects.create(workspace=workspace, group=group, member=people["vijay"])
+        qa = Team.objects.create(name="QA", workspace=workspace)
+        TeamMember.objects.create(workspace=workspace, team=qa, member=people["vijay"])
 
         assert set(_people(_analytics(setup, "ws_admin", team=str(team.id), **MARCH))) == {"hiral"}
         assert set(_people(_analytics(setup, "ws_admin", pm=str(people["ws_admin"].id), **MARCH))) == {"hiral"}
-        by_group = _analytics(setup, "ws_admin", group=str(group.id), **MARCH)
-        assert set(_people(by_group)) == {"vijay"}
-        assert by_group["summary"]["worked_duration"] == 45
+        by_team = _analytics(setup, "ws_admin", team=str(qa.id), **MARCH)
+        assert set(_people(by_team)) == {"vijay"}
+        assert by_team["summary"]["worked_duration"] == 45
+        # the Group filter is gone (groups became teams): ?group= narrows nothing
+        everyone = _analytics(setup, "ws_admin", **MARCH)
+        assert set(_people(_analytics(setup, "ws_admin", group=str(qa.id), **MARCH))) == set(_people(everyone))
         # the existing reports take the same filters
         summary = setup["clients"]["ws_admin"].get(
             f"/api/workspaces/{workspace.slug}/worklog-reports/", {"team": str(team.id), **MARCH}
         )
         assert [user["display_name"] for user in summary.json()["users"]] == ["hiral"]
 
-    def test_options_list_departments_managers_and_groups(self, setup):
+    def test_options_list_departments_and_managers(self, setup):
         workspace, people = setup["workspace"], setup["people"]
         team = Team.objects.create(name="Delivery", workspace=workspace)
         TeamMember.objects.create(workspace=workspace, team=team, member=people["hiral"], is_lead=True)
-        MemberGroup.objects.create(workspace=workspace, name="QA")
         options = setup["clients"]["vijay"].get(f"/api/workspaces/{workspace.slug}/worklog-reports/options/").json()
         assert [team["name"] for team in options["departments"]] == ["Delivery"]
         assert [manager["display_name"] for manager in options["project_managers"]] == ["hiral"]
-        assert [group["name"] for group in options["groups"]] == ["QA"]
+        assert "groups" not in options
 
 
 @pytest.mark.contract
@@ -417,7 +417,8 @@ def rbac(org):  # noqa: F811
 
 @pytest.mark.contract
 class TestRoles:
-    @pytest.mark.parametrize("who, worked", [("hr", 240), ("pm_a", 180), ("pm_b", 120), ("a1", 60)])
+    # PMs: their teams' people only (the loner's hour, in a team project, is HR's to see)
+    @pytest.mark.parametrize("who, worked", [("hr", 240), ("pm_a", 120), ("pm_b", 60), ("a1", 60)])
     def test_worked_time_follows_the_worklogs_permission(self, rbac, who, worked):
         assert _analytics(rbac, who)["summary"]["worked_duration"] == worked
 

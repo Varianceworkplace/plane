@@ -97,6 +97,14 @@ export const PROJECT_DISPLAY_FILTER_OPTIONS: {
     i18n_label: "workspace_projects.scope.my_projects",
   },
   {
+    key: "in_my_list",
+    i18n_label: "workspace_projects.scope.in_my_list",
+  },
+  {
+    key: "hidden_from_my_list",
+    i18n_label: "workspace_projects.scope.hidden_from_my_list",
+  },
+  {
     key: "archived_projects",
     i18n_label: "workspace_projects.scope.archived_projects",
   },

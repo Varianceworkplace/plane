@@ -40,7 +40,6 @@ export class WorklogReportService extends APIService {
     if (filters.to_date) params.set("to_date", filters.to_date);
     if (filters.team?.length) params.set("team", filters.team.join(","));
     if (filters.pm?.length) params.set("pm", filters.pm.join(","));
-    if (filters.group?.length) params.set("group", filters.group.join(","));
     return params.toString();
   }
 
