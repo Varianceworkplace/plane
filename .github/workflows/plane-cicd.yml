@@ -161,12 +161,13 @@ jobs:
           echo "Deployment host: $DEPLOY_HOST"
 
           # FIX: Variables are explicitly passed into the shell context before REMOTE execution begins
+          # The server's output is kept so the step can check below that the script ran to its end.
           ssh \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             -o ConnectTimeout=15 \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "export APP_RELEASE='$RELEASE'; export PLANE_IMAGE_PREFIX='$IMAGE_PREFIX'; bash -s" <<'REMOTE'
+            "export APP_RELEASE='$RELEASE'; export PLANE_IMAGE_PREFIX='$IMAGE_PREFIX'; bash -s" <<'REMOTE' | tee "$RUNNER_TEMP/deploy.log"
           set -Eeuo pipefail
 
           cd /opt/plane-selfhost
@@ -201,7 +202,9 @@ jobs:
             api worker beat-worker migrator
 
           echo "=== Run database migrations ==="
-          compose run --rm migrator
+          # This script reaches the server on stdin (bash -s): without -T and </dev/null, `compose run`
+          # reads the rest of the script as the migrator's input, and the steps below never run.
+          compose run --rm -T migrator </dev/null
 
           echo "=== Recreate application services ==="
           compose up -d --force-recreate \
@@ -270,3 +273,10 @@ jobs:
 
           echo "SUCCESS: All seven application containers use release $APP_RELEASE"
           REMOTE
+
+          # The server script's last line is SUCCESS. Without it the script stopped part-way and exited
+          # quietly (as when the migration step swallowed it), so the release is not live: fail the deploy.
+          if ! grep -qx "SUCCESS: All seven application containers use release $RELEASE" "$RUNNER_TEMP/deploy.log"; then
+            echo "::error::The deploy stopped before the release went live: the server script did not finish."
+            exit 1
+          fi
