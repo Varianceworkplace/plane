@@ -47,7 +47,7 @@ import { useAppRouter } from "@/hooks/use-app-router";
 // services
 import { TicketService } from "@/services/ticket.service";
 // local
-import { ALPHABET } from "../constants";
+import { ALPHABET, TICKET_DECISION_STATUSES } from "../constants";
 import {
   TicketChoiceSelect,
   TicketMemberBadge,
@@ -58,6 +58,7 @@ import {
   TicketStatusSelect,
   toMemberOption,
 } from "../properties";
+import { TicketApprovalTag } from "../detail/ticket-approval";
 import type { TTicket, TTicketListParams, TTicketMeta, TTicketPayload, TTicketStatus } from "../types";
 
 const ticketService = new TicketService();
@@ -492,13 +493,20 @@ export function TicketList(props: Props) {
                   </Link>
                   <div className={cn("shrink-0 px-3", COLUMNS[1].className)}>
                     {ticket.can_edit ? (
-                      <TicketStatusSelect
-                        meta={meta}
-                        value={ticket.state?.id ?? ""}
-                        onChange={(id) => id !== ticket.state?.id && void updateInline(ticket, { state_id: id })}
-                      />
+                      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <TicketStatusSelect
+                          meta={meta}
+                          value={ticket.state?.id ?? ""}
+                          onChange={(id) => id !== ticket.state?.id && void updateInline(ticket, { state_id: id })}
+                          hide={ticket.approval?.status === "pending" ? TICKET_DECISION_STATUSES : undefined}
+                        />
+                        <TicketApprovalTag ticket={ticket} />
+                      </span>
                     ) : (
-                      <TicketStateBadge state={ticket.state} />
+                      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <TicketStateBadge state={ticket.state} />
+                        <TicketApprovalTag ticket={ticket} />
+                      </span>
                     )}
                   </div>
                   <div className={cn("shrink-0 px-3", COLUMNS[2].className)}>

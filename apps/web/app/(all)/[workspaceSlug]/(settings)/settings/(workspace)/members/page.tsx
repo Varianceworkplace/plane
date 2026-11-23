@@ -53,14 +53,15 @@ const WorkspaceMembersSettingsPage = observer(function WorkspaceMembersSettingsP
 
   const handleWorkspaceInvite = async (data: IWorkspaceBulkInviteFormData) => {
     try {
-      await inviteMembersToWorkspace(workspaceSlug, data);
+      const result = await inviteMembersToWorkspace(workspaceSlug, data);
 
       setInviteModal(false);
 
+      // the server says whether emails can actually go out (not when email isn't set up)
       setToast({
-        type: "success",
-        title: "Success!",
-        message: t("workspace_settings.settings.members.invitations_sent_successfully"),
+        type: result?.email_configured === false ? "warning" : "success",
+        title: result?.email_configured === false ? "Invitations saved, not emailed" : "Success!",
+        message: result?.message || t("workspace_settings.settings.members.invitations_sent_successfully"),
       });
     } catch (error: unknown) {
       let message = undefined;

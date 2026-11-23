@@ -24,6 +24,7 @@ from .timezone import urlpatterns as timezone_urls
 from .exporter import urlpatterns as exporter_urls
 from .ticket import urlpatterns as ticket_urls
 from .worklog import urlpatterns as worklog_urls
+from .holiday import urlpatterns as holiday_urls
 from .milestone import urlpatterns as milestone_urls
 from .task_detail import urlpatterns as task_detail_urls
 from .project_detail import urlpatterns as project_detail_urls
@@ -53,6 +54,7 @@ urlpatterns = [
     *exporter_urls,
     *ticket_urls,
     *worklog_urls,
+    *holiday_urls,
     *milestone_urls,
     *task_detail_urls,
     *project_detail_urls,

@@ -10,6 +10,7 @@ import type {
   IWorkspaceMemberMe,
   IWorkspaceMember,
   IWorkspaceMemberInvitation,
+  TWorkspaceInviteResult,
   ILastActiveWorkspaceDetails,
   IWorkspaceSearchResults,
   IProductUpdateResponse,
@@ -75,7 +76,7 @@ export class WorkspaceService extends APIService {
       });
   }
 
-  async inviteWorkspace(workspaceSlug: string, data: IWorkspaceBulkInviteFormData): Promise<any> {
+  async inviteWorkspace(workspaceSlug: string, data: IWorkspaceBulkInviteFormData): Promise<TWorkspaceInviteResult> {
     return this.post(`/api/workspaces/${workspaceSlug}/invitations/`, data)
       .then((response) => response?.data)
       .catch((error) => {
@@ -183,6 +184,18 @@ export class WorkspaceService extends APIService {
     data: Partial<IWorkspaceMember>
   ): Promise<any> {
     return this.patch(`/api/workspaces/${workspaceSlug}/invitations/${invitationId}/`, data)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  /** Sends a pending invitation again (same link) and keeps it open for another week. */
+  async resendWorkspaceInvitation(
+    workspaceSlug: string,
+    invitationId: string
+  ): Promise<IWorkspaceMemberInvitation & { message: string; email_configured: boolean }> {
+    return this.post(`/api/workspaces/${workspaceSlug}/invitations/${invitationId}/resend/`, {})
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

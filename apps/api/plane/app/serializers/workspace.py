@@ -28,6 +28,7 @@ from plane.db.models import (
 )
 from plane.utils.constants import RESTRICTED_WORKSPACE_SLUGS
 from plane.utils.url import contains_url
+from plane.utils.workspace_invites import invite_email_status, invite_expires_at, invite_is_expired
 from plane.utils.content_validator import (
     validate_html_content,
     validate_binary_data,
@@ -117,9 +118,22 @@ class WorkspaceMemberAdminSerializer(DynamicBaseSerializer):
 class WorkSpaceMemberInviteSerializer(BaseSerializer):
     workspace = WorkspaceLiteSerializer(read_only=True)
     invite_link = serializers.SerializerMethodField()
+    # until when it can be joined, and what happened to its last email (see plane.utils.workspace_invites)
+    expires_at = serializers.SerializerMethodField()
+    is_expired = serializers.SerializerMethodField()
+    email_status = serializers.SerializerMethodField()
 
     def get_invite_link(self, obj):
         return f"/workspace-invitations/?invitation_id={obj.id}&slug={obj.workspace.slug}&token={obj.token}"
+
+    def get_expires_at(self, obj):
+        return invite_expires_at(obj)
+
+    def get_is_expired(self, obj):
+        return obj.responded_at is None and invite_is_expired(obj)
+
+    def get_email_status(self, obj):
+        return invite_email_status(obj.id)
 
     class Meta:
         model = WorkspaceMemberInvite
@@ -146,12 +160,17 @@ class WorkSpaceMemberInvitePublicSerializer(BaseSerializer):
     """
 
     workspace = WorkspaceLiteSerializer(read_only=True)
+    is_expired = serializers.SerializerMethodField()
+
+    def get_is_expired(self, obj):
+        return obj.responded_at is None and invite_is_expired(obj)
 
     class Meta:
         model = WorkspaceMemberInvite
         fields = [
             "id",
             "email",
+            "is_expired",
             "workspace",
             "role",
             "message",

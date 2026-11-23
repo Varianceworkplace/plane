@@ -53,6 +53,15 @@ class TicketTrialTested(models.TextChoices):
     NA = "NA", "NA"
 
 
+class TicketApproval(models.TextChoices):
+    """The Manager's decision. A new ticket waits for the Manager picked on it; tickets from before approvals
+    existed count as approved."""
+
+    PENDING = "pending", "Waiting for approval"
+    APPROVED = "approved", "Approved"
+    REJECTED = "rejected", "Rejected"
+
+
 class Ticket(ProjectBaseModel):
     """
     Helpdesk ticket. Title, description, status, priority, assignee, creator,
@@ -67,6 +76,19 @@ class Ticket(ProjectBaseModel):
         null=True,
         related_name="managed_tickets",
     )
+    # the Manager approves the ticket before the assignee sees it (plane.app.views.ticket.base)
+    approval_status = models.CharField(
+        max_length=16, choices=TicketApproval.choices, default=TicketApproval.APPROVED, db_index=True
+    )
+    approval_decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="decided_ticket_approvals",
+    )
+    approval_decided_at = models.DateTimeField(null=True, blank=True)
+    approval_note = models.TextField(blank=True, default="")
     organization_name = models.CharField(max_length=255, blank=True, default="")
     category = models.CharField(max_length=50, choices=TicketCategory.choices, null=True, blank=True)
 

@@ -13,7 +13,9 @@ import type {
   TAccessMember,
   TCheckAccess,
   TGrantPayload,
+  TMemberDeletionSummary,
   TMyAccess,
+  TPasswordResetResult,
   TProjectAccess,
   TProjectJoinRequest,
   TProjectJoinRequests,
@@ -77,8 +79,36 @@ export class AccessControlService extends APIService {
     return this.unwrap<void>(this.delete(`${this.base(workspaceSlug)}roles/${roleId}/`));
   }
 
-  members(workspaceSlug: string): Promise<TAccessMember[]> {
-    return this.unwrap(this.get(`${this.base(workspaceSlug)}members/`));
+  /** With `includeDisabled`, the disabled people too (People tab). */
+  members(workspaceSlug: string, includeDisabled = false): Promise<TAccessMember[]> {
+    return this.unwrap(
+      this.get(`${this.base(workspaceSlug)}members/`, includeDisabled ? { params: { include_disabled: 1 } } : {})
+    );
+  }
+
+  /** The person loses access everywhere at once; nothing of theirs changes. */
+  disableMember(workspaceSlug: string, memberId: string): Promise<void> {
+    return this.unwrap(this.post(`${this.base(workspaceSlug)}members/${memberId}/disable/`, {}));
+  }
+
+  enableMember(workspaceSlug: string, memberId: string): Promise<void> {
+    return this.unwrap(this.post(`${this.base(workspaceSlug)}members/${memberId}/enable/`, {}));
+  }
+
+  /** Admin / HR: email the person a reset link, or get the link back to share another way. */
+  startPasswordReset(workspaceSlug: string, memberId: string, send: "email" | "link"): Promise<TPasswordResetResult> {
+    return this.unwrap(this.post(`${this.base(workspaceSlug)}members/${memberId}/password-reset/`, { send }));
+  }
+
+  memberDeletionSummary(workspaceSlug: string, memberId: string): Promise<TMemberDeletionSummary> {
+    return this.unwrap(this.get(`${this.base(workspaceSlug)}members/${memberId}/delete/`));
+  }
+
+  /** Deletes a disabled person for good; their shared work goes to `transferTo`. */
+  deleteMember(workspaceSlug: string, memberId: string, transferTo: string): Promise<void> {
+    return this.unwrap(
+      this.post(`${this.base(workspaceSlug)}members/${memberId}/delete/`, { transfer_to: transferTo })
+    );
   }
 
   setMemberRoles(workspaceSlug: string, memberId: string, roleIds: string[]): Promise<{ role_ids: string[] }> {

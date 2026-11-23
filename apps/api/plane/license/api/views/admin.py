@@ -39,6 +39,12 @@ from plane.authentication.adapter.error import (
     AuthenticationException,
 )
 from plane.utils.ip_address import get_client_ip
+from plane.authentication.rate_limit import authentication_throttle_allows
+from plane.authentication.utils.password_attempts import (
+    clear_failed_passwords,
+    record_failed_password,
+    too_many_failed_passwords,
+)
 from plane.utils.path_validator import get_safe_redirect_url
 
 
@@ -266,11 +272,24 @@ class InstanceAdminSignUpEndpoint(View):
             return HttpResponseRedirect(url)
 
 
+def _admin_rate_limited(request):
+    exc = AuthenticationException(
+        error_code=AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"],
+        error_message="RATE_LIMIT_EXCEEDED",
+    )
+    url = urljoin(base_host(request=request, is_admin=True), "?" + urlencode(exc.get_error_dict()))
+    return HttpResponseRedirect(url)
+
+
 class InstanceAdminSignInEndpoint(View):
     permission_classes = [AllowAny]
 
     @invalidate_cache(path="/api/instances/", user=False)
     def post(self, request):
+        # the same per-address limit as the other sign-ins (it had none)
+        if not authentication_throttle_allows(request):
+            return _admin_rate_limited(request)
+
         # Check instance first
         instance = Instance.objects.first()
         if instance is None:
@@ -364,8 +383,13 @@ class InstanceAdminSignInEndpoint(View):
             )
             return HttpResponseRedirect(url)
 
+        # too many wrong passwords for this account lately, whatever address they came from
+        if too_many_failed_passwords(email):
+            return _admin_rate_limited(request)
+
         # Check password of the user
         if not user.check_password(password):
+            record_failed_password(email)
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["ADMIN_AUTHENTICATION_FAILED"],
                 error_message="ADMIN_AUTHENTICATION_FAILED",
@@ -389,6 +413,7 @@ class InstanceAdminSignInEndpoint(View):
                 "?" + urlencode(exc.get_error_dict()),
             )
             return HttpResponseRedirect(url)
+        clear_failed_passwords(email)
         # settings last active for the user
         user.is_active = True
         user.last_active = timezone.now()

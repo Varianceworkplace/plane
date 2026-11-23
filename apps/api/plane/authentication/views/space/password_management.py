@@ -32,6 +32,7 @@ from plane.authentication.adapter.error import (
     AuthenticationException,
     AUTHENTICATION_ERROR_CODES,
 )
+from plane.authentication.utils.account_access import is_deactivated
 from plane.authentication.rate_limit import AuthenticationThrottle
 
 
@@ -91,6 +92,13 @@ class ForgotPasswordSpaceEndpoint(APIView):
 
         # Get the user
         user = User.objects.filter(email=email).first()
+        # a disabled account gets no reset link: it couldn't sign in with the new password anyway
+        if is_deactivated(user):
+            exc = AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["USER_ACCOUNT_DEACTIVATED"],
+                error_message="USER_ACCOUNT_DEACTIVATED",
+            )
+            return Response(exc.get_error_dict(), status=status.HTTP_400_BAD_REQUEST)
         if user:
             # Get the reset token for user
             uidb64, token = generate_password_token(user=user)
@@ -123,6 +131,15 @@ class ResetPasswordSpaceEndpoint(View):
                 )
                 params = exc.get_error_dict()
                 url = f"{base_host(request=request, is_space=True)}/accounts/reset-password/?{urlencode(params)}"
+                return HttpResponseRedirect(url)
+
+            # an old link doesn't reopen a disabled account
+            if is_deactivated(user):
+                exc = AuthenticationException(
+                    error_code=AUTHENTICATION_ERROR_CODES["USER_ACCOUNT_DEACTIVATED"],
+                    error_message="USER_ACCOUNT_DEACTIVATED",
+                )
+                url = f"{base_host(request=request, is_space=True)}/accounts/reset-password/?{urlencode(exc.get_error_dict())}"  # noqa: E501
                 return HttpResponseRedirect(url)
 
             password = request.POST.get("password", False)

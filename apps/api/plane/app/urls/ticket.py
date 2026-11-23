@@ -10,6 +10,7 @@ from plane.app.views.ticket.base import (
     TicketBulkUpdateEndpoint,
     TicketCommentDetailEndpoint,
     TicketCommentEndpoint,
+    TicketApprovalEndpoint,
     TicketDetailEndpoint,
     TicketExportEndpoint,
     TicketHistoryEndpoint,
@@ -29,6 +30,12 @@ urlpatterns = [
         "workspaces/<str:slug>/tickets/bulk-comment/", TicketBulkCommentEndpoint.as_view(), name="ticket-bulk-comment"
     ),
     path("workspaces/<str:slug>/tickets/<uuid:ticket_id>/", TicketDetailEndpoint.as_view(), name="ticket-detail"),
+    # the Manager approves or rejects a ticket waiting for them
+    path(
+        "workspaces/<str:slug>/tickets/<uuid:ticket_id>/approval/",
+        TicketApprovalEndpoint.as_view(),
+        name="ticket-approval",
+    ),
     path(
         "workspaces/<str:slug>/tickets/<uuid:ticket_id>/comments/",
         TicketCommentEndpoint.as_view(),

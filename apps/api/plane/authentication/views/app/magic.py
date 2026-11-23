@@ -26,6 +26,7 @@ from plane.authentication.adapter.error import (
     AuthenticationException,
     AUTHENTICATION_ERROR_CODES,
 )
+from plane.authentication.utils.account_access import is_deactivated, signup_allowed
 from plane.authentication.rate_limit import (
     AuthenticationThrottle,
     throttle_auth_redirect,
@@ -51,6 +52,18 @@ class MagicGenerateEndpoint(APIView):
         email = request.data.get("email", "").strip().lower()
         try:
             validate_email(email)
+            # no code for a disabled account, or for a new address that can't sign up
+            user = User.objects.filter(email=email).first()
+            if is_deactivated(user):
+                raise AuthenticationException(
+                    error_code=AUTHENTICATION_ERROR_CODES["USER_ACCOUNT_DEACTIVATED"],
+                    error_message="USER_ACCOUNT_DEACTIVATED",
+                )
+            if not user and not signup_allowed(email):
+                raise AuthenticationException(
+                    error_code=AUTHENTICATION_ERROR_CODES["SIGNUP_DISABLED"],
+                    error_message="SIGNUP_DISABLED",
+                )
             adapter = MagicCodeProvider(request=request, key=email)
             key, token = adapter.initiate()
             # If the smtp is configured send through here
@@ -109,12 +122,15 @@ class MagicSignInEndpoint(View):
             profile, _ = Profile.objects.get_or_create(user=user)
             # Login the user and record his device info
             user_login(request=request, user=user, is_app=True)
-            if user.is_password_autoset and profile.is_onboarded:
+            if next_path:
+                # back to where they were going (e.g. the invitation they opened)
+                path = str(next_path)
+            elif user.is_password_autoset and profile.is_onboarded:
                 # Redirect to the home page
                 path = "/"
             else:
                 # Get the redirection path
-                path = str(next_path) if next_path else str(get_redirection_path(user=user))
+                path = str(get_redirection_path(user=user))
             # redirect to referer path
             url = get_safe_redirect_url(
                 base_url=base_host(request=request, is_app=True),

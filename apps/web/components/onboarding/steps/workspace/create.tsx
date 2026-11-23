@@ -20,7 +20,7 @@ import { cn, validateWorkspaceName, validateSlug } from "@plane/utils";
 // hooks
 import { useInstance } from "@/hooks/store/use-instance";
 import { useWorkspace } from "@/hooks/store/use-workspace";
-import { useUserProfile, useUserSettings } from "@/hooks/store/user";
+import { useUser, useUserProfile, useUserSettings } from "@/hooks/store/user";
 // services
 import { WorkspaceService } from "@/services/workspace.service";
 // local components
@@ -50,6 +50,7 @@ export const WorkspaceCreateStep = observer(function WorkspaceCreateStep({
   const { config } = useInstance();
   const { updateUserProfile } = useUserProfile();
   const { fetchCurrentUserSettings } = useUserSettings();
+  const { signOut } = useUser();
   const { createWorkspace, fetchWorkspaces } = useWorkspace();
 
   const isWorkspaceCreationDisabled = config?.is_workspace_creation_disabled ?? false;
@@ -116,13 +117,25 @@ export const WorkspaceCreateStep = observer(function WorkspaceCreateStep({
   const isButtonDisabled = !isValid || invalidSlug || isSubmitting;
 
   if (isWorkspaceCreationDisabled) {
+    // nothing to create here: back to the invitations if there are any, else a way out instead of a dead end
     return (
-      <div className="flex flex-col gap-10">
+      <div className="flex flex-col gap-6">
         <span className="text-center text-14 text-tertiary">
-          You don&apos;t seem to have any invites to a workspace and your instance admin has restricted creation of new
-          workspaces. Please ask a workspace owner or admin to invite you to a workspace first and come back to this
-          screen to join.
+          {hasInvitations
+            ? "New workspaces can't be created here. Join the workspace you were invited to instead."
+            : "You don't have an invitation to a workspace yet, and new workspaces can't be created here. Ask your admin to invite you, then open the invitation link from your email."}
         </span>
+        {hasInvitations ? (
+          <Button
+            variant="primary"
+            size="lg"
+            stretch="full"
+            label="Back to your invitations"
+            onClick={handleCurrentViewChange}
+          />
+        ) : (
+          <Button variant="secondary" size="lg" stretch="full" label="Sign out" onClick={() => void signOut()} />
+        )}
       </div>
     );
   }

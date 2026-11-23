@@ -79,10 +79,12 @@ type Props = {
   scope: TWorklogReportScope | undefined;
   /** quarterly and yearly reports pick their range with their own period picker */
   showDates?: boolean;
+  /** the task status picker; Attendance counts a person's whole day, so it has none */
+  showStatus?: boolean;
 };
 
 export const WorklogReportFilters = observer(function WorklogReportFilters(props: Props) {
-  const { filters, onChange, projectMode, scope, showDates = true } = props;
+  const { filters, onChange, projectMode, scope, showDates = true, showStatus = true } = props;
   // store hooks
   const {
     workspace: { workspaceMemberIds, getWorkspaceMemberDetails },
@@ -214,32 +216,34 @@ export const WorklogReportFilters = observer(function WorklogReportFilters(props
           onChange={(ids) => update({ pm: ids })}
         />
       )}
-      <Select<StateGroupOption>
-        multiple
-        getValues={() => STATE_GROUP_OPTIONS}
-        value={selectedStateGroups}
-        onChange={(keys) => update({ state_group: keys as TStateGroups[] })}
-        getOptionValue={(group) => group.key}
-        getOptionLabel={(group) => group.label}
-        getOptionIcon={(group) => <StateGroupIcon stateGroup={group.key} color={group.color} className="size-4" />}
-        showSearch={false}
-        pinSelected={false}
-      >
-        <Select.Trigger<StateGroupOption>
-          variant="pill-md"
-          prependIcon={(groups) =>
-            groups.length === 1 ? (
-              <StateGroupIcon stateGroup={groups[0].key} color={groups[0].color} />
-            ) : (
-              <StateOutline aria-hidden="true" className="size-3 text-secondary" />
-            )
-          }
+      {showStatus && (
+        <Select<StateGroupOption>
+          multiple
+          getValues={() => STATE_GROUP_OPTIONS}
+          value={selectedStateGroups}
+          onChange={(keys) => update({ state_group: keys as TStateGroups[] })}
+          getOptionValue={(group) => group.key}
+          getOptionLabel={(group) => group.label}
+          getOptionIcon={(group) => <StateGroupIcon stateGroup={group.key} color={group.color} className="size-4" />}
+          showSearch={false}
+          pinSelected={false}
         >
-          {(groups) =>
-            groups.length === 0 ? "Task status" : groups.length === 1 ? groups[0].label : `${groups.length} statuses`
-          }
-        </Select.Trigger>
-      </Select>
+          <Select.Trigger<StateGroupOption>
+            variant="pill-md"
+            prependIcon={(groups) =>
+              groups.length === 1 ? (
+                <StateGroupIcon stateGroup={groups[0].key} color={groups[0].color} />
+              ) : (
+                <StateOutline aria-hidden="true" className="size-3 text-secondary" />
+              )
+            }
+          >
+            {(groups) =>
+              groups.length === 0 ? "Task status" : groups.length === 1 ? groups[0].label : `${groups.length} statuses`
+            }
+          </Select.Trigger>
+        </Select>
+      )}
       {showDates && (
         <>
           <DateSelect

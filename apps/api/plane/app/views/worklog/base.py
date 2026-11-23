@@ -17,6 +17,7 @@ Time tracking (worklogs).
 # Python imports
 import csv
 import io
+import json
 import uuid
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -45,21 +46,28 @@ from plane.db.models import (
     IssueWorkLogTimer,
     Project,
     ProjectMember,
+    State,
     WorkspaceMember,
 )
+from plane.bgtasks.issue_activities_task import issue_activity
 from plane.utils.csv_utils import sanitize_csv_row
+from plane.utils.host import base_host
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 100
 
 
 def format_duration(minutes):
-    hours, mins = divmod(int(minutes or 0), 60)
-    if hours and mins:
-        return f"{hours}h {mins}m"
-    if hours:
-        return f"{hours}h"
-    return f"{mins}m"
+    """90 -> "1h 30m", 0.1 -> "6s", 1.1 -> "1m 6s": seconds show when there are any (timers save to the second)."""
+    total = max(0, round((minutes or 0) * 60))
+    hours, rest = divmod(total, 3600)
+    mins, secs = divmod(rest, 60)
+    parts = [f"{hours}h"] if hours else []
+    if mins or (hours and secs):
+        parts.append(f"{mins}m")
+    if secs:
+        parts.append(f"{secs}s")
+    return " ".join(parts) or "0m"
 
 
 def serialize_user(user):
@@ -412,8 +420,8 @@ def timer_seconds(timer, now=None):
 
 
 def timer_minutes(timer, now=None):
-    """Whole minutes on the timer, rounded, at least one."""
-    return max(1, int(timer_seconds(timer, now) / 60 + 0.5))
+    """The time on the timer in minutes, to the second (6 seconds = 0.1), at least one second: not rounded up."""
+    return max(1, round(timer_seconds(timer, now))) / 60
 
 
 def serialize_timer(timer):
@@ -500,24 +508,6 @@ class WorkspaceWorkLogTimerEndpoint(BaseAPIView):
         timer = current_timer(slug, request.user)
         return Response({"timer": serialize_timer(timer) if timer else None}, status=status.HTTP_200_OK)
 
-    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
-    def delete(self, request, slug):
-        """Delete timer: removes the member's own timer without logging any time (one started by mistake).
-
-        Their worklogs and other people's timers are untouched. `?id=` names the timer, so a dialog left open on one
-        that has since been saved or replaced doesn't remove the new one.
-        """
-        timer = current_timer(slug, request.user)
-        if "id" in request.query_params and (timer is None or timer.id not in _uuid_list(request.query_params["id"])):
-            current = serialize_timer(timer) if timer else None
-            return Response(
-                {"error": "This timer was already saved or deleted.", "timer": current},
-                status=status.HTTP_409_CONFLICT,
-            )
-        if timer:
-            timer.delete(soft=False)
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 class WorkspaceWorkLogTimerStopEndpoint(BaseAPIView):
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
@@ -555,8 +545,49 @@ class WorkspaceWorkLogTimerResumeEndpoint(BaseAPIView):
         return Response({"timer": serialize_timer(timer), "reason": None}, status=status.HTTP_200_OK)
 
 
+# How saving a timer's time log leaves the task, as in Workplace's Notes: On Hold or Completed (required)
+CLOSING_STATUSES = {"on_hold": "On Hold", "completed": "Completed"}
+ON_HOLD_STATE = {"name": "On Hold", "color": "#F97316", "sequence": 40000, "group": "started"}
+
+
+def closing_state(project, key):
+    """The project's status for `key`: its "Completed" (else its first completed status); its "On Hold", added
+    (in progress, before Completed) if the project doesn't have one."""
+    states = State.objects.filter(project_id=project.id)
+    if key == "completed":
+        return (
+            states.filter(group="completed", name__iexact="Completed").first()
+            or states.filter(group="completed").order_by("sequence").first()
+        )
+    state = states.filter(name__iexact="On Hold").first()
+    if state is None:
+        state = State.objects.create(project=project, workspace_id=project.workspace_id, **ON_HOLD_STATE)
+    return state
+
+
+def move_to_status(request, issue, state):
+    """Puts the task in `state` and records it as any status change is (activity, notifications, completed date)."""
+    if state is None or issue.state_id == state.id:
+        return
+    previous = issue.state_id
+    issue.state = state
+    issue.save(update_fields=["state", "updated_at"])
+    issue_activity.delay(
+        type="issue.activity.updated",
+        requested_data=json.dumps({"state_id": str(state.id)}),
+        actor_id=str(request.user.id),
+        issue_id=str(issue.id),
+        project_id=str(issue.project_id),
+        current_instance=json.dumps({"state_id": str(previous) if previous else None}),
+        epoch=int(timezone.now().timestamp()),
+        notification=True,
+        origin=base_host(request=request, is_app=True),
+    )
+
+
 class WorkspaceWorkLogTimerSaveEndpoint(BaseAPIView):
-    """Turns the (stopped) timer into a worklog. A note describing the work is required."""
+    """Turns the (stopped) timer into a worklog. A note describing the work is required, and so is how the task is
+    left: ?status on_hold or completed moves it to the project's On Hold or Completed status."""
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def post(self, request, slug):
@@ -567,6 +598,9 @@ class WorkspaceWorkLogTimerSaveEndpoint(BaseAPIView):
         description = request.data.get("description")
         if not isinstance(description, str) or not description.strip():
             return Response({"description": "Describe the work you did."}, status=status.HTTP_400_BAD_REQUEST)
+        closing = request.data.get("status")
+        if closing not in CLOSING_STATUSES:
+            return Response({"status": "Pick a status: On Hold or Completed."}, status=status.HTTP_400_BAD_REQUEST)
 
         if timer.stopped_at is None:
             timer.stopped_at = timezone.now()
@@ -588,7 +622,12 @@ class WorkspaceWorkLogTimerSaveEndpoint(BaseAPIView):
                 ended_at=timer.stopped_at,
             )
             timer.delete(soft=False)
-        return Response(serialize_worklog(worklog_queryset(slug).get(pk=worklog.pk)), status=status.HTTP_201_CREATED)
+            issue = Issue.all_objects.select_related("project").get(pk=timer.issue_id)
+            move_to_status(request, issue, closing_state(issue.project, closing))
+        return Response(
+            {**serialize_worklog(worklog_queryset(slug).get(pk=worklog.pk)), "issue_state_id": str(issue.state_id)},
+            status=status.HTTP_201_CREATED,
+        )
 
 
 __all__ = [

@@ -15,11 +15,19 @@ import { IconButton } from "@makeplane/propel/components/icon-button";
 import { TextArea, TextAreaGroup } from "@makeplane/propel/components/text-area";
 import { Tooltip } from "@makeplane/propel/components/tooltip";
 import { PlayOutline, StopOutline } from "@makeplane/propel/icons";
+import { Select } from "@plane/blocks/select";
 import { setToast } from "@plane/blocks/toast";
 import { renderFormattedDate, renderFormattedTime } from "@plane/utils";
 // local imports
 import { formatTimerClock, formatWorklogDuration, useWorklogTimer, worklogService } from "./helpers";
 import type { TWorklogTimer } from "./types";
+
+/** How saving the time log leaves the task, as in Workplace's Notes (required). */
+type TClosingStatus = { key: "on_hold" | "completed"; label: string };
+const CLOSING_STATUSES: TClosingStatus[] = [
+  { key: "on_hold", label: "On Hold" },
+  { key: "completed", label: "Completed" },
+];
 
 /** Seconds on the timer, ticking every second while it runs. Corrects for client / server clock drift; time it stood
  * stopped before a Discard doesn't count. */
@@ -47,8 +55,8 @@ type Props = {
   issueId: string;
   /** may this member start a timer on this work item */
   canStart: boolean;
-  /** called after a timer has been saved as a worklog */
-  onSaved: () => void;
+  /** called after a timer has been saved as a worklog, with the task's status after it (On Hold / Completed) */
+  onSaved: (issueStateId?: string) => void;
   /** smaller trigger for rows of the work item list */
   compact?: boolean;
 };
@@ -166,15 +174,11 @@ export function WorklogTimerControl(props: Props) {
           open={saveOpen}
           workspaceSlug={workspaceSlug}
           timer={timer}
-          onClose={async (result, resumed) => {
+          onClose={async (result, resumed, issueStateId) => {
             setSaveOpen(false);
             if (result === "resumed") await mutate(resumed, { revalidate: false });
-            if (result === "saved" || result === "discarded" || result === "deleted") {
-              await mutate(null, { revalidate: false });
-            }
-            // saved or replaced elsewhere in the meantime: show the timer as it is now
-            if (result === "stale") await mutate();
-            if (result === "saved") onSaved();
+            if (result === "saved" || result === "discarded") await mutate(null, { revalidate: false });
+            if (result === "saved") onSaved(issueStateId);
           }}
         />
       </>
@@ -209,29 +213,29 @@ export function WorklogTimerControl(props: Props) {
   );
 }
 
-/** Shown after Stop: date, start, end and total, plus the required note; or Delete timer for one started by mistake. */
+/** Shown after Stop: date, start, end and total, plus the required note and how the task is left (On Hold or
+ * Completed, as in Workplace). It closes only by saving the time log or by Discard (the timer runs on); there's no
+ * putting it off or deleting the timer. */
 function SaveTimerModal(props: {
   open: boolean;
   workspaceSlug: string;
   timer: TWorklogTimer;
-  /** `resumed` is the running timer after Discard */
-  onClose: (
-    result: "saved" | "resumed" | "discarded" | "deleted" | "stale" | "cancelled",
-    resumed?: TWorklogTimer
-  ) => void;
+  /** `resumed` is the running timer after Discard; `issueStateId` the task's status after saving */
+  onClose: (result: "saved" | "resumed" | "discarded", resumed?: TWorklogTimer, issueStateId?: string) => void;
 }) {
   const { open, workspaceSlug, timer, onClose } = props;
   const [description, setDescription] = useState("");
+  const [closingStatus, setClosingStatus] = useState<TClosingStatus | null>(null);
   const [error, setError] = useState("");
+  const [statusError, setStatusError] = useState("");
   const [saving, setSaving] = useState(false);
   const [resuming, setResuming] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setError("");
-    setConfirmDelete(false);
+    setStatusError("");
+    setClosingStatus(null);
   }, [open]);
 
   const end = timer.stopped_at ?? timer.server_now;
@@ -245,20 +249,25 @@ function SaveTimerModal(props: {
 
   const save = async () => {
     if (saving) return;
-    if (!description.trim()) {
-      setError("Describe the work completed or the changes you made.");
-      return;
-    }
+    const missingNote = !description.trim();
+    if (missingNote) setError("Describe the work completed or the changes you made.");
+    if (!closingStatus) setStatusError("Pick a status: On Hold or Completed.");
+    if (missingNote || !closingStatus) return;
     setSaving(true);
     try {
-      await worklogService.saveTimer(workspaceSlug, description.trim());
+      const saved = await worklogService.saveTimer(workspaceSlug, description.trim(), closingStatus.key);
       setDescription("");
-      setToast({ type: "success", title: "Time logged", message: `${formatWorklogDuration(timer.duration)} saved.` });
-      onClose("saved");
+      setToast({
+        type: "success",
+        title: "Time logged",
+        message: `${formatWorklogDuration(timer.duration)} saved. The task is now ${closingStatus.label}.`,
+      });
+      onClose("saved", undefined, saved.issue_state_id);
     } catch (err) {
       const data = (err ?? {}) as Record<string, string>;
-      const message = data.description || data.error || "Something went wrong. Please try again.";
-      setError(message);
+      if (data.status) setStatusError(data.status);
+      const message = data.description || data.status || data.error || "Something went wrong. Please try again.";
+      if (!data.status) setError(message);
       setToast({ type: "error", title: "Time not logged", message });
     } finally {
       setSaving(false);
@@ -295,30 +304,9 @@ function SaveTimerModal(props: {
     }
   };
 
-  // Delete timer: removes only this timer and logs no time (the member's worklogs stay); asks once more first
-  const deleteTimer = async () => {
-    if (deleting) return;
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
-    setDeleting(true);
-    try {
-      await worklogService.deleteTimer(workspaceSlug, timer.id);
-      setDescription("");
-      setToast({ type: "success", title: "Timer deleted", message: "No time was logged." });
-      onClose("deleted");
-    } catch (err) {
-      const data = (err ?? {}) as { error?: string; timer?: TWorklogTimer | null };
-      setToast({ type: "error", title: "Timer not deleted", message: data.error ?? "Please try again." });
-      if (data.timer !== undefined) onClose("stale");
-    } finally {
-      setDeleting(false);
-    }
-  };
-
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose("cancelled")}>
+    // Escape and clicks outside don't close it: the time is saved, or Discard takes the Stop back
+    <Dialog open={open} onOpenChange={() => undefined}>
       <DialogContent size="md">
         <div className="px-5 pt-5">
           <DialogTitle>Save time log</DialogTitle>
@@ -363,11 +351,40 @@ function SaveTimerModal(props: {
                 {error && <span className="text-caption-md-regular text-danger-primary">{error}</span>}
               </div>
             </Field>
+            <Field name="status" invalid={!!statusError}>
+              <div className="flex flex-col gap-1.5">
+                <FieldLabel size="md" inset={false} required>
+                  Status
+                </FieldLabel>
+                <div className="rounded-md border-[0.5px] border-subtle">
+                  <Select<TClosingStatus>
+                    getValues={() => CLOSING_STATUSES}
+                    value={closingStatus}
+                    onChange={(key) => {
+                      setClosingStatus(CLOSING_STATUSES.find((option) => option.key === key) ?? null);
+                      setStatusError("");
+                    }}
+                    // names the picker for screen readers: "Status, On Hold"
+                    placeholder="Status"
+                    getOptionValue={(option) => option.key}
+                    getOptionLabel={(option) => option.label}
+                    showSearch={false}
+                    pinSelected={false}
+                  >
+                    <Select.Trigger<TClosingStatus> variant="select-md" className="w-full" aria-label="Status">
+                      <span className="truncate text-left">
+                        {closingStatus?.label ?? <span className="text-placeholder">Select a status</span>}
+                      </span>
+                    </Select.Trigger>
+                  </Select>
+                </div>
+                {statusError && <span className="text-caption-md-regular text-danger-primary">{statusError}</span>}
+              </div>
+            </Field>
             <button type="submit" className="hidden" tabIndex={-1} />
           </form>
         </DialogMain>
         <DialogActions>
-          {/* one row; on a narrow screen Later and Save move to a second row */}
           <div className="flex w-full flex-wrap items-center justify-end gap-3">
             <div className="mr-auto flex items-center gap-2">
               <Button
@@ -378,17 +395,8 @@ function SaveTimerModal(props: {
                 loading={resuming}
                 onClick={() => void discard()}
               />
-              <Button
-                stretch="auto"
-                variant={confirmDelete ? "danger" : "ghost"}
-                size="md"
-                label={confirmDelete ? "Click again to delete" : "Delete timer"}
-                loading={deleting}
-                onClick={() => void deleteTimer()}
-              />
             </div>
             <div className="flex items-center gap-3">
-              <Button stretch="auto" variant="secondary" size="md" label="Later" onClick={() => onClose("cancelled")} />
               <Button
                 stretch="auto"
                 variant="primary"

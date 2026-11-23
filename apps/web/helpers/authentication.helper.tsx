@@ -127,8 +127,9 @@ const errorCodeMessages: {
     message: () => `Email required. Please try again.`,
   },
   [EAuthenticationErrorCodes.SIGNUP_DISABLED]: {
-    title: `Sign up disabled`,
-    message: () => `Sign up disabled. Please contact your administrator.`,
+    title: `No account for this email`,
+    message: () =>
+      `New accounts need an invitation. Ask your admin to invite you, then open the invitation link from your email.`,
   },
   [EAuthenticationErrorCodes.MAGIC_LINK_LOGIN_DISABLED]: {
     title: `Magic link login disabled`,
@@ -372,8 +373,8 @@ const errorCodeMessages: {
     message: () => <div>Your account is deactivated</div>,
   },
   [EAuthenticationErrorCodes.RATE_LIMIT_EXCEEDED]: {
-    title: "",
-    message: () => `Rate limit exceeded. Please try again later.`,
+    title: `Too many attempts`,
+    message: () => `Too many sign-in attempts. Please wait 15 minutes and try again.`,
   },
 };
 

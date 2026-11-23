@@ -31,6 +31,7 @@ export const WORKLOG_REPORT_TYPES: { key: TWorklogReportType; label: string }[] 
   { key: "monthly", label: "Monthly" },
   { key: "quarterly", label: "Quarterly" },
   { key: "yearly", label: "Yearly" },
+  { key: "attendance", label: "Attendance" },
 ];
 
 export const isWorklogReportType = (value: string | undefined): value is TWorklogReportType =>
@@ -122,6 +123,22 @@ export const useWorklogReport = (workspaceSlug: string, filters: TWorklogReportF
     { revalidateOnFocus: false, keepPreviousData: true }
   );
   return { summary: data, error, isLoading };
+};
+
+/** Attendance starts with this month so far. */
+export const getDefaultAttendanceFilters = (today = new Date()): TWorklogReportFilters => ({
+  ...EMPTY_WORKLOG_REPORT_FILTERS,
+  from_date: toReportDate(new Date(today.getFullYear(), today.getMonth(), 1)),
+  to_date: toReportDate(today),
+});
+
+export const useAttendanceReport = (workspaceSlug: string, filters: TWorklogReportFilters) => {
+  const { data, error, isLoading } = useSWR(
+    workspaceSlug ? ["WORKLOG_REPORT_ATTENDANCE", workspaceSlug, JSON.stringify(filters)] : null,
+    () => worklogReportService.attendance(workspaceSlug, filters),
+    { revalidateOnFocus: false, keepPreviousData: true }
+  );
+  return { attendance: data, error: error as Record<string, string> | undefined, isLoading };
 };
 
 export const useWorklogMonthlyReport = (workspaceSlug: string, filters: TWorklogReportFilters) => {

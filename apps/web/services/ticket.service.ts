@@ -77,6 +77,20 @@ export class TicketService extends APIService {
       });
   }
 
+  /** The Manager approves (the assignee gets it) or rejects (it goes no further) a ticket waiting for them. */
+  async decideApproval(
+    workspaceSlug: string,
+    ticketId: string,
+    decision: "approve" | "reject",
+    note = ""
+  ): Promise<TTicket> {
+    return this.post(`${this.base(workspaceSlug)}${ticketId}/approval/`, { decision, note })
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
   async update(workspaceSlug: string, ticketId: string, data: TTicketPayload): Promise<TTicket & { visible?: false }> {
     return this.patch(`${this.base(workspaceSlug)}${ticketId}/`, data)
       .then((response) => response?.data)

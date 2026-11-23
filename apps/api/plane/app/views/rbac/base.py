@@ -462,10 +462,14 @@ class RoleDetailEndpoint(BaseAPIView):
 
 
 class AccessMembersEndpoint(BaseAPIView):
-    """Everyone in the workspace with their roles and teams (People tab)."""
+    """Everyone in the workspace with their roles and teams (People tab). ?include_disabled=1 adds the disabled
+    people (Access control › People lists them to enable or delete); `can_remove` says whether the viewer may
+    disable, enable or delete the person (plane.utils.member_removal)."""
 
     @allow_permission(WORKSPACE_ROLES, level="WORKSPACE")
     def get(self, request, slug):
+        from plane.utils.member_removal import protected_member_ids, removable_member_ids
+
         workspace = Workspace.objects.get(slug=slug)
         if not can_manage_access(request.user, workspace):
             return forbidden()
@@ -476,9 +480,20 @@ class AccessMembersEndpoint(BaseAPIView):
             "member_id", "team_id", "is_lead"
         ):
             teams.setdefault(member_id, []).append({"team_id": str(team_id), "is_lead": is_lead})
-        rows = WorkspaceMember.objects.filter(workspace=workspace, is_active=True, member__is_bot=False).values_list(
-            "member_id", "role"
-        )
+        rows = WorkspaceMember.objects.filter(workspace=workspace, member__is_bot=False)
+        if request.GET.get("include_disabled") != "1":
+            rows = rows.filter(is_active=True)
+        reached = removable_member_ids(request.user, workspace)
+        protected = protected_member_ids()
+        viewer_is_admin = is_workspace_admin(request.user, workspace)
+
+        def can_remove(member_id, role):
+            if member_id == request.user.id or member_id in protected:
+                return False
+            if role == ROLE.ADMIN.value and not viewer_is_admin:
+                return False
+            return reached is None or member_id in reached
+
         return Response(
             [
                 {
@@ -486,8 +501,12 @@ class AccessMembersEndpoint(BaseAPIView):
                     "workspace_role": role,
                     "role_ids": roles.get(member_id, []),
                     "teams": teams.get(member_id, []),
+                    "is_active": bool(is_active and user_active),
+                    "can_remove": can_remove(member_id, role),
                 }
-                for member_id, role in rows
+                for member_id, role, is_active, user_active in rows.values_list(
+                    "member_id", "role", "is_active", "member__is_active"
+                )
             ],
             status=status.HTTP_200_OK,
         )

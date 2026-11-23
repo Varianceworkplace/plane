@@ -9,7 +9,12 @@ import { action, computed, makeObservable, observable, runInAction } from "mobx"
 import { computedFn } from "mobx-utils";
 // types
 import type { EUserPermissions } from "@plane/constants";
-import type { IWorkspaceBulkInviteFormData, IWorkspaceMember, IWorkspaceMemberInvitation } from "@plane/types";
+import type {
+  IWorkspaceBulkInviteFormData,
+  IWorkspaceMember,
+  IWorkspaceMemberInvitation,
+  TWorkspaceInviteResult,
+} from "@plane/types";
 // services
 import { WorkspaceService } from "@/services/workspace.service";
 // types
@@ -52,7 +57,10 @@ export interface IWorkspaceMemberStore {
   updateMember: (workspaceSlug: string, userId: string, data: { role: EUserPermissions }) => Promise<void>;
   removeMemberFromWorkspace: (workspaceSlug: string, userId: string) => Promise<void>;
   // invite actions
-  inviteMembersToWorkspace: (workspaceSlug: string, data: IWorkspaceBulkInviteFormData) => Promise<void>;
+  inviteMembersToWorkspace: (
+    workspaceSlug: string,
+    data: IWorkspaceBulkInviteFormData
+  ) => Promise<TWorkspaceInviteResult>;
   updateMemberInvitation: (
     workspaceSlug: string,
     invitationId: string,

@@ -11,6 +11,7 @@ import jwt
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.db import transaction
 from django.utils import timezone
 
 # Third party modules
@@ -20,6 +21,7 @@ from rest_framework.response import Response
 
 # Module imports
 from plane.app.permissions import WorkSpaceAdminPermission
+from plane.app.permissions.workspace import Admin, Guest, Member
 from plane.app.serializers import (
     WorkSpaceMemberInviteSerializer,
     WorkSpaceMemberInvitePublicSerializer,
@@ -30,7 +32,26 @@ from plane.bgtasks.workspace_invitation_task import workspace_invitation
 from plane.db.models import User, Workspace, WorkspaceMember, WorkspaceMemberInvite
 from plane.utils.cache import invalidate_cache, invalidate_cache_directly
 from plane.utils.host import base_host
+from plane.utils.workspace_invites import (
+    email_is_configured,
+    invite_is_expired,
+    open_invites,
+    record_invite_email,
+)
 from .. import BaseViewSet
+
+
+def send_invitation_emails(request, workspace, invitations):
+    """Queues each invitation's email. Without email set up nothing is queued (each invitation notes that), and
+    False is returned so the caller can say so instead of claiming they were sent."""
+    if not email_is_configured():
+        for invite in invitations:
+            record_invite_email(invite.id, "not_configured")
+        return False
+    current_site = base_host(request=request, is_app=True)
+    for invite in invitations:
+        workspace_invitation.delay(invite.email, workspace.id, invite.token, current_site, request.user.email)
+    return True
 
 
 class WorkspaceInvitationsViewset(BaseViewSet):
@@ -68,10 +89,27 @@ class WorkspaceInvitationsViewset(BaseViewSet):
         # Get the workspace object
         workspace = Workspace.objects.get(slug=slug)
 
+        # Every address must be valid before anything is saved
+        wanted = []
+        for email in emails:
+            address = (email.get("email") or "").strip().lower()
+            try:
+                validate_email(address)
+            except ValidationError:
+                return Response(
+                    {
+                        "error": f"Invalid email - {email} provided a valid email address is required to send the invite"  # noqa: E501
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            wanted.append((address, int(email.get("role", 5))))
+        # the same address twice in one go counts once (the last role given)
+        wanted = list({address: (address, role) for address, role in wanted}.values())
+
         # Check if user is already a member of workspace
         workspace_members = WorkspaceMember.objects.filter(
             workspace_id=workspace.id,
-            member__email__in=[email.get("email") for email in emails],
+            member__email__in=[address for address, _ in wanted],
             is_active=True,
         ).select_related("member", "member__avatar_asset")
 
@@ -84,48 +122,116 @@ class WorkspaceInvitationsViewset(BaseViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        workspace_invitations = []
-        for email in emails:
-            try:
-                validate_email(email.get("email"))
-                workspace_invitations.append(
-                    WorkspaceMemberInvite(
-                        email=email.get("email").strip().lower(),
+        # Someone already invited is invited again: their invitation (same link) is sent again with a fresh
+        # validity, instead of the new one being dropped. Never past the requester's own role, as for a role change.
+        existing = {
+            invite.email: invite
+            for invite in WorkspaceMemberInvite.objects.filter(
+                workspace_id=workspace.id, email__in=[address for address, _ in wanted]
+            )
+        }
+        for address, _role in wanted:
+            if address in existing and existing[address].role > requesting_user.role:
+                return Response(
+                    {"error": f"{address} already has an invitation with a higher role than yours"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        invitations, resent = [], []
+        with transaction.atomic():
+            for address, role in wanted:
+                invite = existing.get(address)
+                if invite:
+                    invite.role = role
+                    invite.accepted = False
+                    invite.responded_at = None
+                    invite.save()
+                    resent.append(invite)
+                else:
+                    invite = WorkspaceMemberInvite.objects.create(
+                        email=address,
                         workspace_id=workspace.id,
                         token=jwt.encode(
-                            {"email": email, "timestamp": datetime.now().timestamp()},
+                            {"email": {"email": address, "role": role}, "timestamp": datetime.now().timestamp()},
                             settings.SECRET_KEY,
                             algorithm="HS256",
                         ),
-                        role=email.get("role", 5),
+                        role=role,
                         created_by=request.user,
                     )
-                )
-            except ValidationError:
-                return Response(
-                    {
-                        "error": f"Invalid email - {email} provided a valid email address is required to send the invite"  # noqa: E501
-                    },
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        # Create workspace member invite
-        workspace_invitations = WorkspaceMemberInvite.objects.bulk_create(
-            workspace_invitations, batch_size=10, ignore_conflicts=True
+                invitations.append(invite)
+
+        email_ready = send_invitation_emails(request, workspace, invitations)
+        total = len(invitations)
+        if email_ready:
+            message = f"Sending {total} invitation{'' if total == 1 else 's'} by email"
+            if resent:
+                message += f"; {len(resent)} of them {'was' if len(resent) == 1 else 'were'} already invited, so it was sent again"  # noqa: E501
+            message += "."
+        else:
+            message = (
+                "Invitations saved, but email isn't set up, so nobody was emailed. "
+                "Copy each invitation link from the pending list and share it."
+            )
+        return Response(
+            {
+                "message": message,
+                "email_configured": email_ready,
+                "invited": [invite.email for invite in invitations],
+                "resent": [invite.email for invite in resent],
+            },
+            status=status.HTTP_200_OK,
         )
 
-        current_site = base_host(request=request, is_app=True)
-
-        # Send invitations
-        for invitation in workspace_invitations:
-            workspace_invitation.delay(
-                invitation.email,
-                workspace.id,
-                invitation.token,
-                current_site,
-                request.user.email,
+    def resend(self, request, slug, pk):
+        """Sends a pending (or declined) invitation again, same link, and keeps it open for another stretch."""
+        invite = WorkspaceMemberInvite.objects.filter(pk=pk, workspace__slug=slug).select_related("workspace").first()
+        if not invite:
+            return Response({"error": "Invitation not found"}, status=status.HTTP_404_NOT_FOUND)
+        requesting_user = WorkspaceMember.objects.get(workspace__slug=slug, member=request.user, is_active=True)
+        if invite.role > requesting_user.role:
+            return Response(
+                {"error": "You cannot resend an invitation with a higher role than your own"},
+                status=status.HTTP_403_FORBIDDEN,
             )
+        invite.accepted = False
+        invite.responded_at = None
+        invite.save()
+        email_ready = send_invitation_emails(request, invite.workspace, [invite])
+        return Response(
+            {
+                **self.get_serializer(invite).data,
+                "email_configured": email_ready,
+                "message": f"Invitation sent again to {invite.email}."
+                if email_ready
+                else "Email isn't set up, so it wasn't emailed. Copy the invitation link and share it.",
+            },
+            status=status.HTTP_200_OK,
+        )
 
-        return Response({"message": "Emails sent successfully"}, status=status.HTTP_200_OK)
+    def partial_update(self, request, slug, pk):
+        """Changes a pending invite's role, never to (or from) a role above the requester's own: otherwise a Member
+        could invite someone as Member and then make them an Admin. Nothing else on an invite changes here."""
+        invite = WorkspaceMemberInvite.objects.filter(pk=pk, workspace__slug=slug).first()
+        if not invite:
+            return Response({"error": "Invitation not found"}, status=status.HTTP_404_NOT_FOUND)
+        if invite.responded_at:
+            return Response({"error": "This invitation has already been answered"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            role = int(request.data.get("role"))
+        except (TypeError, ValueError):
+            role = None
+        if role not in (Admin, Member, Guest):
+            return Response({"error": "Pick a valid role"}, status=status.HTTP_400_BAD_REQUEST)
+        requesting_user = WorkspaceMember.objects.get(workspace__slug=slug, member=request.user, is_active=True)
+        if max(role, invite.role) > requesting_user.role:
+            return Response(
+                {"error": "You cannot give an invitation a higher role than your own"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        invite.role = role
+        invite.save(update_fields=["role", "updated_at"])
+        return Response(self.get_serializer(invite).data, status=status.HTTP_200_OK)
 
     def destroy(self, request, slug, pk):
         workspace_member_invite = WorkspaceMemberInvite.objects.get(pk=pk, workspace__slug=slug)
@@ -171,6 +277,12 @@ class WorkspaceJoinEndpoint(BaseAPIView):
             return Response(
                 {"error": "You do not have permission to accept this invitation"},
                 status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if workspace_invite.responded_at is None and invite_is_expired(workspace_invite):
+            return Response(
+                {"error": "This invitation has expired. Ask your admin to send it again."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # If already responded then return error
@@ -238,17 +350,31 @@ class UserWorkspaceInvitationsViewSet(BaseViewSet):
     model = WorkspaceMemberInvite
 
     def get_queryset(self):
+        # only the ones that can still be joined (not answered, not expired)
         return self.filter_queryset(
-            super().get_queryset().filter(email=self.request.user.email).select_related("workspace")
+            open_invites(super().get_queryset().filter(email=self.request.user.email)).select_related("workspace")
         )
 
     @invalidate_cache(path="/api/workspaces/", user=False)
     @invalidate_cache(path="/api/users/me/workspaces/", multiple=True)
     def create(self, request):
+        # Joining by email match alone needs proof that the address is theirs (an emailed code, a provider that
+        # vouches for it, or a password reset by email); otherwise whoever signs up first with an invited address,
+        # say a mistyped one, would join with that role. Without that proof, the invitation link (its token) works.
+        if not request.user.is_email_verified:
+            return Response(
+                {"error": "To join, open the invitation link we emailed you."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         invitations = request.data.get("invitations", [])
-        workspace_invitations = WorkspaceMemberInvite.objects.filter(
-            pk__in=invitations, email=request.user.email
+        workspace_invitations = open_invites(
+            WorkspaceMemberInvite.objects.filter(pk__in=invitations, email=request.user.email)
         ).order_by("-created_at")
+        if invitations and not workspace_invitations.exists():
+            return Response(
+                {"error": "These invitations have expired or were already answered. Ask your admin to resend them."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         # If the user is already a member of workspace and was deactivated then activate the user
         for invitation in workspace_invitations:

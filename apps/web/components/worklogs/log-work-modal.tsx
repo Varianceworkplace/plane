@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 // plane imports
 import { Button } from "@makeplane/propel/components/button";
 import { Dialog, DialogActions, DialogContent, DialogMain, DialogTitle } from "@makeplane/propel/components/dialog";
@@ -62,6 +62,8 @@ export function LogWorkModal(props: Props) {
   const [description, setDescription] = useState("");
   const [errors, setErrors] = useState<TErrors>({});
   const [saving, setSaving] = useState(false);
+  // an entry's fields as opened: what isn't changed is kept exactly (a timer's seconds, its exact start and end)
+  const opened = useRef({ startTime: "", endTime: "", startDay: 0, endDay: 0, hours: "", minutes: "" });
 
   useEffect(() => {
     if (!open) return;
@@ -73,11 +75,32 @@ export function LogWorkModal(props: Props) {
     setStartTime(started ? toTimeValue(started) : "");
     setEndDate(ended ? startOfDay(ended) : fallbackDay);
     setEndTime(ended ? toTimeValue(ended) : "");
-    setHours(worklog ? String(Math.floor(worklog.duration / 60) || "") : "");
-    setMinutes(worklog ? String(worklog.duration % 60 || "") : "");
+    // whole hours and minutes in the fields; a timer's extra seconds stay unless the time is changed
+    const openedHours = worklog ? String(Math.floor(worklog.duration / 60) || "") : "";
+    const openedMinutes = worklog ? String(Math.floor(worklog.duration % 60) || "") : "";
+    setHours(openedHours);
+    setMinutes(openedMinutes);
     setDescription(worklog?.description ?? "");
     setErrors({});
+    opened.current = {
+      startTime: started ? toTimeValue(started) : "",
+      endTime: ended ? toTimeValue(ended) : "",
+      startDay: (started ? startOfDay(started) : fallbackDay).getTime(),
+      endDay: (ended ? startOfDay(ended) : fallbackDay).getTime(),
+      hours: openedHours,
+      minutes: openedMinutes,
+    };
   }, [open, worklog]);
+
+  // editing: only what was changed is sent, so the rest stays exactly as it was
+  const timesChanged =
+    !worklog ||
+    startTime !== opened.current.startTime ||
+    endTime !== opened.current.endTime ||
+    (startDate?.getTime() ?? 0) !== opened.current.startDay ||
+    (endDate?.getTime() ?? 0) !== opened.current.endDay;
+  const durationChanged = !worklog || hours !== opened.current.hours || minutes !== opened.current.minutes;
+  const hasSeconds = !!worklog && Math.round(worklog.duration * 60) % 60 !== 0;
 
   const start = combine(startDate, startTime);
   const end = combine(endDate, endTime);
@@ -113,18 +136,21 @@ export function LogWorkModal(props: Props) {
     const next: TErrors = {};
     if (!start) next.started_at = "Pick the date and time you started.";
     if (!end) next.ended_at = "Pick the date and time you finished.";
-    if (start && end && end <= start) next.ended_at = "The end must be after the start.";
-    else if (end && end.getTime() > Date.now() + CLOCK_SKEW_MS)
+    // the stored start and end (to the second) are checked by the server; only new ones are checked here
+    if (timesChanged && start && end && end <= start) next.ended_at = "The end must be after the start.";
+    else if (timesChanged && end && end.getTime() > Date.now() + CLOCK_SKEW_MS)
       next.ended_at = "You can't log time that hasn't happened yet.";
 
     const h = toNumber(hours);
     const m = toNumber(minutes);
-    if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || m < 0)
+    if (!durationChanged) {
+      // unchanged: the entry keeps its exact time (seconds included)
+    } else if (!Number.isInteger(h) || !Number.isInteger(m) || h < 0 || m < 0)
       next.duration = "Enter whole numbers for hours and minutes.";
     else if (m > 59) next.duration = "Minutes must be between 0 and 59.";
     else if (h > 999) next.duration = "Hours can't be more than 999.";
     else if (h * 60 + m < 1) next.duration = "Enter the time you spent.";
-    else if (span !== null && h * 60 + m > span)
+    else if (timesChanged && span !== null && h * 60 + m > span)
       next.duration = `The time can't be more than the ${formatWorklogDuration(span)} between start and end.`;
 
     if (!description.trim()) next.description = "Add a note about the work you did.";
@@ -145,8 +171,14 @@ export function LogWorkModal(props: Props) {
         started_at: valid.start.toISOString(),
         ended_at: valid.end.toISOString(),
       };
-      if (worklog) await worklogService.update(workspaceSlug, projectId, issueId, worklog.id, payload);
-      else await worklogService.create(workspaceSlug, projectId, issueId, payload);
+      if (worklog) {
+        // only what changed, so a timer entry keeps its exact seconds and its exact start and end
+        await worklogService.update(workspaceSlug, projectId, issueId, worklog.id, {
+          description: payload.description,
+          ...(durationChanged ? { duration: payload.duration } : {}),
+          ...(timesChanged ? { started_at: payload.started_at, ended_at: payload.ended_at } : {}),
+        });
+      } else await worklogService.create(workspaceSlug, projectId, issueId, payload);
       setToast({ type: "success", title: isEdit ? "Worklog updated" : "Time logged", message: "" });
       onClose(true);
     } catch (err) {
@@ -280,6 +312,10 @@ export function LogWorkModal(props: Props) {
               </div>
               {errors.duration ? (
                 <span className="text-caption-md-regular text-danger-primary">{errors.duration}</span>
+              ) : hasSeconds && !durationChanged && worklog ? (
+                <span className="text-caption-md-regular text-tertiary">
+                  {`Logged by the timer: ${formatWorklogDuration(worklog.duration)}. It stays exact unless you change the hours or minutes.`}
+                </span>
               ) : (
                 <span className="text-caption-md-regular text-tertiary">
                   {span !== null

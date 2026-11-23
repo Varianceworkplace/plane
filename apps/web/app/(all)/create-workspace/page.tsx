@@ -4,13 +4,13 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
 // plane imports
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@makeplane/propel/components/button";
-import type { IWorkspace } from "@plane/types";
+import type { IWorkspace, IWorkspaceMemberInvitation } from "@plane/types";
 // assets
 import WorkspaceCreationDisabled from "@/app/assets/workspace/workspace-creation-disabled.png?url";
 // components
@@ -22,6 +22,10 @@ import { useInstance } from "@/hooks/store/use-instance";
 import { useAppRouter } from "@/hooks/use-app-router";
 // wrappers
 import { AuthenticationWrapper } from "@/lib/wrappers/authentication-wrapper";
+// services
+import { WorkspaceService } from "@/services/workspace.service";
+
+const workspaceService = new WorkspaceService();
 
 const CreateWorkspacePage = observer(function CreateWorkspacePage() {
   const { t } = useTranslation();
@@ -37,8 +41,28 @@ const CreateWorkspacePage = observer(function CreateWorkspacePage() {
     slug: "",
     organization_size: "",
   });
+  const [openInvitations, setOpenInvitations] = useState<IWorkspaceMemberInvitation[]>([]);
   // derived values
   const isWorkspaceCreationDisabled = config?.is_workspace_creation_disabled ?? false;
+
+  // Someone with no workspace but a waiting invitation lands here after sign-in: when workspaces can't be
+  // created, send them to their invitations; otherwise point them there.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let cancelled = false;
+    workspaceService
+      .userWorkspaceInvitations()
+      .then((invitations) => {
+        if (cancelled) return undefined;
+        if (invitations.length > 0 && isWorkspaceCreationDisabled) router.replace("/invitations");
+        else setOpenInvitations(invitations);
+        return undefined;
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id, isWorkspaceCreationDisabled, router]);
   const requestAccessLabel = t("workspace_creation.errors.creation_disabled.request_button");
 
   // methods
@@ -108,6 +132,21 @@ const CreateWorkspacePage = observer(function CreateWorkspacePage() {
             </div>
           ) : (
             <div className="w-full space-y-7 sm:space-y-10">
+              {openInvitations.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border-[0.5px] border-subtle bg-layer-1 px-4 py-3 sm:w-3/4 md:w-2/5">
+                  <span className="text-body-xs-regular text-secondary">
+                    {`You have an invitation to ${openInvitations[0].workspace.name}${openInvitations.length > 1 ? ` and ${openInvitations.length - 1} more` : ""}.`}
+                  </span>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    stretch="auto"
+                    nativeButton={false}
+                    render={<Link href="/invitations" />}
+                    label="See invitations"
+                  />
+                </div>
+              )}
               <h4 className="text-20 font-semibold">{t("workspace_creation.heading")}</h4>
               <div className="sm:w-3/4 md:w-2/5">
                 <CreateWorkspaceForm

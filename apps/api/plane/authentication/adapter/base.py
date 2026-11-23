@@ -22,14 +22,26 @@ from zxcvbn import zxcvbn
 from plane.bgtasks.user_activation_email_task import user_activation_email
 
 # Module imports
-from plane.db.models import FileAsset, Profile, User, WorkspaceMemberInvite
+from plane.db.models import FileAsset, Profile, Session, User
 from plane.license.utils.instance_value import get_configuration_value
 from plane.settings.storage import S3Storage
 from plane.utils.exception_logger import log_exception
 from plane.utils.host import base_host
 from plane.utils.ip_address import get_client_ip
+from plane.authentication.utils.account_access import signup_allowed
 
 from .error import AUTHENTICATION_ERROR_CODES, AuthenticationException
+
+
+def confirm_email_ownership(user, drop_password=False):
+    """The person has just proved they own the account's email. Marks it verified and ends every open session
+    (and, with drop_password, a password set before that proof) so nobody who used the account without the
+    inbox stays in. The caller saves the user."""
+    user.is_email_verified = True
+    if drop_password and not user.is_password_autoset:
+        user.set_password(uuid.uuid4().hex)
+        user.is_password_autoset = True
+    Session.objects.filter(user_id=str(user.pk)).delete()
 
 
 class Adapter:
@@ -102,13 +114,9 @@ class Adapter:
     def __check_signup(self, email):
         """Check if sign up is enabled or not and raise exception if not enabled"""
 
-        # Get configuration value
-        (ENABLE_SIGNUP,) = get_configuration_value([
-            {"key": "ENABLE_SIGNUP", "default": os.environ.get("ENABLE_SIGNUP", "1")}
-        ])
-
-        # Check if sign up is disabled and invite is present or not
-        if ENABLE_SIGNUP == "0" and not WorkspaceMemberInvite.objects.filter(email=email).exists():
+        # Sign-up turned off: only an open invitation (not expired, not answered) lets this address in;
+        # the email check and the code request apply the same rule (plane.authentication.utils.account_access).
+        if not signup_allowed(email):
             self.logger.warning("Sign up is disabled and invite is not present")
             # Raise exception
             raise AuthenticationException(
@@ -388,6 +396,12 @@ class Adapter:
 
             # Create profile
             Profile.objects.create(user=user)
+
+        # An emailed code (or a provider that vouches for the address) is the first proof this account's owner
+        # holds the email: anything set up without that proof goes, so whoever created the account with a
+        # password for someone else's address can't keep using it alongside them.
+        elif self.user_data.get("user", {}).get("is_password_autoset") and not user.is_email_verified:
+            confirm_email_ownership(user, drop_password=True)
 
         # Check if IDP sync is enabled and user is not signing up
         if self.check_sync_enabled() and not is_signup:

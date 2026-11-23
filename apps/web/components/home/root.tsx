@@ -16,6 +16,7 @@ import { useUserProfile, useUser } from "@/hooks/store/user";
 import { TourRoot } from "@/components/onboarding/tour/root";
 // local imports
 import { DashboardWidgets } from "./home-dashboard-widgets";
+import { NextHolidayCard } from "./next-holiday";
 import { UserGreetingsView } from "./user-greetings";
 import { HomePeekOverviewsRoot } from "../issues/peek-overview/peek-overviews";
 
@@ -57,6 +58,7 @@ export const WorkspaceHomeView = observer(function WorkspaceHomeView() {
         <ContentWrapper className="mx-auto scrollbar-hide gap-6 bg-surface-1 px-page-x">
           <div className="mx-auto w-full max-w-[800px]">
             {currentUser && <UserGreetingsView user={currentUser} />}
+            {workspaceSlug && <NextHolidayCard workspaceSlug={workspaceSlug.toString()} />}
             <DashboardWidgets />
           </div>
         </ContentWrapper>

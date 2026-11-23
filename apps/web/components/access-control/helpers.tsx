@@ -74,6 +74,8 @@ export const accessKeys = {
   // the teams the Assigned to dropdowns offer
   teamOptions: (slug: string) => `ACCESS_TEAM_OPTIONS_${slug}`,
   members: (slug: string) => `ACCESS_MEMBERS_${slug}`,
+  // the People tab's list, disabled people included
+  people: (slug: string) => `ACCESS_PEOPLE_${slug}`,
   project: (projectId: string) => `PROJECT_ACCESS_${projectId}`,
   preview: (slug: string) => `ACCESS_PREVIEW_${slug}`,
   joinRequests: (slug: string) => `ACCESS_JOIN_REQUESTS_${slug}`,
@@ -105,9 +107,10 @@ export const useTeams = (workspaceSlug: string, enabled = true) => {
   return { teams: data, mutate: refresh };
 };
 
-export const useAccessMembers = (workspaceSlug: string, enabled = true) => {
-  const { data, mutate } = useSWR(enabled && workspaceSlug ? accessKeys.members(workspaceSlug) : null, () =>
-    accessControlService.members(workspaceSlug)
+export const useAccessMembers = (workspaceSlug: string, enabled = true, includeDisabled = false) => {
+  const key = includeDisabled ? accessKeys.people(workspaceSlug) : accessKeys.members(workspaceSlug);
+  const { data, mutate } = useSWR(enabled && workspaceSlug ? key : null, () =>
+    accessControlService.members(workspaceSlug, includeDisabled)
   );
   return { members: data, mutate };
 };

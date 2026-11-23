@@ -23,6 +23,7 @@ from plane.authentication.adapter.error import (
     AUTHENTICATION_ERROR_CODES,
 )
 from plane.authentication.rate_limit import AuthenticationThrottle
+from plane.authentication.utils.account_access import is_deactivated, signup_allowed
 from plane.license.utils.instance_value import get_configuration_value
 
 
@@ -78,6 +79,21 @@ class EmailCheckEndpoint(APIView):
             return Response(exc.get_error_dict(), status=status.HTTP_400_BAD_REQUEST)
         # Check if a user already exists with the given email
         existing_user = User.objects.filter(email=email).first()
+
+        # Say straight away when nothing can follow (rather than after a password form or an emailed code):
+        # a disabled account, or a new address while sign-up is off and it has no open invitation.
+        if is_deactivated(existing_user):
+            exc = AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["USER_ACCOUNT_DEACTIVATED"],
+                error_message="USER_ACCOUNT_DEACTIVATED",
+            )
+            return Response(exc.get_error_dict(), status=status.HTTP_400_BAD_REQUEST)
+        if not existing_user and not signup_allowed(email):
+            exc = AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["SIGNUP_DISABLED"],
+                error_message="SIGNUP_DISABLED",
+            )
+            return Response(exc.get_error_dict(), status=status.HTTP_400_BAD_REQUEST)
 
         # If existing user
         if existing_user:

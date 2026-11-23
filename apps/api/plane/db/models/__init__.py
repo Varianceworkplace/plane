@@ -88,8 +88,17 @@ from .label import Label
 from .device import Device, DeviceSession
 
 from .sticky import Sticky
-from .ticket import Ticket, TicketCategory, TicketToolCategory, TicketTrialTested, TICKET_STATUSES, TICKET_PRIORITIES
+from .ticket import (
+    TICKET_PRIORITIES,
+    TICKET_STATUSES,
+    Ticket,
+    TicketApproval,
+    TicketCategory,
+    TicketToolCategory,
+    TicketTrialTested,
+)
 from .worklog import IssueTimeEstimate, IssueWorkLog, IssueWorkLogTimer, MAX_WORKLOG_DURATION
+from .holiday import Holiday, HolidayKind
 from .task_detail import IssueTaskDetail, TASK_DETAIL_CHOICES, PROGRESS_VALUES
 from .project_detail import ProjectDetail, PROJECT_DETAIL_CHOICES
 from .milestone import Milestone, MilestoneWorkItem, MILESTONE_STATUSES, MILESTONE_TYPES

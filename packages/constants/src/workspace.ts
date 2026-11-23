@@ -286,6 +286,14 @@ export const WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS: Record<string, IWorkspac
     access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
     highlight: (pathname: string, url: string) => pathname.includes(url),
   },
+  // the company's holiday list: everyone reads it, workspace admins and HR keep it (sidebar › Holidays)
+  holidays: {
+    key: "holidays",
+    labelTranslationKey: "sidebar.holidays",
+    href: `/holidays/`,
+    access: [EUserWorkspaceRoles.ADMIN, EUserWorkspaceRoles.MEMBER],
+    highlight: (pathname: string, url: string) => pathname.includes(url),
+  },
   "project-milestones": {
     key: "project_milestones",
     labelTranslationKey: "sidebar.project_milestones",
@@ -312,6 +320,7 @@ export const WORKSPACE_SIDEBAR_STATIC_PINNED_NAVIGATION_ITEMS_LINKS: IWorkspaceS
   WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS["tickets"],
   WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS["timesheet"],
   WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS["reports"],
+  WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS["holidays"],
 ];
 
 export const IS_FAVORITE_MENU_OPEN = "is_favorite_menu_open";

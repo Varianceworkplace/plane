@@ -7,6 +7,7 @@
 import {
   AnalyticsOutline,
   ArchiveOutline,
+  CalendarOutline,
   ClockOutline,
   CyclesOutline,
   DashboardsOutline,
@@ -50,6 +51,8 @@ export const getSidebarNavigationItemIcon = (key: string, className: string = ""
       return <DashboardsOutline className={cn("size-4 flex-shrink-0", className)} />;
     case "timesheet":
       return <ClockOutline className={cn("size-4 flex-shrink-0", className)} />;
+    case "holidays":
+      return <CalendarOutline className={cn("size-4 flex-shrink-0", className)} />;
     case "stickies":
       return <MultipleStickyOutline className={cn("size-4 flex-shrink-0", className)} />;
   }

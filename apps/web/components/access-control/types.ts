@@ -154,6 +154,39 @@ export type TAccessMember = {
   workspace_role: number;
   role_ids: string[];
   teams: { team_id: string; is_lead: boolean }[];
+  /** false once disabled (only listed with include_disabled) */
+  is_active?: boolean;
+  /** whether the viewer may disable, enable or delete them */
+  can_remove?: boolean;
+};
+
+/** What deleting a member would do (Access control › People › Delete permanently). */
+/** What starting a password reset gave back: a note that it was emailed, or the link itself. */
+export type TPasswordResetResult = { message?: string; link?: string; expires_in_minutes?: number };
+
+export type TMemberDeletionSummary = {
+  member_id: string;
+  /** why it can't happen yet, e.g. "Disable them first." */
+  blocker: string | null;
+  transfer: {
+    projects_created: number;
+    projects_led: number;
+    tasks_assigned: number;
+    tasks_created: number;
+    comments: number;
+    pages: number;
+  };
+  delete: {
+    time_entries: number;
+    time_minutes: number;
+    running_timer: boolean;
+    drafts: number;
+    project_memberships: number;
+    teams: number;
+    roles: number;
+  };
+  /** the active members who may take over their work */
+  transfer_to_ids: string[];
 };
 
 export type TCheckAccess = {

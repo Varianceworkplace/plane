@@ -20,7 +20,7 @@ import { useAppRouter } from "@/hooks/use-app-router";
 // services
 import { TicketService } from "@/services/ticket.service";
 // local
-import { TICKET_SECTIONS } from "../constants";
+import { TICKET_DECISION_STATUSES, TICKET_SECTIONS } from "../constants";
 import type { TTicketFieldDef } from "../constants";
 import {
   TicketChoiceSelect,
@@ -87,8 +87,16 @@ export const TicketForm = observer(function TicketForm(props: Props) {
   const { workspaceSlug, meta, ticket, duplicateFrom } = props;
   const router = useAppRouter();
   const isEdit = !!ticket;
-  const initial = useMemo(() => toValues(ticket ?? duplicateFrom, meta), [ticket, duplicateFrom, meta]);
+  const initial = useMemo(() => {
+    const start = toValues(ticket ?? duplicateFrom, meta);
+    // a copy is a new ticket that waits for its Manager again, so it doesn't start Approved / Rejected
+    if (!ticket && TICKET_DECISION_STATUSES.includes(duplicateFrom?.state?.name ?? "")) start.state_id = "";
+    return start;
+  }, [ticket, duplicateFrom, meta]);
   const [values, setValues] = useState<TValues>(initial);
+  // Waiting for the Manager (an edited ticket that's pending, a new one whose Manager is someone else): Approved /
+  // Reject are theirs to decide and the Manager stays as picked.
+  const waiting = isEdit ? ticket?.approval?.status === "pending" : values.manager_id !== meta.current_user.id;
   const [errors, setErrors] = useState<TErrors>({});
   const [saving, setSaving] = useState(false);
 
@@ -223,6 +231,7 @@ export const TicketForm = observer(function TicketForm(props: Props) {
             invalid={invalid}
             placeholder="Select an Option"
             className="w-full"
+            hide={waiting ? TICKET_DECISION_STATUSES : undefined}
           />
         );
       case "priority":
@@ -248,6 +257,15 @@ export const TicketForm = observer(function TicketForm(props: Props) {
           />
         );
       case "member":
+        if (isEdit && waiting && field.key === "manager_id")
+          return (
+            <div
+              className="flex h-8 items-center rounded-md border-[0.5px] border-subtle bg-layer-1 px-2.5"
+              title="The Manager can't be changed while the ticket waits for their approval."
+            >
+              <TicketMemberBadge user={ticket?.manager ?? null} />
+            </div>
+          );
         return (
           <TicketMemberSelect
             meta={meta}

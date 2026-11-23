@@ -10,7 +10,13 @@ import { useParams } from "next/navigation";
 // plane imports
 import { ROLE, EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-import { ChevronDownOutline, DeleteOutline, LinkOutline, MoreHorizontalOutline } from "@makeplane/propel/icons";
+import {
+  ChevronDownOutline,
+  DeleteOutline,
+  LinkOutline,
+  MoreHorizontalOutline,
+  RefreshOutline,
+} from "@makeplane/propel/icons";
 import { Icon } from "@makeplane/propel/components/icon";
 import { IconButton } from "@makeplane/propel/components/icon-button";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@makeplane/propel/components/menu";
@@ -18,12 +24,16 @@ import type { TContextMenuItem } from "@plane/blocks/context-menu";
 import { getRenderableItems, resolveItemVariant } from "@plane/blocks/context-menu";
 import { Select, SelectDropdownPlacementContext } from "@plane/blocks/select";
 import { setToast } from "@plane/blocks/toast";
-import { copyTextToClipboard } from "@plane/utils";
+import { copyTextToClipboard, renderFormattedDate } from "@plane/utils";
 // components
 import { ConfirmWorkspaceMemberRemove } from "@/components/workspace/confirm-workspace-member-remove";
 // hooks
 import { useMember } from "@/hooks/store/use-member";
 import { useUserPermissions } from "@/hooks/store/user";
+// services
+import { WorkspaceService } from "@/services/workspace.service";
+
+const workspaceService = new WorkspaceService();
 
 type TRoleOption = { key: number; label: string };
 
@@ -45,7 +55,12 @@ export const WorkspaceInvitationsListItem = observer(function WorkspaceInvitatio
   // store hooks
   const { allowPermissions, workspaceInfoBySlug } = useUserPermissions();
   const {
-    workspace: { updateMemberInvitation, deleteMemberInvitation, getWorkspaceInvitationDetails },
+    workspace: {
+      updateMemberInvitation,
+      deleteMemberInvitation,
+      getWorkspaceInvitationDetails,
+      fetchWorkspaceMemberInvitations,
+    },
   } = useMember();
   // derived values
   const invitationDetails = getWorkspaceInvitationDetails(invitationId);
@@ -91,6 +106,29 @@ export const WorkspaceInvitationsListItem = observer(function WorkspaceInvitatio
 
   if (!invitationDetails || !currentWorkspaceMemberInfo) return null;
 
+  // same link, emailed again, and open for another week
+  const handleResend = async () => {
+    try {
+      const result = await workspaceService.resendWorkspaceInvitation(workspaceSlug.toString(), invitationDetails.id);
+      await fetchWorkspaceMemberInvitations(workspaceSlug.toString());
+      setToast(
+        result.email_configured
+          ? { type: "success", title: "Invitation sent again", message: result.message }
+          : { type: "warning", title: "Invitation reopened, not emailed", message: result.message }
+      );
+    } catch (err: unknown) {
+      const error = err as { error?: string };
+      setToast({
+        type: "error",
+        title: "Not sent",
+        message: error?.error || "Something went wrong. Please try again.",
+      });
+    }
+  };
+
+  const emailFailed = invitationDetails.email_status?.status === "failed";
+  const notEmailed = invitationDetails.email_status?.status === "not_configured";
+
   const handleCopyText = async () => {
     try {
       const inviteLink = new URL(invitationDetails.invite_link, window.location.origin).href;
@@ -112,6 +150,13 @@ export const WorkspaceInvitationsListItem = observer(function WorkspaceInvitatio
       title: t("common.actions.copy_link"),
       icon: LinkOutline,
       shouldRender: !!invitationDetails.invite_link,
+    },
+    {
+      key: "resend",
+      action: () => void handleResend(),
+      title: "Resend invitation",
+      icon: RefreshOutline,
+      shouldRender: isAdmin,
     },
     {
       key: "remove",
@@ -146,9 +191,37 @@ export const WorkspaceInvitationsListItem = observer(function WorkspaceInvitatio
           </div>
         </div>
         <div className="flex items-center gap-2 text-11">
-          <div className="flex items-center justify-center rounded-sm bg-label-yellow-bg-strong/20 px-2.5 py-1 text-center text-caption-sm-medium text-label-yellow-text">
-            <p>{t("common.pending")}</p>
-          </div>
+          {(emailFailed || notEmailed) && (
+            <div
+              className="flex items-center justify-center rounded-sm bg-danger-subtle px-2.5 py-1 text-center text-caption-sm-medium text-danger-primary"
+              title={
+                emailFailed
+                  ? `The email couldn't be sent${invitationDetails.email_status?.error ? `: ${invitationDetails.email_status.error}` : ""}. Resend it, or copy the link and share it.`
+                  : "Email isn't set up, so it wasn't emailed. Copy the link and share it."
+              }
+            >
+              <p>{emailFailed ? "Email not sent" : "Not emailed"}</p>
+            </div>
+          )}
+          {invitationDetails.is_expired ? (
+            <div
+              className="flex items-center justify-center rounded-sm bg-layer-3 px-2.5 py-1 text-center text-caption-sm-medium text-tertiary"
+              title="Its link no longer works. Resend it to open it for another week."
+            >
+              <p>Expired</p>
+            </div>
+          ) : (
+            <div
+              className="flex items-center justify-center rounded-sm bg-label-yellow-bg-strong/20 px-2.5 py-1 text-center text-caption-sm-medium text-label-yellow-text"
+              title={
+                invitationDetails.expires_at
+                  ? `Open until ${renderFormattedDate(invitationDetails.expires_at) ?? ""}`
+                  : undefined
+              }
+            >
+              <p>{t("common.pending")}</p>
+            </div>
+          )}
           <SelectDropdownPlacementContext.Provider value={ROLE_DROPDOWN_PLACEMENT}>
             <Select<TRoleOption>
               value={roleOptions.find((role) => role.key === invitationDetails.role) ?? null}

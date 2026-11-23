@@ -26,12 +26,14 @@ from django.views import View
 from plane.bgtasks.forgot_password_task import forgot_password
 from plane.license.models import Instance
 from plane.db.models import User
+from plane.authentication.adapter.base import confirm_email_ownership
 from plane.license.utils.instance_value import get_configuration_value
 from plane.authentication.utils.host import base_host
 from plane.authentication.adapter.error import (
     AuthenticationException,
     AUTHENTICATION_ERROR_CODES,
 )
+from plane.authentication.utils.account_access import is_deactivated
 from plane.authentication.rate_limit import AuthenticationThrottle
 
 
@@ -79,6 +81,13 @@ class ForgotPasswordEndpoint(APIView):
 
         # Get the user
         user = User.objects.filter(email=email).first()
+        # a disabled account gets no reset link: it couldn't sign in with the new password anyway
+        if is_deactivated(user):
+            exc = AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["USER_ACCOUNT_DEACTIVATED"],
+                error_message="USER_ACCOUNT_DEACTIVATED",
+            )
+            return Response(exc.get_error_dict(), status=status.HTTP_400_BAD_REQUEST)
         if user:
             # Get the reset token for user
             uidb64, token = generate_password_token(user=user)
@@ -128,6 +137,18 @@ class ResetPasswordEndpoint(View):
                 )
                 return HttpResponseRedirect(url)
 
+            # an old link doesn't reopen a disabled account
+            if is_deactivated(user):
+                exc = AuthenticationException(
+                    error_code=AUTHENTICATION_ERROR_CODES["USER_ACCOUNT_DEACTIVATED"],
+                    error_message="USER_ACCOUNT_DEACTIVATED",
+                )
+                url = urljoin(
+                    base_host(request=request, is_app=True),
+                    "accounts/reset-password?" + urlencode(exc.get_error_dict()),
+                )
+                return HttpResponseRedirect(url)
+
             password = request.POST.get("password", False)
 
             if not password:
@@ -157,6 +178,8 @@ class ResetPasswordEndpoint(View):
             # set_password also hashes the password that the user will get
             user.set_password(password)
             user.is_password_autoset = False
+            # the reset link came to their inbox: the email is theirs, and old sessions end with the old password
+            confirm_email_ownership(user)
             user.save()
 
             url = urljoin(

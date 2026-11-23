@@ -94,6 +94,8 @@ export enum EAdminAuthErrorCodes {
   ADMIN_USER_ALREADY_EXIST = "5180",
   ADMIN_USER_DOES_NOT_EXIST = "5185",
   ADMIN_USER_DEACTIVATED = "5190",
+  // too many sign-in attempts (from this address, or wrong passwords for this account)
+  RATE_LIMIT_EXCEEDED = "5900",
 }
 
 export type TAdminAuthErrorInfo = {

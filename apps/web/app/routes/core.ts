@@ -131,6 +131,11 @@ export const coreRoutes: RouteConfigEntry[] = [
           route(":workspaceSlug/timesheet", "./(all)/[workspaceSlug]/(projects)/timesheet/page.tsx"),
         ]),
 
+        // Holidays (the company's holiday list: everyone reads it, admins and HR keep it)
+        layout("./(all)/[workspaceSlug]/(projects)/holidays/layout.tsx", [
+          route(":workspaceSlug/holidays", "./(all)/[workspaceSlug]/(projects)/holidays/page.tsx"),
+        ]),
+
         // Reports (worklog charts)
         layout("./(all)/[workspaceSlug]/(projects)/reports/layout.tsx", [
           route(
