@@ -8,7 +8,15 @@ import type { TStateGroups } from "@plane/types";
 // local imports
 import type { TWorklog, TWorklogUser } from "@/components/worklogs/types";
 
-export type TWorklogReportType = "project-wise" | "user-wise" | "daily" | "weekly" | "monthly" | "quarterly" | "yearly";
+export type TWorklogReportType =
+  | "project-wise"
+  | "user-wise"
+  | "daily"
+  | "weekly"
+  | "monthly"
+  | "quarterly"
+  | "yearly"
+  | "attendance";
 
 export type TWorklogReportFilters = {
   project: string[];
@@ -247,4 +255,74 @@ export type TWorklogAnalytics = {
 export type TWorklogReportOptions = {
   departments: { id: string; name: string }[];
   project_managers: (TWorklogUser & { team_ids: string[] })[];
+};
+
+/** Attendance: how one employee's day counts (see plane/app/views/worklog/attendance.py) */
+export type TAttendanceStatus =
+  | "present"
+  | "absent"
+  | "week_off"
+  | "week_off_worked"
+  | "holiday"
+  | "holiday_worked"
+  | "today"
+  | "upcoming"
+  | "not_joined"
+  | "inactive";
+
+export type TAttendanceCell = { status: TAttendanceStatus; minutes: number; entries: number };
+
+export type TAttendanceEmployee = TWorklogUser & {
+  email: string;
+  is_active: boolean;
+  joined_on: string;
+  /** keyed YYYY-MM-DD */
+  days: Record<string, TAttendanceCell>;
+  summary: {
+    working_days: number;
+    present: number;
+    absent: number;
+    week_off: number;
+    week_off_worked: number;
+    /** days on the company's holiday list (sidebar › Holidays), worked or not */
+    holidays: number;
+    holiday_worked: number;
+    total_minutes: number;
+    days_worked: number;
+    average_minutes: number;
+  };
+};
+
+export type TAttendanceDay = {
+  date: string;
+  /** 1 Monday … 7 Sunday */
+  weekday: number;
+  is_week_off: boolean;
+  /** a holiday for everyone (an optional holiday stays a working day) */
+  is_holiday: boolean;
+  /** the holiday on this day, optional ones too */
+  holiday: { name: string; kind: "holiday" | "optional" } | null;
+  is_upcoming: boolean;
+  total_minutes: number;
+  present: number;
+  absent: number;
+};
+
+export type TAttendanceReport = {
+  from_date: string;
+  to_date: string;
+  today: string;
+  /** the company's time zone the days are counted in */
+  timezone: string;
+  days: TAttendanceDay[];
+  employees: TAttendanceEmployee[];
+  totals: {
+    employees: number;
+    total_minutes: number;
+    present: number;
+    absent: number;
+    working_days: number;
+    holidays: number;
+  };
+  scope: TWorklogReportScope;
 };

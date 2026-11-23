@@ -8,6 +8,7 @@
 import { API_BASE_URL } from "@plane/constants";
 // types
 import type {
+  TAttendanceReport,
   TWorklogAnalytics,
   TWorklogAnalyticsPeriod,
   TWorklogMonthlyReport,
@@ -53,6 +54,20 @@ export class WorklogReportService extends APIService {
       .catch((error) => {
         throw error?.response?.data;
       });
+  }
+
+  /** Attendance: everyone's hours day by day, with Absent and Week Off (dates, users, departments, PMs). */
+  async attendance(workspaceSlug: string, filters: TWorklogReportFilters): Promise<TAttendanceReport> {
+    return this.get(`${this.base(workspaceSlug)}attendance/?${this.filterQuery(filters)}`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  /** The attendance grid as a file; the browser sends the session cookie. */
+  attendanceDownloadUrl(workspaceSlug: string, filters: TWorklogReportFilters, format: "csv" | "xlsx") {
+    return `${API_BASE_URL}${this.base(workspaceSlug)}attendance/download/?${this.filterQuery(filters, { type: format })}`;
   }
 
   async options(workspaceSlug: string): Promise<TWorklogReportOptions> {

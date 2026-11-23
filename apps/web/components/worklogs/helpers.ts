@@ -13,14 +13,18 @@ import { WorklogService } from "@/services/worklog.service";
 
 export const worklogService = new WorklogService();
 
-/** 90 -> "1h 30m", 60 -> "1h", 15 -> "15m" */
+/** Minutes, to the second: 90 -> "1h 30m", 60 -> "1h", 15 -> "15m", 0.1 -> "6s", 1.1 -> "1m 6s" (timers save
+ * exactly what they ran; seconds show only when there are any). */
 export const formatWorklogDuration = (minutes: number | null | undefined): string => {
-  const total = Math.max(0, Math.round(minutes ?? 0));
-  const hours = Math.floor(total / 60);
-  const mins = total % 60;
-  if (hours && mins) return `${hours}h ${mins}m`;
-  if (hours) return `${hours}h`;
-  return `${mins}m`;
+  const total = Math.max(0, Math.round((minutes ?? 0) * 60));
+  const hours = Math.floor(total / 3600);
+  const mins = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  const parts: string[] = [];
+  if (hours) parts.push(`${hours}h`);
+  if (mins || (hours && secs)) parts.push(`${mins}m`);
+  if (secs) parts.push(`${secs}s`);
+  return parts.join(" ") || "0m";
 };
 
 /**

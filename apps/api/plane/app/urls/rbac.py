@@ -20,6 +20,12 @@ from plane.app.views.rbac.base import (
     TeamOptionsEndpoint,
 )
 from plane.app.views.rbac.join_request import ProjectJoinRequestDetailEndpoint, ProjectJoinRequestEndpoint
+from plane.app.views.rbac.member_status import (
+    MemberDeleteEndpoint,
+    MemberDisableEndpoint,
+    MemberEnableEndpoint,
+    MemberPasswordResetEndpoint,
+)
 
 urlpatterns = [
     path("workspaces/<str:slug>/access-control/", AccessControlEndpoint.as_view(), name="access-control"),
@@ -45,6 +51,26 @@ urlpatterns = [
         "workspaces/<str:slug>/access-control/members/<uuid:member_id>/check/",
         CheckAccessEndpoint.as_view(),
         name="access-check",
+    ),
+    path(
+        "workspaces/<str:slug>/access-control/members/<uuid:member_id>/disable/",
+        MemberDisableEndpoint.as_view(),
+        name="access-member-disable",
+    ),
+    path(
+        "workspaces/<str:slug>/access-control/members/<uuid:member_id>/enable/",
+        MemberEnableEndpoint.as_view(),
+        name="access-member-enable",
+    ),
+    path(
+        "workspaces/<str:slug>/access-control/members/<uuid:member_id>/password-reset/",
+        MemberPasswordResetEndpoint.as_view(),
+        name="access-control-member-password-reset",
+    ),
+    path(
+        "workspaces/<str:slug>/access-control/members/<uuid:member_id>/delete/",
+        MemberDeleteEndpoint.as_view(),
+        name="access-member-delete",
     ),
     path("workspaces/<str:slug>/access-control/teams/", TeamListCreateEndpoint.as_view(), name="access-teams"),
     path(

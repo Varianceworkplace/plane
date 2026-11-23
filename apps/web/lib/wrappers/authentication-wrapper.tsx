@@ -104,6 +104,10 @@ export const AuthenticationWrapper = observer(function AuthenticationWrapper(pro
         const currentRedirectRoute = getWorkspaceRedirectionUrl();
         router.push(currentRedirectRoute);
         return <></>;
+      } else if (nextPath && isValidURL(nextPath) && nextPath.startsWith("/workspace-invitations")) {
+        // signed up from an invitation link: accept it first (with its token); onboarding follows
+        router.push(nextPath);
+        return <></>;
       } else {
         router.push("/onboarding");
         return <></>;

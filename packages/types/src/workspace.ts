@@ -57,7 +57,26 @@ export interface IWorkspaceMemberInvitation {
     name: string;
     slug: string;
   };
+  /** until when it can be joined (a week after it was last sent) */
+  expires_at?: string;
+  is_expired?: boolean;
+  /** what happened to its last email, when known */
+  email_status?: TWorkspaceInvitationEmailStatus | null;
 }
+
+export type TWorkspaceInvitationEmailStatus = {
+  status: "sent" | "failed" | "not_configured";
+  at: string;
+  error?: string;
+};
+
+/** What the server says after inviting people: whether emails could go out, and who was invited again. */
+export type TWorkspaceInviteResult = {
+  message: string;
+  email_configured: boolean;
+  invited: string[];
+  resent: string[];
+};
 
 export interface IWorkspaceBulkInviteFormData {
   emails: { email: string; role: TUserPermissions }[];

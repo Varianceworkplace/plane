@@ -11,6 +11,7 @@ from django.db.models import Q
 from .project import ProjectBaseModel
 from plane.db.mixins import SoftDeletionManager
 
+
 class StateGroup(models.TextChoices):
     BACKLOG = "backlog", "Backlog"
     UNSTARTED = "unstarted", "Unstarted"
@@ -41,8 +42,15 @@ DEFAULT_STATES = [
         "sequence": 35000,
         "group": StateGroup.STARTED.value,
     },
+    # how a timer's time log closes a task (Save time log: On Hold or Completed), as in Workplace
     {
-        "name": "Done",
+        "name": "On Hold",
+        "color": "#F97316",
+        "sequence": 40000,
+        "group": StateGroup.STARTED.value,
+    },
+    {
+        "name": "Completed",
         "color": "#46A758",
         "sequence": 45000,
         "group": StateGroup.COMPLETED.value,

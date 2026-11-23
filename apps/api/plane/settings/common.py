@@ -148,6 +148,10 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "plane.authentication.adapter.exception.auth_exception_handler",
     # Preserve original Django URL parameter names (pk) instead of converting to 'id'
     "SCHEMA_COERCE_PATH_PK": False,
+    # How many reverse proxies of ours sit in front of the API (e.g. 1 for the bundled Caddy alone). When set, the
+    # per-address limits use the address our proxy saw instead of the whole X-Forwarded-For header, which a client
+    # can fill with anything. Unset keeps the old behaviour; set it only when the count is right for the deployment.
+    "NUM_PROXIES": int(os.environ["NUM_PROXIES"]) if os.environ.get("NUM_PROXIES", "").strip() else None,
 }
 
 # API key throttle rate (DRF SimpleRateThrottle format, e.g. "60/minute")

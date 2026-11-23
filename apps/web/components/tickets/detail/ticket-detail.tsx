@@ -40,7 +40,7 @@ import { useAppRouter } from "@/hooks/use-app-router";
 // services
 import { TicketService } from "@/services/ticket.service";
 // local
-import { TICKET_SECTIONS } from "../constants";
+import { TICKET_DECISION_STATUSES, TICKET_SECTIONS } from "../constants";
 import {
   TicketChoiceSelect,
   TicketMemberBadge,
@@ -51,6 +51,7 @@ import {
   TicketStatusSelect,
 } from "../properties";
 import { TicketRichTextField } from "../rich-text-field";
+import { TicketApprovalPanel } from "./ticket-approval";
 import type { TTicket, TTicketComment, TTicketHistory, TTicketMeta, TTicketPayload, TTicketUser } from "../types";
 
 const ticketService = new TicketService();
@@ -123,6 +124,7 @@ export function TicketDetail(props: Props) {
     );
 
   const editable = ticket.can_edit;
+  const waiting = ticket.approval?.status === "pending";
 
   return (
     <div className="flex h-full w-full flex-col overflow-y-auto md:flex-row md:overflow-hidden">
@@ -161,6 +163,11 @@ export function TicketDetail(props: Props) {
                 </span>
               )}
             </div>
+            <TicketApprovalPanel
+              workspaceSlug={workspaceSlug}
+              ticket={ticket}
+              onDecided={(updated) => void mutate(updated, { revalidate: false })}
+            />
           </div>
 
           <Card icon={TextOutline} title="Description">
@@ -209,6 +216,7 @@ export function TicketDetail(props: Props) {
                   onChange={(id) => id && id !== ticket.state?.id && void update({ state_id: id }, "Status")}
                   variant="select-ghost-md"
                   className="w-full"
+                  hide={waiting ? TICKET_DECISION_STATUSES : undefined}
                 />
               ) : (
                 <TicketStateBadge state={ticket.state} bordered={false} />
@@ -246,7 +254,8 @@ export function TicketDetail(props: Props) {
               )}
             </SidebarPropertyListItem>
             <SidebarPropertyListItem icon={UserCircleOutline} label="Manager">
-              {editable ? (
+              {/* while it waits, the Manager stays as picked: they're the one approving it */}
+              {editable && !waiting ? (
                 <TicketMemberSelect
                   meta={meta}
                   value={ticket.manager?.id ?? ""}
@@ -612,6 +621,7 @@ function ActivitySection(props: { ticket: TTicket; workspaceSlug: string }) {
       comments
         .filter((c) => !c.parent_id)
         .forEach((item) => items.push({ kind: "comment", at: item.created_at, item }));
+    // oxlint-disable-next-line unicorn/no-array-sort -- sorts the new list built above
     return items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
   }, [comments, history, filter]);
   const replies = (id: string) => comments.filter((c) => c.parent_id === id);

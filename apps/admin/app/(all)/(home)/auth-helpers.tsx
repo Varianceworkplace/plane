@@ -73,6 +73,10 @@ const errorCodeMessages: {
     title: `User account deactivated`,
     message: () => `User account deactivated. Please contact ${SUPPORT_EMAIL ? SUPPORT_EMAIL : "administrator"}.`,
   },
+  [EAdminAuthErrorCodes.RATE_LIMIT_EXCEEDED]: {
+    title: `Too many attempts`,
+    message: () => `Too many sign-in attempts. Please wait 15 minutes and try again.`,
+  },
 };
 
 export const authErrorHandler = (errorCode: EAdminAuthErrorCodes, email?: string): TAdminAuthErrorInfo | undefined => {
@@ -86,6 +90,7 @@ export const authErrorHandler = (errorCode: EAdminAuthErrorCodes, email?: string
     EAdminAuthErrorCodes.ADMIN_USER_ALREADY_EXIST,
     EAdminAuthErrorCodes.ADMIN_USER_DOES_NOT_EXIST,
     EAdminAuthErrorCodes.ADMIN_USER_DEACTIVATED,
+    EAdminAuthErrorCodes.RATE_LIMIT_EXCEEDED,
   ];
 
   if (bannerAlertErrorCodes.includes(errorCode))

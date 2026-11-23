@@ -25,6 +25,7 @@ from plane.authentication.adapter.error import (
     AuthenticationException,
     AUTHENTICATION_ERROR_CODES,
 )
+from plane.authentication.utils.account_access import is_deactivated, signup_allowed
 from plane.authentication.rate_limit import (
     AuthenticationThrottle,
     throttle_auth_redirect,
@@ -50,6 +51,18 @@ class MagicGenerateSpaceEndpoint(APIView):
         email = request.data.get("email", "").strip().lower()
         try:
             validate_email(email)
+            # no code for a disabled account, or for a new address that can't sign up
+            user = User.objects.filter(email=email).first()
+            if is_deactivated(user):
+                raise AuthenticationException(
+                    error_code=AUTHENTICATION_ERROR_CODES["USER_ACCOUNT_DEACTIVATED"],
+                    error_message="USER_ACCOUNT_DEACTIVATED",
+                )
+            if not user and not signup_allowed(email):
+                raise AuthenticationException(
+                    error_code=AUTHENTICATION_ERROR_CODES["SIGNUP_DISABLED"],
+                    error_message="SIGNUP_DISABLED",
+                )
             adapter = MagicCodeProvider(request=request, key=email)
             key, token = adapter.initiate()
             # If the smtp is configured send through here

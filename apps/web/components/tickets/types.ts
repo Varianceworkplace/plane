@@ -42,6 +42,15 @@ export type TTicketTextField =
 
 export type TTicketChoiceField = "category" | "tool_category" | "trial_tested";
 
+export type TTicketApproval = {
+  status: "pending" | "approved" | "rejected";
+  label: string;
+  decided_by: TTicketUser | null;
+  decided_at: string | null;
+  /** the Manager's reason */
+  note: string;
+};
+
 export type TTicket = {
   id: string;
   issue_id: string;
@@ -58,6 +67,10 @@ export type TTicket = {
   updated_at: string;
   can_edit: boolean;
   manager?: TTicketUser | null;
+  /** the Manager's approval: the assignee gets the ticket once it's approved */
+  approval: TTicketApproval;
+  /** this person is the Manager and the ticket waits for them */
+  can_approve: boolean;
   description_html?: string;
   solution_html?: string;
 } & Partial<Record<TTicketTextField, string>> &

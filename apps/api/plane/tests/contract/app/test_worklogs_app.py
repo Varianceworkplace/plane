@@ -13,7 +13,7 @@ Rules under test:
   * ticket work items stay unreachable
   * start / stop timer: one per member, stop freezes the end time, saving needs a note
   * Discard on the save dialog resumes the timer from the time it had; the stopped time doesn't count
-  * Delete timer removes only the member's own timer, logging nothing
+  * timers can't be deleted: a stopped timer is saved with a note, or Discard takes the Stop back
 """
 
 import io
@@ -416,17 +416,22 @@ def test_timer_start_stop_save_creates_worklog_with_times(setup):
     assert stopped.status_code == status.HTTP_200_OK
     body = stopped.json()
     assert body["is_running"] is False and body["stopped_at"]
-    assert body["duration"] == 86  # rounded to the nearest minute
+    assert abs(body["duration"] - (85 + 40 / 60)) < 0.05  # 85m 40s, to the second (not rounded to minutes)
 
     # stopping again keeps the first end time
     assert client.post(_timer_url(setup, "stop/")).json()["stopped_at"] == body["stopped_at"]
 
     assert client.post(_timer_url(setup, "save/"), {"description": "  "}, format="json").status_code == 400
 
-    saved = client.post(_timer_url(setup, "save/"), {"description": "Fixed language files"}, format="json")
+    # how the task is left is required too: On Hold or Completed
+    missing = client.post(_timer_url(setup, "save/"), {"description": "Fixed language files"}, format="json")
+    assert missing.status_code == 400 and "status" in missing.json()
+    saved = client.post(
+        _timer_url(setup, "save/"), {"description": "Fixed language files", "status": "on_hold"}, format="json"
+    )
     assert saved.status_code == status.HTTP_201_CREATED, saved.content
     worklog = saved.json()
-    assert worklog["duration"] == 86
+    assert abs(worklog["duration"] - (85 + 40 / 60)) < 0.05
     assert worklog["description"] == "Fixed language files"
     assert worklog["started_at"] and worklog["ended_at"]
     assert client.get(_timer_url(setup)).json() == {"timer": None}
@@ -453,42 +458,16 @@ def test_only_one_timer_per_member(setup):
 
 
 @pytest.mark.contract
-def test_discard_timer_logs_nothing(setup):
+def test_timers_cant_be_deleted(setup):
+    """There's no Delete timer: a stopped timer is saved with a note, or Discard takes the Stop back."""
     client = setup["clients"]["member"]
-    client.post(_start_url(setup))
-    assert client.delete(_timer_url(setup)).status_code == status.HTTP_204_NO_CONTENT
-    assert client.get(_timer_url(setup)).json() == {"timer": None}
+    started = client.post(_start_url(setup)).json()
+    client.post(_timer_url(setup, "stop/"))
+    response = client.delete(_timer_url(setup) + f"?id={started['id']}")
+    assert response.status_code == status.HTTP_405_METHOD_NOT_ALLOWED
+    timer = client.get(_timer_url(setup)).json()["timer"]
+    assert timer["id"] == started["id"] and timer["is_running"] is False
     assert not IssueWorkLog.objects.filter(issue=setup["issue"]).exists()
-    # and a new timer can be started again
-    assert client.post(_start_url(setup)).status_code == 201
-
-
-@pytest.mark.contract
-def test_delete_timer_removes_only_that_timer(setup):
-    member, other = setup["clients"]["member"], setup["clients"]["other"]
-    earlier = _log(setup, "member", 30)
-    second_issue = Issue.objects.create(
-        name="Second", workspace=setup["workspace"], project=setup["project"], state=setup["issue"].state
-    )
-    _assign([second_issue], [setup["people"]["member"], setup["people"]["other"]])
-    assert other.post(_start_url(setup, issue=second_issue)).status_code == 201
-    started = member.post(_start_url(setup)).json()
-    member.post(_timer_url(setup, "stop/"))
-
-    # a dialog left open on an older timer doesn't remove the current one
-    stale = member.delete(_timer_url(setup) + f"?id={uuid4()}")
-    assert stale.status_code == status.HTTP_409_CONFLICT
-    assert stale.json()["timer"]["id"] == started["id"]
-
-    assert member.delete(_timer_url(setup) + f"?id={started['id']}").status_code == status.HTTP_204_NO_CONTENT
-    assert member.get(_timer_url(setup)).json() == {"timer": None}
-    # no time logged, the earlier entry kept, the other member's timer still running
-    assert [str(pk) for pk in IssueWorkLog.objects.values_list("id", flat=True)] == [earlier["id"]]
-    other_timer = other.get(_timer_url(setup)).json()["timer"]
-    assert other_timer["is_running"] is True and other_timer["issue"]["id"] == str(second_issue.id)
-    # it's gone: a second delete of it is refused, and a new timer can start
-    assert member.delete(_timer_url(setup) + f"?id={started['id']}").status_code == status.HTTP_409_CONFLICT
-    assert member.post(_start_url(setup)).status_code == status.HTTP_201_CREATED
 
 
 @pytest.mark.contract
@@ -500,7 +479,7 @@ def test_discard_on_the_save_dialog_resumes_the_timer(setup):
     IssueWorkLogTimer.objects.filter(user=setup["people"]["member"]).update(
         started_at=started_at, stopped_at=timezone.now() - timedelta(minutes=5)
     )
-    assert client.get(_timer_url(setup)).json()["timer"]["duration"] == 10
+    assert abs(client.get(_timer_url(setup)).json()["timer"]["duration"] - 10) < 0.05
 
     response = client.post(_timer_url(setup, "resume/"))
     assert response.status_code == status.HTTP_200_OK, response.content
@@ -508,7 +487,7 @@ def test_discard_on_the_save_dialog_resumes_the_timer(setup):
     timer = response.json()["timer"]
     assert timer["is_running"] is True and timer["stopped_at"] is None
     # on from the 10 minutes: not from zero, and the 5 stopped minutes don't count
-    assert abs(timer["elapsed_seconds"] - 10 * 60) < 5 and timer["duration"] == 10
+    assert abs(timer["elapsed_seconds"] - 10 * 60) < 5 and abs(timer["duration"] - 10) < 0.1
     assert abs(timer["paused_seconds"] - 5 * 60) < 5
 
     # resuming a running timer changes nothing
@@ -519,7 +498,9 @@ def test_discard_on_the_save_dialog_resumes_the_timer(setup):
         stopped_at=timezone.now() - timedelta(minutes=2)
     )
     client.post(_timer_url(setup, "resume/"))
-    saved = client.post(_timer_url(setup, "save/"), {"description": "Picked it back up"}, format="json")
+    saved = client.post(
+        _timer_url(setup, "save/"), {"description": "Picked it back up", "status": "on_hold"}, format="json"
+    )
     assert saved.status_code == status.HTTP_201_CREATED, saved.content
     assert saved.json()["duration"] == 8
     stored = IssueWorkLog.objects.get(pk=saved.json()["id"])
@@ -535,7 +516,7 @@ def test_discard_removes_a_timer_that_cant_run_on(setup):
     client.post(_timer_url(setup, "stop/"))
     ProjectMember.objects.filter(project=setup["project"], member=setup["people"]["member"]).update(is_active=False)
 
-    blocked = client.post(_timer_url(setup, "save/"), {"description": "work"}, format="json")
+    blocked = client.post(_timer_url(setup, "save/"), {"description": "work", "status": "completed"}, format="json")
     assert blocked.status_code == status.HTTP_403_FORBIDDEN
     assert blocked.json()["error"] == "You are no longer a member of this project. Discard the timer instead."
 
@@ -544,6 +525,107 @@ def test_discard_removes_a_timer_that_cant_run_on(setup):
     assert response.json() == {"timer": None, "reason": "You are no longer a member of this project."}
     assert client.get(_timer_url(setup)).json() == {"timer": None}
     assert not IssueWorkLog.objects.filter(issue=setup["issue"]).exists()
+
+
+@pytest.mark.contract
+def test_saving_a_time_log_puts_the_task_on_hold_or_completes_it(setup):
+    """As Workplace's Notes: the time log says how the task is left; the project's statuses are used."""
+    client, issue, project = setup["clients"]["member"], setup["issue"], setup["project"]
+    completed = State.objects.create(
+        name="Completed", project=project, workspace=setup["workspace"], group="completed", sequence=45000
+    )
+
+    client.post(_start_url(setup))
+    client.post(_timer_url(setup, "stop/"))
+    refused = client.post(_timer_url(setup, "save/"), {"description": "work", "status": "done"}, format="json")
+    assert refused.status_code == 400 and refused.json() == {"status": "Pick a status: On Hold or Completed."}
+    assert IssueWorkLogTimer.objects.filter(user=setup["people"]["member"]).exists()  # nothing saved
+
+    # On Hold: the project gets the status when it has none, and the task goes there
+    saved = client.post(_timer_url(setup, "save/"), {"description": "Half done", "status": "on_hold"}, format="json")
+    assert saved.status_code == 201, saved.content
+    on_hold = State.objects.get(project=project, name="On Hold")
+    assert on_hold.group == "started"
+    issue.refresh_from_db()
+    assert issue.state_id == on_hold.id and issue.completed_at is None
+    assert saved.json()["issue_state_id"] == str(on_hold.id)
+
+    # Completed: the project's Completed status, with the completion date set
+    client.post(_start_url(setup))
+    client.post(_timer_url(setup, "stop/"))
+    saved = client.post(_timer_url(setup, "save/"), {"description": "All done", "status": "completed"}, format="json")
+    assert saved.status_code == 201, saved.content
+    issue.refresh_from_db()
+    assert issue.state_id == completed.id and issue.completed_at is not None
+    # and On Hold isn't added twice
+    client.post(_start_url(setup))
+    client.post(_timer_url(setup, "save/"), {"description": "Reopened", "status": "on_hold"}, format="json")
+    assert State.objects.filter(project=project, name="On Hold").count() == 1
+    assert IssueWorkLog.objects.filter(issue=issue).count() == 3
+
+
+@pytest.mark.contract
+def test_projects_statuses_get_on_hold_and_completed(setup):
+    """Migration 0146: Done becomes Completed and On Hold is added; customised projects are left alone."""
+    import importlib
+
+    from django.apps import apps as django_apps
+
+    migration = importlib.import_module("plane.db.migrations.0146_on_hold_completed_states")
+    plain, custom = setup["project"], setup["off_project"]
+    done = State.objects.create(name="Done", project=plain, workspace=setup["workspace"], group="completed")
+    # a project that already has both keeps its own
+    State.objects.create(name="Completed", project=custom, workspace=setup["workspace"], group="completed")
+    State.objects.create(name="On Hold", project=custom, workspace=setup["workspace"], group="unstarted")
+
+    migration.forwards(django_apps, None)
+    migration.forwards(django_apps, None)  # twice changes nothing more
+
+    done.refresh_from_db()
+    assert done.name == "Completed" and done.group == "completed"
+    assert State.objects.filter(project=plain, name="On Hold", group="started").count() == 1
+    assert State.objects.filter(project=custom, name="On Hold").values_list("group", flat=True)[0] == "unstarted"
+    assert State.objects.filter(project=custom, name__in=["Completed", "On Hold"]).count() == 2
+
+
+@pytest.mark.contract
+def test_a_short_timer_keeps_its_seconds(setup):
+    """6 seconds of work is 6 seconds (0.1 minute), not a minute; editing the note keeps them."""
+    client = setup["clients"]["member"]
+    client.post(_start_url(setup))
+    now = timezone.now()
+    IssueWorkLogTimer.objects.filter(user=setup["people"]["member"]).update(
+        started_at=now - timedelta(seconds=6), stopped_at=now
+    )
+    timer = client.get(_timer_url(setup)).json()["timer"]
+    assert timer["duration"] == 0.1
+    saved = client.post(_timer_url(setup, "save/"), {"description": "Quick fix", "status": "on_hold"}, format="json")
+    assert saved.status_code == 201, saved.content
+    assert saved.json()["duration"] == 0.1
+    stored = IssueWorkLog.objects.get(pk=saved.json()["id"])
+    assert round(stored.duration * 60) == 6
+
+    # changing only the note keeps the seconds and the exact start and end
+    response = client.patch(_url(setup, worklog_id=stored.id), {"description": "Quick fix, tested"}, format="json")
+    assert response.status_code == 200, response.content
+    again = IssueWorkLog.objects.get(pk=stored.id)
+    assert round(again.duration * 60) == 6 and again.started_at == stored.started_at
+    # and the Time Sheet adds seconds up
+    sheet = client.get(f"/api/workspaces/{setup['workspace'].slug}/timesheet/").json()
+    assert round(sheet["total_duration"] * 60) == 6
+
+
+@pytest.mark.unit
+def test_durations_show_seconds():
+    from plane.app.views.worklog.base import format_duration
+
+    assert format_duration(0.1) == "6s"
+    assert format_duration(1 + 6 / 60) == "1m 6s"
+    assert format_duration(90) == "1h 30m"
+    assert format_duration(60) == "1h"
+    assert format_duration(60 + 6 / 60) == "1h 0m 6s"
+    assert format_duration(15) == "15m"
+    assert format_duration(0) == "0m"
 
 
 @pytest.mark.contract
@@ -565,7 +647,9 @@ def test_timer_rules(setup):
 def test_editing_timer_entry_moves_end_time(setup):
     client = setup["clients"]["member"]
     client.post(_start_url(setup))
-    worklog = client.post(_timer_url(setup, "save/"), {"description": "work"}, format="json").json()
+    worklog = client.post(
+        _timer_url(setup, "save/"), {"description": "work", "status": "on_hold"}, format="json"
+    ).json()
     response = client.patch(_url(setup, worklog_id=worklog["id"]), {"duration": 120}, format="json")
     assert response.status_code == 200
     stored = IssueWorkLog.objects.get(pk=worklog["id"])

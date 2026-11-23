@@ -15,11 +15,12 @@ MAX_WORKLOG_DURATION = 999 * 60 + 59
 
 
 class IssueWorkLog(ProjectBaseModel):
-    """Time a member spent on a work item. `duration` is stored in minutes."""
+    """Time a member spent on a work item. `duration` is stored in minutes, to the second: a timer saves exactly what
+    it ran (6 seconds = 0.1), time logged by hand is whole minutes."""
 
     issue = models.ForeignKey("db.Issue", on_delete=models.CASCADE, related_name="issue_worklogs")
     logged_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="user_worklogs")
-    duration = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(MAX_WORKLOG_DURATION)])
+    duration = models.FloatField(validators=[MinValueValidator(1 / 60), MaxValueValidator(MAX_WORKLOG_DURATION)])
     description = models.TextField(blank=True, default="")
     # Set when the entry comes from the start / stop timer (empty for manual entries)
     started_at = models.DateTimeField(null=True, blank=True)

@@ -18,6 +18,7 @@ from plane.app.views.worklog.base import (
 from plane.app.views.worklog.estimate import IssueTimeEstimateEndpoint, ProjectTimeEstimatesEndpoint
 from plane.app.views.worklog.timesheet import TimesheetDownloadEndpoint, TimesheetEndpoint
 from plane.app.views.worklog.analytics import WorkLogReportAnalyticsEndpoint, WorkLogReportOptionsEndpoint
+from plane.app.views.worklog.attendance import AttendanceReportDownloadEndpoint, AttendanceReportEndpoint
 from plane.app.views.worklog.report import (
     WorkLogReportDetailEndpoint,
     WorkLogReportDownloadEndpoint,
@@ -102,5 +103,16 @@ urlpatterns = [
         "workspaces/<str:slug>/worklog-reports/download/",
         WorkLogReportDownloadEndpoint.as_view(),
         name="worklog-report-download",
+    ),
+    # Attendance: everyone's hours day by day, with Absent and Week Off (and its CSV / Excel)
+    path(
+        "workspaces/<str:slug>/worklog-reports/attendance/",
+        AttendanceReportEndpoint.as_view(),
+        name="worklog-report-attendance",
+    ),
+    path(
+        "workspaces/<str:slug>/worklog-reports/attendance/download/",
+        AttendanceReportDownloadEndpoint.as_view(),
+        name="worklog-report-attendance-download",
     ),
 ]

@@ -17,15 +17,19 @@ from plane.db.models import User, Workspace, WorkspaceMemberInvite
 from plane.license.utils.instance_value import get_email_configuration
 from plane.utils.email import generate_plain_text_from_html
 from plane.utils.exception_logger import log_exception
+from plane.utils.workspace_invites import record_invite_email
 
 
 @shared_task
 def workspace_invitation(email, workspace_id, token, current_site, inviter):
+    # what happened is kept per invitation, so the Members page can say whether the email went out
+    invite_id = None
     try:
         user = User.objects.get(email=inviter)
 
         workspace = Workspace.objects.get(pk=workspace_id)
         workspace_member_invite = WorkspaceMemberInvite.objects.get(token=token, email=email)
+        invite_id = workspace_member_invite.id
 
         # Relative link
         relative_link = (
@@ -44,6 +48,9 @@ def workspace_invitation(email, workspace_id, token, current_site, inviter):
             EMAIL_USE_SSL,
             EMAIL_FROM,
         ) = get_email_configuration()
+        if not EMAIL_HOST:
+            record_invite_email(invite_id, "not_configured")
+            return
 
         # Subject of the email
         subject = f"{user.first_name or user.display_name or user.email} has invited you to join them in {workspace.name} on Variance"  # noqa: E501
@@ -80,10 +87,13 @@ def workspace_invitation(email, workspace_id, token, current_site, inviter):
         )
         msg.attach_alternative(html_content, "text/html")
         msg.send()
+        record_invite_email(invite_id, "sent")
         logging.getLogger("plane.worker").info("Email sent successfully")
         return
     except (Workspace.DoesNotExist, WorkspaceMemberInvite.DoesNotExist):
         return
     except Exception as e:
+        if invite_id:
+            record_invite_email(invite_id, "failed", e)
         log_exception(e)
         return

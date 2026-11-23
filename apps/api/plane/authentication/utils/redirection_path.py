@@ -3,6 +3,7 @@
 # See the LICENSE file for details.
 
 from plane.db.models import Profile, Workspace, WorkspaceMemberInvite
+from plane.utils.workspace_invites import open_invites
 
 
 def get_redirection_path(user):
@@ -39,7 +40,7 @@ def get_redirection_path(user):
         return f"{fallback_workspace.slug}"
 
     # Redirect to invitations if the user has unaccepted invitations
-    if WorkspaceMemberInvite.objects.filter(email=user.email).count():
+    if open_invites(WorkspaceMemberInvite.objects.filter(email=user.email)).exists():
         return "invitations"
 
     # Redirect the user to create workspace

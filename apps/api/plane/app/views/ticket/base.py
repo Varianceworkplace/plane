@@ -6,8 +6,13 @@
 Helpdesk ticket endpoints (vTiger CRM 6.5 "Tickets" module).
 
 Access rules (enforced here, never by role):
-  * view / comment : current assignee or creator   (as observed in the reference CRM)
-  * edit           : current assignee only
+  * approval       : a new ticket waits for the Manager picked on it, who approves or rejects it (with a reason).
+                     Approved, it moves to the Approved status; rejected, it moves to Reject. A creator who picks
+                     themselves as Manager approves it at once. Tickets from before approvals existed count as
+                     approved. While it waits, the Manager and the Approved / Reject statuses are left to the
+                     Manager's decision.
+  * view / comment : the creator, the Manager, and the current assignee (also while it waits and once rejected)
+  * edit           : the current assignee, from the moment it's assigned to them (waiting, approved or rejected)
   * delete         : nobody; no endpoint exposes it
 Workspace / project admins get no implicit access. Tickets live in a hidden
 per-workspace project and are invisible to every generic Plane endpoint
@@ -25,7 +30,7 @@ from django.db.models import Case, CharField, Count, OuterRef, Q, Value, When
 from django.db.models.functions import Coalesce, Concat, Lower
 from django.http import HttpResponse, HttpResponseRedirect
 from django.utils import timezone
-from django.utils.html import strip_tags
+from django.utils.html import escape, strip_tags
 
 # Third party imports
 from rest_framework import status
@@ -50,6 +55,7 @@ from plane.db.models import (
     TicketTrialTested,
     TICKET_PRIORITIES,
     TICKET_STATUSES,
+    TicketApproval,
     Workspace,
     WorkspaceMember,
 )
@@ -67,6 +73,7 @@ PRIORITY_LABELS = dict(TICKET_PRIORITIES)
 
 # Field labels used in the history ("Updates") feed, in form order
 FIELD_LABELS = {
+    "approval": "Approval",
     "name": "Title",
     "organization_name": "Organization Name",
     "assignee": "Assigned To",
@@ -99,6 +106,7 @@ FIELD_LABELS = {
 # List view saved filters ("All Tickets" dropdown)
 TICKET_FILTERS = [
     {"key": "all", "label": "All Tickets"},
+    {"key": "awaiting_my_approval", "label": "Waiting for My Approval"},
     {"key": "open", "label": "Open Tickets"},  # Status is not Closed
     {"key": "assigned_to_me", "label": "Assigned to Me"},
     {"key": "created_by_me", "label": "Created by Me"},
@@ -119,6 +127,10 @@ SORT_FIELDS = {
 
 
 # ---------------------------------------------------------------- helpers
+
+
+# set by the Manager's decision (Approve / Reject) while a ticket waits for approval
+DECISION_STATUSES = ("Approved", "Reject")
 
 
 def user_name(user):
@@ -215,6 +227,7 @@ def ticket_queryset(slug):
             "issue__created_by",
             "issue__updated_by",
             "manager",
+            "approval_decided_by",
             "project",
         )
         .annotate(
@@ -245,8 +258,8 @@ def assignee_filter(user):
 
 
 def visible_tickets(slug, user):
-    """Tickets the user may view: currently assigned to them, or created by them."""
-    return ticket_queryset(slug).filter(assignee_filter(user) | Q(issue__created_by=user)).distinct()
+    """Tickets the user may view: created by them, managed by them (to approve), or assigned to them (at any stage)."""
+    return ticket_queryset(slug).filter(Q(issue__created_by=user) | Q(manager=user) | assignee_filter(user)).distinct()
 
 
 def current_assignee(issue):
@@ -254,12 +267,47 @@ def current_assignee(issue):
     return row.assignee if row else None
 
 
+def is_assignee(ticket, user):
+    return IssueAssignee.objects.filter(issue_id=ticket.issue_id, assignee=user, deleted_at__isnull=True).exists()
+
+
 def can_view(ticket, user):
-    return ticket.issue.created_by_id == user.id or can_edit(ticket, user)
+    """The creator, the Manager and the current assignee, whether the ticket is waiting, approved or rejected."""
+    return ticket.issue.created_by_id == user.id or ticket.manager_id == user.id or is_assignee(ticket, user)
 
 
 def can_edit(ticket, user):
-    return IssueAssignee.objects.filter(issue_id=ticket.issue_id, assignee=user, deleted_at__isnull=True).exists()
+    """The current assignee, whether the ticket is waiting, approved or rejected."""
+    return is_assignee(ticket, user)
+
+
+def approval_guard(ticket, data):
+    """While a ticket waits, its Manager and the Approved / Reject statuses are the Manager's decision to make, so
+    nobody approves their own ticket by making themselves its Manager or picking a status. Returns an error dict."""
+    if ticket.approval_status != TicketApproval.PENDING:
+        return None
+    manager = user_name(ticket.manager) or "the Manager"
+    if data.get("manager_id") and str(data["manager_id"]) != str(ticket.manager_id):
+        return {"manager_id": [f"The Manager can't be changed while the ticket waits for {manager}'s approval."]}
+    if data.get("state_id"):
+        name = State.objects.filter(id=data["state_id"]).values_list("name", flat=True).first()
+        if name in DECISION_STATUSES:
+            return {"state_id": [f"Only {manager}'s approval can move the ticket to {name}."]}
+    return None
+
+
+def can_approve(ticket, user):
+    return ticket.manager_id == user.id and ticket.approval_status == TicketApproval.PENDING
+
+
+def serialize_approval(ticket):
+    return {
+        "status": ticket.approval_status,
+        "label": TicketApproval(ticket.approval_status).label,
+        "decided_by": user_dict(ticket.approval_decided_by),
+        "decided_at": ticket.approval_decided_at,
+        "note": ticket.approval_note,
+    }
 
 
 def get_visible_ticket(slug, ticket_id, user):
@@ -307,12 +355,14 @@ def serialize_ticket(ticket, user, detail=False):
         "created_by": user_dict(issue.created_by),
         "created_at": issue.created_at,
         "updated_at": issue.updated_at,
-        "can_edit": bool(assignee and assignee.id == user.id),
+        "can_edit": can_edit(ticket, user),
+        "approval": serialize_approval(ticket),
+        "can_approve": can_approve(ticket, user),
+        "manager": user_dict(ticket.manager),
     }
     if detail:
         data.update(
             {
-                "manager": user_dict(ticket.manager),
                 "category": ticket.category,
                 "tool_category": ticket.tool_category,
                 "trial_tested": ticket.trial_tested,
@@ -330,6 +380,7 @@ def snapshot(ticket):
     """Display values used to compute the history feed."""
     issue = ticket.issue
     values = {
+        "approval": TicketApproval(ticket.approval_status).label,
         "name": issue.name,
         "assignee": user_name(current_assignee(issue)),
         "priority": PRIORITY_LABELS.get(issue.priority),
@@ -487,6 +538,8 @@ def apply_view(queryset, view, user):
         return queryset.filter(assignee_filter(user))
     if view == "created_by_me":
         return queryset.filter(issue__created_by=user)
+    if view == "awaiting_my_approval":
+        return queryset.filter(manager=user, approval_status=TicketApproval.PENDING)
     return queryset
 
 
@@ -601,6 +654,13 @@ class TicketListCreateEndpoint(TicketBaseEndpoint):
         state = State.objects.filter(id=data["state_id"], project=project).first()
         if not state:
             return Response({"state_id": ["Select a valid Status."]}, status=status.HTTP_400_BAD_REQUEST)
+        # the Manager approves it first, unless the creator is the Manager
+        self_managed = str(data["manager_id"]) == str(request.user.id)
+        if not self_managed and state.name in DECISION_STATUSES:
+            return Response(
+                {"state_id": [f"Only the Manager's approval can move the ticket to {state.name}."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         for key in ("assignee_id", "manager_id"):
             if not is_active_member(workspace, data[key]):
                 label = "Assigned To" if key == "assignee_id" else "Manager"
@@ -628,6 +688,9 @@ class TicketListCreateEndpoint(TicketBaseEndpoint):
                 project=project,
                 manager_id=data["manager_id"],
                 solution_html=data.get("solution_html") or "<p></p>",
+                approval_status=TicketApproval.APPROVED if self_managed else TicketApproval.PENDING,
+                approval_decided_by_id=request.user.id if self_managed else None,
+                approval_decided_at=timezone.now() if self_managed else None,
             )
             for field in list(TICKET_TEXT_FIELDS) + list(TICKET_CHOICE_FIELDS):
                 if field in data:
@@ -659,6 +722,9 @@ class TicketDetailEndpoint(TicketBaseEndpoint):
         serializer = TicketWriteSerializer(data=request.data, partial=True)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        waiting = approval_guard(ticket, serializer.validated_data)
+        if waiting:
+            return Response(waiting, status=status.HTTP_400_BAD_REQUEST)
 
         workspace = Workspace.objects.get(slug=slug)
         with transaction.atomic():
@@ -673,6 +739,56 @@ class TicketDetailEndpoint(TicketBaseEndpoint):
         # After a reassignment the former assignee may no longer see the ticket.
         if not can_view(ticket, request.user):
             return Response({"id": str(ticket.id), "visible": False}, status=status.HTTP_200_OK)
+        return Response(serialize_ticket(ticket, request.user, detail=True), status=status.HTTP_200_OK)
+
+
+class TicketApprovalEndpoint(TicketBaseEndpoint):
+    """POST {"decision": "approve" | "reject", "note": "..."}: the ticket's Manager decides while it waits.
+    Approved: status Approved, and the assignee gets the ticket. Rejected: status Reject; it goes no further.
+    The note (a reason) is kept on the ticket and posted as the Manager's comment."""
+
+    @allow_permission(WORKSPACE_ROLES, level="WORKSPACE")
+    def post(self, request, slug, ticket_id):
+        ticket = get_visible_ticket(slug, ticket_id, request.user)
+        if not ticket:
+            return Response({"error": "Ticket not found."}, status=status.HTTP_404_NOT_FOUND)
+        if ticket.manager_id != request.user.id:
+            return Response(
+                {"error": "Only the ticket's Manager can approve or reject it."}, status=status.HTTP_403_FORBIDDEN
+            )
+        if ticket.approval_status != TicketApproval.PENDING:
+            return Response(
+                {"error": f"This ticket is already {TicketApproval(ticket.approval_status).label.lower()}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        decision = request.data.get("decision")
+        if decision not in ("approve", "reject"):
+            return Response({"decision": ["Approve or reject."]}, status=status.HTTP_400_BAD_REQUEST)
+        note = request.data.get("note") or ""
+        if not isinstance(note, str):
+            return Response({"note": ["Write the reason as text."]}, status=status.HTTP_400_BAD_REQUEST)
+        note = note.strip()[:2000]
+
+        approved = decision == "approve"
+        next_status = State.objects.filter(project=ticket.project, name="Approved" if approved else "Reject").first()
+        with transaction.atomic():
+            before = snapshot(ticket)
+            ticket.approval_status = TicketApproval.APPROVED if approved else TicketApproval.REJECTED
+            ticket.approval_decided_by = request.user
+            ticket.approval_decided_at = timezone.now()
+            ticket.approval_note = note
+            ticket.updated_by = request.user
+            ticket.save(disable_auto_set_user=True)
+            issue = ticket.issue
+            if next_status:
+                issue.state = next_status
+            issue.updated_by = request.user
+            issue.save(disable_auto_set_user=True)
+            ticket = ticket_queryset(slug).get(id=ticket.id)
+            record_history(ticket, request.user, before, snapshot(ticket))
+            if note:
+                label = "Approved" if approved else "Rejected"
+                create_comment(ticket, request.user, f"<p><strong>{label}:</strong> {escape(note)}</p>")
         return Response(serialize_ticket(ticket, request.user, detail=True), status=status.HTTP_200_OK)
 
 
@@ -695,7 +811,8 @@ class TicketBulkUpdateEndpoint(TicketBaseEndpoint):
         updated, skipped = [], []
         for ticket_id in ids:
             ticket = get_visible_ticket(slug, ticket_id, request.user)
-            if not ticket or not can_edit(ticket, request.user):
+            # (a waiting ticket keeps its Manager, and its Approved / Reject decision, for the Manager)
+            if not ticket or not can_edit(ticket, request.user) or approval_guard(ticket, serializer.validated_data):
                 skipped.append(str(ticket_id))
                 continue
             with transaction.atomic():

@@ -5,6 +5,7 @@
  */
 
 import { useState } from "react";
+import { observer } from "mobx-react";
 // plane imports
 import { ROLE } from "@plane/constants";
 import { Button } from "@makeplane/propel/components/button";
@@ -12,12 +13,14 @@ import { Button as ButtonElement } from "@makeplane/propel/elements/button";
 import type { IWorkspaceMemberInvitation } from "@plane/types";
 import { Checkbox } from "@makeplane/propel/components/checkbox";
 import { Spinner } from "@plane/blocks/spinner";
+import { setToast } from "@plane/blocks/toast";
 import { truncateText } from "@plane/utils";
 // constants
 import { WorkspaceLogo } from "@/components/workspace/logo";
 // hooks
+import { useInstance } from "@/hooks/store/use-instance";
 import { useWorkspace } from "@/hooks/store/use-workspace";
-import { useUserSettings } from "@/hooks/store/user";
+import { useUser, useUserSettings } from "@/hooks/store/user";
 // services
 import { WorkspaceService } from "@/services/workspace.service";
 // local components
@@ -30,13 +33,23 @@ type Props = {
 };
 const workspaceService = new WorkspaceService();
 
-export function WorkspaceJoinInvitesStep(props: Props) {
+// observer: it reads the signed-in user and the instance settings from the stores
+export const WorkspaceJoinInvitesStep = observer(function WorkspaceJoinInvitesStep(props: Props) {
   const { invitations, handleNextStep, handleCurrentViewChange } = props;
   // states
   const [isJoiningWorkspaces, setIsJoiningWorkspaces] = useState(false);
-  const [invitationsRespond, setInvitationsRespond] = useState<string[]>([]);
+  // ticked to begin with: most people have just the one invitation, from their company
+  const [invitationsRespond, setInvitationsRespond] = useState<string[]>(() =>
+    props.invitations.map((invitation) => invitation.id)
+  );
   // store hooks
   const { fetchWorkspaces } = useWorkspace();
+  const { data: currentUser } = useUser();
+  const { config } = useInstance();
+  // when the server blocks new workspaces, the button would only lead to a "can't create" message
+  const canCreateWorkspace = !config?.is_workspace_creation_disabled;
+  // without a confirmed email (e.g. a password sign-up), joining goes through the invitation link and its token
+  const needsInvitationLink = currentUser?.is_email_verified === false;
   const { fetchCurrentUserSettings } = useUserSettings();
 
   // handle invitation
@@ -50,7 +63,7 @@ export function WorkspaceJoinInvitesStep(props: Props) {
 
   // submit invitations
   const submitInvitations = async () => {
-    const invitation = invitations?.find((invitation) => invitation.id === invitationsRespond[0]);
+    const invitation = invitations?.find((item) => item.id === invitationsRespond[0]);
 
     if (invitationsRespond.length <= 0 && !invitation?.role) return;
 
@@ -63,13 +76,21 @@ export function WorkspaceJoinInvitesStep(props: Props) {
       await handleNextStep();
     } catch (error: any) {
       console.error(error);
+      setToast({
+        type: "error",
+        title: "Couldn't join",
+        message: typeof error?.error === "string" ? error.error : "Something went wrong. Please try again.",
+      });
       setIsJoiningWorkspaces(false);
     }
   };
 
   return invitations && invitations.length > 0 ? (
     <div className="flex flex-col gap-10">
-      <CommonOnboardingHeader title="Join invites or create a workspace" description="All your work — unified." />
+      <CommonOnboardingHeader
+        title={canCreateWorkspace ? "Join invites or create a workspace" : "Join your workspace"}
+        description="All your work — unified."
+      />
       <div className="flex flex-col gap-3">
         {invitations &&
           invitations.length > 0 &&
@@ -77,6 +98,7 @@ export function WorkspaceJoinInvitesStep(props: Props) {
             const isSelected = invitationsRespond.includes(invitation.id);
             const invitedWorkspace = invitation.workspace;
             return (
+              // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- existing row; its checkbox is the keyboard control
               <div
                 key={invitation.id}
                 className={`flex cursor-pointer items-center gap-2 rounded-lg border border-subtle px-3 py-2 hover:bg-surface-2`}
@@ -101,26 +123,31 @@ export function WorkspaceJoinInvitesStep(props: Props) {
           })}
       </div>
       <div className="flex flex-col gap-4">
+        {needsInvitationLink && (
+          <p className="text-body-xs-regular text-secondary">To join, open the invitation link we emailed you.</p>
+        )}
         <ButtonElement
           variant="primary"
           size="lg"
           stretch="full"
           onClick={submitInvitations}
-          disabled={isJoiningWorkspaces || !invitationsRespond.length}
+          disabled={isJoiningWorkspaces || !invitationsRespond.length || needsInvitationLink}
         >
           {isJoiningWorkspaces ? <Spinner height="20px" width="20px" /> : "Continue"}
         </ButtonElement>
-        <Button
-          variant="ghost"
-          size="lg"
-          stretch="full"
-          label="Create new workspace"
-          onClick={handleCurrentViewChange}
-          disabled={isJoiningWorkspaces}
-        />
+        {canCreateWorkspace && (
+          <Button
+            variant="ghost"
+            size="lg"
+            stretch="full"
+            label="Create new workspace"
+            onClick={handleCurrentViewChange}
+            disabled={isJoiningWorkspaces}
+          />
+        )}
       </div>
     </div>
   ) : (
     <div>No Invitations found</div>
   );
-}
+});

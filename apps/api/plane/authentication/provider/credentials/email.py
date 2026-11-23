@@ -11,6 +11,11 @@ from plane.authentication.adapter.error import (
     AUTHENTICATION_ERROR_CODES,
     AuthenticationException,
 )
+from plane.authentication.utils.password_attempts import (
+    clear_failed_passwords,
+    record_failed_password,
+    too_many_failed_passwords,
+)
 from plane.db.models import User
 from plane.license.utils.instance_value import get_configuration_value
 
@@ -70,8 +75,18 @@ class EmailProvider(CredentialAdapter):
                     payload={"email": self.key},
                 )
 
+            # too many wrong passwords for this account lately: wait, whatever address it comes from
+            if too_many_failed_passwords(self.key):
+                self.logger.warning("Too many failed passwords for this account")
+                raise AuthenticationException(
+                    error_message="RATE_LIMIT_EXCEEDED",
+                    error_code=AUTHENTICATION_ERROR_CODES["RATE_LIMIT_EXCEEDED"],
+                    payload={"email": self.key},
+                )
+
             # Check user password
             if not user.check_password(self.code):
+                record_failed_password(self.key)
                 self.logger.warning("Authentication failed - invalid credentials")
                 raise AuthenticationException(
                     error_message=(
@@ -82,6 +97,7 @@ class EmailProvider(CredentialAdapter):
                     ],
                     payload={"email": self.key},
                 )
+            clear_failed_passwords(self.key)
 
             super().set_user_data({
                 "email": self.key,

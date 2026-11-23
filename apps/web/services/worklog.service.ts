@@ -47,7 +47,8 @@ export class WorklogService extends APIService {
     projectId: string,
     issueId: string,
     worklogId: string,
-    data: TWorklogPayload
+    // only the fields that changed: the others stay exactly as stored (a timer's seconds, its start and end)
+    data: Partial<TWorklogPayload>
   ): Promise<TWorklog> {
     return this.patch(`${this.issueBase(workspaceSlug, projectId, issueId)}${worklogId}/`, data)
       .then((response) => response?.data)
@@ -122,18 +123,14 @@ export class WorklogService extends APIService {
       });
   }
 
-  async saveTimer(workspaceSlug: string, description: string): Promise<TWorklog> {
-    return this.post(`/api/workspaces/${workspaceSlug}/worklog-timer/save/`, { description })
+  /** Saves the stopped timer as a worklog; `status` is how the task is left (it moves to that project status). */
+  async saveTimer(
+    workspaceSlug: string,
+    description: string,
+    status: "on_hold" | "completed"
+  ): Promise<TWorklog & { issue_state_id: string }> {
+    return this.post(`/api/workspaces/${workspaceSlug}/worklog-timer/save/`, { description, status })
       .then((response) => response?.data)
-      .catch((error) => {
-        throw error?.response?.data;
-      });
-  }
-
-  /** Delete timer: removes this timer (by id) without logging any time. */
-  async deleteTimer(workspaceSlug: string, timerId: string): Promise<void> {
-    return this.delete(`/api/workspaces/${workspaceSlug}/worklog-timer/?id=${timerId}`)
-      .then(() => undefined)
       .catch((error) => {
         throw error?.response?.data;
       });

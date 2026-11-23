@@ -111,4 +111,7 @@ export const TICKET_SECTIONS: TTicketSection[] = [
   },
 ];
 
+/** Set by the Manager's Approve / Reject while a ticket waits for approval, so not offered to anyone else then. */
+export const TICKET_DECISION_STATUSES: readonly string[] = ["Approved", "Reject"];
+
 export const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");

@@ -97,19 +97,22 @@ type TStatusSelectProps = {
   invalid?: boolean;
   placeholder?: string;
   className?: string;
+  /** statuses not to offer (by name), e.g. Approved / Reject while the ticket waits for its Manager */
+  hide?: readonly string[];
 };
 
 export function TicketStatusSelect(props: TStatusSelectProps) {
-  const { meta, value, onChange, variant = "pill-md", invalid, placeholder = "Status", className } = props;
+  const { meta, value, onChange, variant = "pill-md", invalid, placeholder = "Status", className, hide } = props;
   const getValues = useCallback(
     async ({ search }: { search?: string }) => {
       const query = search?.trim().toLowerCase();
       const results = meta.statuses
         .map(toStateOption)
+        .filter((state) => !hide?.includes(state.name))
         .filter((state) => !query || state.name.toLowerCase().includes(query));
       return { results, next_page_results: false };
     },
-    [meta.statuses]
+    [meta.statuses, hide]
   );
   const index = meta.statuses.findIndex((s) => s.id === value);
   const selected = index >= 0 ? toStateOption(meta.statuses[index], index) : null;

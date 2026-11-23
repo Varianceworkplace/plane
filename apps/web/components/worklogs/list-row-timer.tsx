@@ -12,11 +12,26 @@ import { useSWRConfig } from "swr";
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import type { TIssue } from "@plane/types";
 // hooks
+import { useIssueDetail } from "@/hooks/store/use-issue-detail";
+import { useIssues } from "@/hooks/store/use-issues";
 import { useProject } from "@/hooks/store/use-project";
+import { useProjectState } from "@/hooks/store/use-project-state";
 import { useUserPermissions } from "@/hooks/store/user";
+import { useIssueStoreType } from "@/hooks/use-issue-layout-store";
 // local imports
 import { refreshWorkItemTime, useWorklogTimer } from "./helpers";
 import { WorklogTimerControl } from "./timer-control";
+
+/** Every list store (BaseIssuesStore) updates a work item in the store alone with `shouldSync` false. */
+type TLocalIssueUpdate = {
+  issueUpdate?: (
+    workspaceSlug: string,
+    projectId: string,
+    issueId: string,
+    data: Partial<TIssue>,
+    shouldSync?: boolean
+  ) => Promise<void>;
+};
 
 /** Start / Stop timer inside a row of the work item list. */
 export const ListRowWorklogTimer = observer(function ListRowWorklogTimer(props: { issue: TIssue }) {
@@ -29,6 +44,10 @@ export const ListRowWorklogTimer = observer(function ListRowWorklogTimer(props: 
   const { allowPermissions } = useUserPermissions();
   const { timer } = useWorklogTimer(workspaceSlug);
   const { mutate } = useSWRConfig();
+  const storeType = useIssueStoreType();
+  const { issues } = useIssues(storeType);
+  const { getStateById, fetchProjectStates } = useProjectState();
+  const { rootIssueStore } = useIssueDetail();
 
   const projectId = issue.project_id ?? "";
   const project = projectId ? getProjectById(projectId) : undefined;
@@ -62,7 +81,17 @@ export const ListRowWorklogTimer = observer(function ListRowWorklogTimer(props: 
         projectId={projectId}
         issueId={issue.id}
         canStart={canStart}
-        onSaved={() => void refreshWorkItemTime(mutate, projectId, issue.id)}
+        onSaved={(issueStateId) => {
+          void refreshWorkItemTime(mutate, projectId, issue.id);
+          if (!issueStateId || issueStateId === issue.state_id) return;
+          // saving the time log put the task On Hold or Completed: show it (On Hold may be new to the project)
+          if (!getStateById(issueStateId)) void fetchProjectStates(workspaceSlug, projectId);
+          // the layout's store, without syncing (the server already moved it), so grouped lists regroup too
+          const layoutStore = issues as unknown as TLocalIssueUpdate;
+          if (typeof layoutStore.issueUpdate === "function") {
+            void layoutStore.issueUpdate(workspaceSlug, projectId, issue.id, { state_id: issueStateId }, false);
+          } else rootIssueStore.issues.updateIssue(issue.id, { state_id: issueStateId });
+        }}
       />
     </div>
   );

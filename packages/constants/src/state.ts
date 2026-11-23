@@ -40,7 +40,7 @@ export const STATE_GROUPS: {
   completed: {
     key: "completed",
     label: "Completed",
-    defaultStateName: "Done",
+    defaultStateName: "Completed",
     color: "#16a34a",
   },
   cancelled: {

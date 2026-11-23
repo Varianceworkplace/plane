@@ -106,6 +106,14 @@ export const OnboardingRoot = observer(function OnboardingRoot({ invitations = [
 
   const updateCurrentStep = (step: EOnboardingSteps) => setCurrentStep(step);
 
+  // Profile done and already in a workspace (e.g. they accepted their invitation link part-way through):
+  // nothing left to join or create, so onboarding is over, as it is right after the profile step.
+  const profileComplete = !!userProfile?.onboarding_step?.profile_complete;
+  const inAWorkspace = workspacesList.length > 0;
+  useEffect(() => {
+    if (profileComplete && inAWorkspace) void finishOnboarding();
+  }, [profileComplete, inAWorkspace, finishOnboarding]);
+
   useEffect(() => {
     const handleInitialStep = () => {
       if (

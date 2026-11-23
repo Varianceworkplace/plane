@@ -5,8 +5,9 @@
 """Contract tests for the helpdesk Ticket module (plane.app.views.ticket).
 
 Access rules under test:
-  * view / comment: current assignee or creator
-  * edit: current assignee only (workspace/project admins and managers get nothing implicit)
+  * approval: a new ticket waits for its Manager, who approves (status Approved, the assignee gets it) or rejects it
+  * view / comment: the creator, the Manager, and the current assignee once approved
+  * edit: the current assignee once approved (workspace/project admins get nothing implicit)
   * delete: impossible through any endpoint
   * ticket data never leaks through generic project / work item endpoints
 """
@@ -17,7 +18,7 @@ import pytest
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from plane.db.models import Issue, IssueActivity, Project, ProjectMember, User, WorkspaceMember
+from plane.db.models import Issue, IssueActivity, IssueComment, Project, ProjectMember, Ticket, User, WorkspaceMember
 
 BASE = "/api/workspaces/{slug}/tickets/"
 
@@ -83,6 +84,8 @@ def ticket(clients, people, workspace, meta):
     }
     response = clients["hiral"].post(BASE.format(slug=workspace.slug), payload, format="json")
     assert response.status_code == status.HTTP_201_CREATED, response.content
+    # the editing tests below start from an approved ticket (approval has its own tests)
+    Ticket.objects.filter(id=response.json()["id"]).update(approval_status="approved")
     return response.json()
 
 
@@ -158,7 +161,7 @@ class TestTicketVisibility:
         assert response.json()["total"] == count
 
     @pytest.mark.django_db
-    def test_manager_without_assignment_cannot_view(self, clients, people, workspace, meta):
+    def test_the_manager_sees_the_ticket_to_approve_it(self, clients, people, workspace, meta):
         payload = {
             "name": "Managed by Manoj",
             "assignee_id": str(people["vijay"].id),
@@ -166,7 +169,9 @@ class TestTicketVisibility:
             "state_id": _status_id(meta, "Open"),
         }
         ticket = clients["hiral"].post(BASE.format(slug=workspace.slug), payload, format="json").json()
-        assert clients["manoj"].get(_detail(workspace, ticket)).status_code == 404
+        response = clients["manoj"].get(_detail(workspace, ticket))
+        assert response.status_code == 200
+        assert response.json()["can_approve"] is True and response.json()["can_edit"] is False
 
 
 @pytest.mark.contract
@@ -204,9 +209,9 @@ class TestTicketEdit:
             format="json",
         )
         assert response.status_code == 200
-        # Vijay is neither assignee nor creator any more
-        assert clients["vijay"].get(url).status_code == 404
-        assert clients["vijay"].patch(url, {"name": "x"}, format="json").status_code == 404
+        # Vijay isn't the assignee any more: as the ticket's Manager he still sees it, read-only
+        assert clients["vijay"].get(url).json()["can_edit"] is False
+        assert clients["vijay"].patch(url, {"name": "x"}, format="json").status_code == 403
         # Manoj gains view + edit immediately
         assert clients["manoj"].get(url).json()["can_edit"] is True
         assert clients["manoj"].patch(url, {"priority": "high"}, format="json").status_code == 200
@@ -366,6 +371,8 @@ class TestTicketViewsAndSummary:
             )
             assert response.status_code == status.HTTP_201_CREATED, response.content
             created.append(response.json())
+        # these tests are about views and filters: the tickets are approved (approval has its own tests)
+        Ticket.objects.filter(id__in=[t["id"] for t in created]).update(approval_status="approved")
         return created
 
     @pytest.mark.django_db
@@ -406,6 +413,7 @@ class TestTicketViewsAndSummary:
         hiral = clients["hiral"].get(url).json()
         assert hiral["views"] == {
             "all": 3,
+            "awaiting_my_approval": 0,  # Manoj manages these
             "open": 2,
             "assigned_to_me": 2,
             "created_by_me": 2,
@@ -418,3 +426,136 @@ class TestTicketViewsAndSummary:
         assert vijay["views"]["all"] == 2
         # someone with no tickets sees zeros
         assert clients["raj"].get(url).json()["views"]["all"] == 0
+
+
+# ---------------------------------------------------------------- approval
+
+
+def _new_ticket(clients, people, workspace, meta, creator="hiral", assignee="raj", manager="manoj"):
+    payload = {
+        "name": "New laptop",
+        "assignee_id": str(people[assignee].id),
+        "manager_id": str(people[manager].id),
+        "state_id": _status_id(meta, "Open"),
+        "priority": "high",
+    }
+    response = clients[creator].post(BASE.format(slug=workspace.slug), payload, format="json")
+    assert response.status_code == status.HTTP_201_CREATED, response.content
+    return response.json()
+
+
+def _decide(clients, who, workspace, ticket, decision, note=""):
+    return clients[who].post(
+        _detail(workspace, ticket) + "approval/", {"decision": decision, "note": note}, format="json"
+    )
+
+
+@pytest.mark.contract
+class TestApproval:
+    @pytest.mark.django_db
+    def test_a_new_ticket_waits_for_its_manager(self, clients, people, workspace, meta):
+        ticket = _new_ticket(clients, people, workspace, meta)
+        assert ticket["approval"]["status"] == "pending"
+        # the assignee sees it and works on it straight away, but doesn't decide it
+        seen = clients["raj"].get(_detail(workspace, ticket))
+        assert seen.status_code == 200 and seen.json()["approval"]["status"] == "pending"
+        assert seen.json()["can_edit"] is True and seen.json()["can_approve"] is False
+        assert clients["raj"].get(BASE.format(slug=workspace.slug)).json()["total"] == 1
+        assert clients["raj"].patch(_detail(workspace, ticket), {"name": "x"}, format="json").status_code == 200
+        # the creator follows it; the Manager has it waiting
+        assert clients["hiral"].get(_detail(workspace, ticket)).json()["approval"]["status"] == "pending"
+        mine = clients["manoj"].get(BASE.format(slug=workspace.slug) + "?filter=awaiting_my_approval").json()
+        assert mine["total"] == 1 and mine["results"][0]["can_approve"] is True
+        summary = clients["manoj"].get(BASE.format(slug=workspace.slug) + "summary/").json()
+        assert summary["views"]["awaiting_my_approval"] == 1
+        assert "awaiting_my_approval" in {f["key"] for f in meta["filters"]}
+
+    @pytest.mark.django_db
+    def test_approving(self, clients, people, workspace, meta):
+        ticket = _new_ticket(clients, people, workspace, meta)
+        # only the Manager decides
+        assert _decide(clients, "hiral", workspace, ticket, "approve").status_code == status.HTTP_403_FORBIDDEN
+        assert _decide(clients, "raj", workspace, ticket, "approve").status_code == status.HTTP_403_FORBIDDEN
+        assert _decide(clients, "manoj", workspace, ticket, "maybe").status_code == status.HTTP_400_BAD_REQUEST
+
+        response = _decide(clients, "manoj", workspace, ticket, "approve", "Go ahead")
+        assert response.status_code == 200, response.content
+        body = response.json()
+        assert body["approval"]["status"] == "approved" and body["approval"]["decided_by"]["id"] == str(
+            people["manoj"].id
+        )
+        assert body["state"]["name"] == "Approved"
+        # the assignee carries on with it
+        detail = clients["raj"].get(_detail(workspace, ticket))
+        assert detail.status_code == 200 and detail.json()["can_edit"] is True
+        edit = clients["raj"].patch(
+            _detail(workspace, ticket), {"state_id": _status_id(meta, "In Progress")}, format="json"
+        )
+        assert edit.status_code == 200
+        # the decision is in the history and the note in the comments
+        # (tickets are hidden from Plane's own managers: read them unfiltered)
+        fields = set(IssueActivity.all_objects.filter(issue_id=ticket["issue_id"]).values_list("field", flat=True))
+        assert {"Approval", "Status"} <= fields
+        assert IssueComment.all_objects.filter(issue_id=ticket["issue_id"], comment_html__icontains="Go ahead").exists()
+        # decided once
+        assert _decide(clients, "manoj", workspace, ticket, "reject").status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.django_db
+    def test_rejecting(self, clients, people, workspace, meta):
+        ticket = _new_ticket(clients, people, workspace, meta)
+        response = _decide(clients, "manoj", workspace, ticket, "reject", "Not in this budget")
+        assert response.status_code == 200, response.content
+        assert response.json()["approval"]["status"] == "rejected" and response.json()["state"]["name"] == "Reject"
+        # the creator and the assignee both see it, with the reason; the assignee can still edit it
+        for who, edits in (("hiral", False), ("raj", True)):
+            seen = clients[who].get(_detail(workspace, ticket))
+            assert seen.status_code == 200
+            assert seen.json()["approval"]["note"] == "Not in this budget" and seen.json()["can_edit"] is edits
+        assert clients["raj"].patch(_detail(workspace, ticket), {"name": "x"}, format="json").status_code == 200
+        assert clients["hiral"].patch(_detail(workspace, ticket), {"name": "y"}, format="json").status_code == 403
+
+    @pytest.mark.django_db
+    def test_a_creator_who_is_the_manager_approves_it_at_once(self, clients, people, workspace, meta):
+        ticket = _new_ticket(clients, people, workspace, meta, creator="manoj", manager="manoj")
+        assert ticket["approval"]["status"] == "approved"
+        assert clients["raj"].get(_detail(workspace, ticket)).status_code == 200
+
+    @pytest.mark.django_db
+    def test_a_waiting_ticket_leaves_the_decision_to_its_manager(self, clients, people, workspace, meta):
+        ticket = _new_ticket(clients, people, workspace, meta)
+        url = _detail(workspace, ticket)
+        # the assignee works on it...
+        working = clients["raj"].patch(url, {"state_id": _status_id(meta, "In Progress")}, format="json")
+        assert working.status_code == 200
+        # ...but can't approve it by status, or by making themselves its Manager
+        for name in ("Approved", "Reject"):
+            response = clients["raj"].patch(url, {"state_id": _status_id(meta, name)}, format="json")
+            assert response.status_code == 400 and name in response.json()["state_id"][0]
+        response = clients["raj"].patch(url, {"manager_id": str(people["raj"].id)}, format="json")
+        assert response.status_code == 400 and "manager_id" in response.json()
+        bulk = clients["raj"].patch(
+            BASE.format(slug=workspace.slug) + "bulk-update/",
+            {"ticket_ids": [ticket["id"]], "changes": {"state_id": _status_id(meta, "Approved")}},
+            format="json",
+        )
+        assert bulk.status_code == 200 and bulk.json()["skipped"] == [ticket["id"]]
+        row = Ticket.objects.get(id=ticket["id"])
+        assert row.issue.state.name == "In Progress" and row.manager_id == people["manoj"].id
+        assert row.approval_status == "pending"
+        # once decided they're ordinary fields again
+        assert _decide(clients, "manoj", workspace, ticket, "approve").status_code == 200
+        assert clients["raj"].patch(url, {"manager_id": str(people["hiral"].id)}, format="json").status_code == 200
+
+    @pytest.mark.django_db
+    def test_a_new_ticket_cant_start_approved_or_rejected(self, clients, people, workspace, meta):
+        payload = {
+            "name": "Monitor",
+            "assignee_id": str(people["raj"].id),
+            "manager_id": str(people["manoj"].id),
+            "state_id": _status_id(meta, "Approved"),
+        }
+        response = clients["hiral"].post(BASE.format(slug=workspace.slug), payload, format="json")
+        assert response.status_code == 400 and "state_id" in response.json()
+        # unless the creator is the Manager, who approves it at once
+        response = clients["manoj"].post(BASE.format(slug=workspace.slug), payload, format="json")
+        assert response.status_code == 201 and response.json()["approval"]["status"] == "approved"

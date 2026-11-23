@@ -12,6 +12,7 @@ import { EmptyStateCompact } from "@plane/blocks/empty-state";
 import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 // components
 import { PageHead } from "@/components/core/page-title";
+import { AttendanceReport } from "@/components/worklog-reports/attendance-report";
 import { WORKLOG_REPORT_TYPES, isWorklogReportType } from "@/components/worklog-reports/helpers";
 import { QuarterlyWorklogReport, YearlyWorklogReport } from "@/components/worklog-reports/long-period-report";
 import { MonthlyWorklogReport } from "@/components/worklog-reports/monthly-report";
@@ -56,7 +57,9 @@ function WorklogReportsPage({ params }: Route.ComponentProps) {
           </Tabs>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {/* keyed so each report keeps its own filters */}
-            {reportType === "monthly" ? (
+            {reportType === "attendance" ? (
+              <AttendanceReport workspaceSlug={workspaceSlug} />
+            ) : reportType === "monthly" ? (
               <MonthlyWorklogReport workspaceSlug={workspaceSlug} />
             ) : reportType === "quarterly" ? (
               <QuarterlyWorklogReport workspaceSlug={workspaceSlug} />

@@ -101,11 +101,11 @@ function UserInvitationsPage() {
           });
         return undefined;
       })
-      .catch((_err) => {
+      .catch((err: { error?: unknown } | undefined) => {
         setToast({
           type: "error",
           title: t("error"),
-          message: t("something_went_wrong_please_try_again"),
+          message: typeof err?.error === "string" ? err.error : t("something_went_wrong_please_try_again"),
         });
         setIsJoiningWorkspaces(false);
       });
@@ -166,6 +166,11 @@ function UserInvitationsPage() {
                     );
                   })}
                 </div>
+                {currentUser?.is_email_verified === false && (
+                  <p className="text-body-xs-regular text-secondary">
+                    To join, open the invitation link we emailed you.
+                  </p>
+                )}
                 <div className="flex items-center gap-3">
                   <Button
                     variant="primary"
@@ -174,7 +179,9 @@ function UserInvitationsPage() {
                     stretch="auto"
                     label={t("accept_and_join")}
                     onClick={submitInvitations}
-                    disabled={isJoiningWorkspaces || invitationsRespond.length === 0}
+                    disabled={
+                      isJoiningWorkspaces || invitationsRespond.length === 0 || currentUser?.is_email_verified === false
+                    }
                     loading={isJoiningWorkspaces}
                   />
                   <Button
