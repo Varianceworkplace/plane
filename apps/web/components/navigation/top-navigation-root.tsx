@@ -18,6 +18,7 @@ import { AppSidebarItem } from "@/components/sidebar/sidebar-item";
 import { InboxOutline } from "@makeplane/propel/icons";
 import useSWR from "swr";
 import { useWorkspaceNotifications } from "@/hooks/store/notifications";
+import { TopBarWorklogTimer } from "@/components/worklogs/top-bar-timer";
 // local imports
 
 export const TopNavigationRoot = observer(function TopNavigationRoot() {
@@ -59,6 +60,7 @@ export const TopNavigationRoot = observer(function TopNavigationRoot() {
       </div>
       {/* Additional Actions */}
       <div className="flex flex-1 shrink-0 items-center justify-end gap-1">
+        <TopBarWorklogTimer />
         <Tooltip label="Inbox" side="bottom">
           <AppSidebarItem
             variant="link"

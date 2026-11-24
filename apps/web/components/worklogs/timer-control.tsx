@@ -31,7 +31,7 @@ const CLOSING_STATUSES: TClosingStatus[] = [
 
 /** Seconds on the timer, ticking every second while it runs. Corrects for client / server clock drift; time it stood
  * stopped before a Discard doesn't count. */
-const useTimerSeconds = (timer: TWorklogTimer | null) => {
+export const useTimerSeconds = (timer: TWorklogTimer | null) => {
   const [, setTick] = useState(0);
   // server time minus local time, captured whenever fresh timer data arrives
   const clockOffset = useMemo(
@@ -216,7 +216,7 @@ export function WorklogTimerControl(props: Props) {
 /** Shown after Stop: date, start, end and total, plus the required note and how the task is left (On Hold or
  * Completed, as in Workplace). It closes only by saving the time log or by Discard (the timer runs on); there's no
  * putting it off or deleting the timer. */
-function SaveTimerModal(props: {
+export function SaveTimerModal(props: {
   open: boolean;
   workspaceSlug: string;
   timer: TWorklogTimer;
