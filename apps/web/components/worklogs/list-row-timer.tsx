@@ -23,7 +23,7 @@ import { refreshWorkItemTime, useWorklogTimer } from "./helpers";
 import { WorklogTimerControl } from "./timer-control";
 
 /** Every list store (BaseIssuesStore) updates a work item in the store alone with `shouldSync` false. */
-type TLocalIssueUpdate = {
+export type TLocalIssueUpdate = {
   issueUpdate?: (
     workspaceSlug: string,
     projectId: string,
