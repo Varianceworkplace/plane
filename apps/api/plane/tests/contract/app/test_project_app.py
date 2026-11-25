@@ -340,6 +340,31 @@ class TestProjectAPIGet(TestProjectBase):
         assert data[0]["description"] == "A detailed test project"
 
     @pytest.mark.django_db
+    def test_list_detail_members(self, session_client, workspace, create_user):
+        """Each project's members: active people only (no bots, nobody who left), newest first; [] when none"""
+
+        def person(name, **extra):
+            suffix = uuid.uuid4().hex[:6]
+            user = User.objects.create(email=f"{name}-{suffix}@plane.so", username=f"{name}{suffix}", **extra)
+            WorkspaceMember.objects.create(workspace=workspace, member=user, role=15)
+            return user
+
+        project = Project.objects.create(name="Team Project", identifier="TP", workspace=workspace)
+        empty = Project.objects.create(name="Empty Project", identifier="EP", workspace=workspace)
+        ProjectMember.objects.create(project=project, member=create_user, role=20, is_active=True)
+        ProjectMember.objects.create(project=empty, member=create_user, role=20, is_active=False)
+        newer, left, bot = person("newer"), person("left"), person("bot", is_bot=True)
+        for user, active in ((left, False), (bot, True), (newer, True)):
+            ProjectMember.objects.create(project=project, member=user, role=15, is_active=active)
+
+        data = {p["name"]: p for p in session_client.get(self.get_project_url(workspace.slug, details=True)).json()}
+        assert data["Team Project"]["members"] == [str(newer.id), str(create_user.id)]
+        assert data["Empty Project"]["members"] == []
+        # asked for some fields only: members come along all the same, as before
+        some = session_client.get(self.get_project_url(workspace.slug, details=True), {"fields": "id,name"}).json()
+        assert {p["name"]: p["members"] for p in some}["Team Project"] == [str(newer.id), str(create_user.id)]
+
+    @pytest.mark.django_db
     def test_retrieve_project_success(self, session_client, workspace, create_user):
         """Test retrieving a specific project"""
         # Create a project

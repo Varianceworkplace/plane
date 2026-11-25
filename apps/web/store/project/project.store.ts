@@ -34,6 +34,9 @@ export interface IProjectStore {
   archivedProjectIds: string[] | undefined;
   totalProjectIds: string[] | undefined;
   joinedProjectIds: string[];
+  /** the projects the person is working on, by their latest timer activity (GET my-active-projects/) */
+  workingProjectIds: string[];
+  sidebarWorkingProjectIds: string[];
   sidebarProjectIds: string[];
   favoriteProjectIds: string[];
   currentProjectDetails: TProject | undefined;
@@ -69,6 +72,7 @@ export interface IProjectStore {
   // project-view action
   updateProjectView: (workspaceSlug: string, projectId: string, viewProps: any) => Promise<any>;
   setProjectInMyList: (workspaceSlug: string, projectId: string, show: boolean) => Promise<void>;
+  setWorkingProjectIds: (projectIds: string[]) => void;
   // CRUD actions
   createProject: (workspaceSlug: string, data: Partial<TProject>) => Promise<TProject>;
   updateProject: (workspaceSlug: string, projectId: string, data: Partial<TProject>) => Promise<TProject>;
@@ -85,6 +89,7 @@ export class ProjectStore implements IProjectStore {
   fetchStatus: TFetchStatus = undefined;
   projectMap: Record<string, TProject> = {};
   projectAnalyticsCountMap: Record<string, TProjectAnalyticsCount> = {};
+  workingProjectIds: string[] = [];
   openCollapsibleSection: ProjectOverviewCollapsible[] = ["milestones"];
   lastCollapsibleAction: ProjectOverviewCollapsible | null = null;
 
@@ -105,6 +110,7 @@ export class ProjectStore implements IProjectStore {
       fetchStatus: observable.ref,
       projectMap: observable,
       projectAnalyticsCountMap: observable,
+      workingProjectIds: observable.ref,
       openCollapsibleSection: observable.ref,
       lastCollapsibleAction: observable.ref,
       // computed
@@ -115,6 +121,7 @@ export class ProjectStore implements IProjectStore {
       totalProjectIds: computed,
       currentProjectDetails: computed,
       joinedProjectIds: computed,
+      sidebarWorkingProjectIds: computed,
       sidebarProjectIds: computed,
       favoriteProjectIds: computed,
       currentProjectNextSequenceId: computed,
@@ -131,6 +138,7 @@ export class ProjectStore implements IProjectStore {
       // project-view action
       updateProjectView: action,
       setProjectInMyList: action,
+      setWorkingProjectIds: action,
       // CRUD actions
       createProject: action,
       updateProject: action,
@@ -258,8 +266,26 @@ export class ProjectStore implements IProjectStore {
    * uses it; everything else (pickers, filters, search) keeps every joined project.
    */
   get sidebarProjectIds() {
-    return this.joinedProjectIds.filter((projectId) => this.projectMap?.[projectId]?.in_my_list !== false);
+    const listed = this.joinedProjectIds.filter((projectId) => this.projectMap?.[projectId]?.in_my_list !== false);
+    // the projects they're working on first (latest timer activity), then their own order
+    const working = new Set(this.sidebarWorkingProjectIds);
+    return [...this.sidebarWorkingProjectIds, ...listed.filter((projectId) => !working.has(projectId))];
   }
+
+  /**
+   * The projects of the sidebar list the person is working on (an ongoing task of theirs), in the order of their
+   * latest timer activity. They stay on top and can't be dragged; hidden ones ("Hide from List") stay hidden.
+   */
+  get sidebarWorkingProjectIds() {
+    const joined = new Set(this.joinedProjectIds);
+    return this.workingProjectIds.filter(
+      (projectId) => joined.has(projectId) && this.projectMap?.[projectId]?.in_my_list !== false
+    );
+  }
+
+  setWorkingProjectIds = (projectIds: string[]) => {
+    if (projectIds.join() !== this.workingProjectIds.join()) this.workingProjectIds = projectIds;
+  };
 
   /**
    * Returns favorite project IDs belong to the current workspace

@@ -125,6 +125,10 @@ class ProjectListSerializer(DynamicBaseSerializer):
     next_work_item_sequence = serializers.SerializerMethodField()
 
     def get_members(self, obj):
+        # the project list (ProjectViewSet.list_detail) hands over the ids alone, see with_member_ids
+        member_ids = getattr(obj, "member_ids", None)
+        if member_ids is not None:
+            return member_ids
         project_members = getattr(obj, "members_list", None)
         if project_members is not None:
             # Filter members by the project ID
@@ -133,7 +137,11 @@ class ProjectListSerializer(DynamicBaseSerializer):
 
     def get_next_work_item_sequence(self, obj):
         """Get the next sequence ID that will be assigned to a new issue"""
-        max_sequence = IssueSequence.objects.filter(project_id=obj.id).aggregate(max_seq=Max("sequence"))["max_seq"]
+        if hasattr(obj, "max_issue_sequence"):
+            # annotated by the project list query (ProjectViewSet.get_queryset), saving a query per project
+            max_sequence = obj.max_issue_sequence
+        else:
+            max_sequence = IssueSequence.objects.filter(project_id=obj.id).aggregate(max_seq=Max("sequence"))["max_seq"]
         return (max_sequence + 1) if max_sequence else 1
 
     class Meta:

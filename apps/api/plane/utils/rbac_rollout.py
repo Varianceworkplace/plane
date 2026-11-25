@@ -40,16 +40,26 @@ def rollout_preview(workspace):
 
         work_items = Issue.issue_objects.filter(workspace=workspace)
         projects = Project.objects.filter(workspace=workspace, archived_at__isnull=True)
+        # (project, person) -> (role, active): only what's compared below, not whole membership rows
         rows = {
-            (row.project_id, row.member_id): row
-            for row in ProjectMember.objects.filter(workspace=workspace, member__isnull=False)
+            (project_id, member_id): (role, is_active)
+            for project_id, member_id, role, is_active in ProjectMember.objects.filter(
+                workspace=workspace, member__isnull=False
+            ).values_list("project_id", "member_id", "role", "is_active")
         }
-        desired = desired_project_roles(workspace.id)
+        memberships = list(memberships)
+        # each person's access is loaded once, here and for desired_project_roles
+        profiles = {
+            membership.member_id: AccessProfile.load(membership.member, workspace.id) for membership in memberships
+        }
+        desired_by_member = {}
+        for (project_id, user_id), role in desired_project_roles(workspace.id, profiles=profiles).items():
+            desired_by_member.setdefault(user_id, []).append((project_id, role))
 
         people = []
         for membership in memberships:
             user = membership.member
-            profile = AccessProfile.load(user, workspace.id)
+            profile = profiles[membership.member_id]
             is_admin = membership.role == ROLE_ADMIN
             after = work_items.filter(profile.work_item_q("view")).count()
             if workspace.is_rbac_enabled:
@@ -60,13 +70,11 @@ def rollout_preview(workspace):
                 in_projects = Q() if is_admin else Q(project_id__in=own_projects.values("project_id"))
                 now = work_items.filter(visible_to(user) & in_projects).count()
             added = raised = 0
-            for (project_id, user_id), role in desired.items():
-                if user_id != user.id:
-                    continue
-                row = rows.get((project_id, user_id))
-                if row is None or not row.is_active:
+            for project_id, role in desired_by_member.get(user.id, []):
+                row = rows.get((project_id, user.id))
+                if row is None or not row[1]:
                     added += 1
-                elif row.role < role:
+                elif row[0] < role:
                     raised += 1
             people.append(
                 {

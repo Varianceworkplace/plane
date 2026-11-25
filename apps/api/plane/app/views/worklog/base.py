@@ -85,6 +85,7 @@ def serialize_worklog(worklog):
     project = worklog.project
     return {
         "id": str(worklog.id),
+        "timesheet_no": worklog.timesheet_no,
         "duration": worklog.duration,
         "description": worklog.description,
         "logged_by": serialize_user(worklog.logged_by),
@@ -335,6 +336,7 @@ class WorkspaceWorkLogEndpoint(BaseAPIView):
 
 class WorkspaceWorkLogDownloadEndpoint(BaseAPIView):
     HEADERS = [
+        "Timesheet No.",
         "Project",
         "Work item ID",
         "Work item",
@@ -367,6 +369,7 @@ class WorkspaceWorkLogDownloadEndpoint(BaseAPIView):
         for worklog in filtered_workspace_worklogs(request, slug).select_related("logged_by"):
             rows.append(
                 [
+                    worklog.timesheet_no,
                     worklog.project.name,
                     f"{worklog.project.identifier}-{worklog.issue.sequence_id}",
                     worklog.issue.name,

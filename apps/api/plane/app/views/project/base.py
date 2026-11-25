@@ -9,7 +9,7 @@ import json
 # Django imports
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Exists, F, OuterRef, Prefetch, Q, Subquery, Count
+from django.db.models import Exists, F, Max, OuterRef, Prefetch, Q, Subquery, Count
 from django.utils import timezone
 
 # Third Party imports
@@ -30,6 +30,7 @@ from plane.db.models import (
     UserFavorite,
     DeployBoard,
     Intake,
+    IssueSequence,
     Project,
     ProjectDetail,
     ProjectIdentifier,
@@ -50,6 +51,21 @@ from plane.utils.order_queryset import PROJECT_ORDER_BY_ALLOWLIST, sanitize_orde
 from plane.db.models.rbac import schedule_project_access_sync
 from plane.utils.project_list import in_my_list_annotation
 from plane.utils.rbac import is_rbac_enabled, rbac_profile
+
+
+def with_member_ids(projects):
+    """Each project's active, non-bot member ids (newest first), as ProjectListSerializer's `members` gives them, from
+    one query of ids alone. The member prefetch builds a ProjectMember and a User object per membership, which took
+    seconds once the projects had ~75,000 memberships between them."""
+    projects = list(projects)
+    member_ids = {project.id: [] for project in projects}
+    for project_id, member_id in ProjectMember.objects.filter(
+        project_id__in=list(member_ids), is_active=True, member__is_bot=False
+    ).values_list("project_id", "member_id"):
+        member_ids[project_id].append(member_id)
+    for project in projects:
+        project.member_ids = member_ids[project.id]
+    return projects
 
 
 class ProjectViewSet(BaseViewSet):
@@ -99,12 +115,22 @@ class ProjectViewSet(BaseViewSet):
             .annotate(sort_order=Subquery(sort_order))
             # the person's sidebar Projects list (Show in List / Hide from List)
             .annotate(in_my_list=in_my_list_annotation(self.request, self.kwargs.get("slug")))
+            # the highest work item number, for next_work_item_sequence: one query for all projects, not one each
+            .annotate(
+                max_issue_sequence=Subquery(
+                    IssueSequence.objects.filter(project_id=OuterRef("pk"))
+                    .values("project_id")
+                    .annotate(max_seq=Max("sequence"))
+                    .values("max_seq")[:1]
+                )
+            )
             .prefetch_related(
                 Prefetch(
                     "project_projectmember",
-                    queryset=ProjectMember.objects.filter(
-                        workspace__slug=self.kwargs.get("slug"), is_active=True
-                    ).select_related("member"),
+                    # only what the project list reads (member ids, active, bot): a project can have many members
+                    queryset=ProjectMember.objects.filter(workspace__slug=self.kwargs.get("slug"), is_active=True)
+                    .select_related("member")
+                    .only("id", "project_id", "member_id", "is_active", "member__id", "member__is_bot"),
                     to_attr="members_list",
                 )
             )
@@ -114,7 +140,8 @@ class ProjectViewSet(BaseViewSet):
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
     def list_detail(self, request, slug):
         fields = [field for field in request.GET.get("fields", "").split(",") if field]
-        projects = self.get_queryset().order_by("sort_order", "name")
+        # members come from with_member_ids, not the prefetch (much faster with many members)
+        projects = self.get_queryset().prefetch_related(None).order_by("sort_order", "name")
         if WorkspaceMember.objects.filter(
             member=request.user,
             workspace__slug=slug,
@@ -154,10 +181,10 @@ class ProjectViewSet(BaseViewSet):
                 ),
                 request=request,
                 queryset=(projects),
-                on_results=lambda projects: ProjectListSerializer(projects, many=True).data,
+                on_results=lambda projects: ProjectListSerializer(with_member_ids(projects), many=True).data,
             )
 
-        projects = ProjectListSerializer(projects, many=True, fields=fields if fields else None).data
+        projects = ProjectListSerializer(with_member_ids(projects), many=True, fields=fields if fields else None).data
         return Response(projects, status=status.HTTP_200_OK)
 
     @allow_permission(allowed_roles=[ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")

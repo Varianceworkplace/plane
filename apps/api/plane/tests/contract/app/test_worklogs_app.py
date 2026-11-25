@@ -323,14 +323,15 @@ def test_workspace_worklog_filters(setup):
 
 @pytest.mark.contract
 def test_download_csv_and_xlsx(setup):
-    _log(setup, "member", 630, "=HYPERLINK(evil)")
+    logged = _log(setup, "member", 630, "=HYPERLINK(evil)")
     client = setup["clients"]["admin"]
 
     response = client.get(_ws_url(setup, "download/"), {"type": "csv"})
     assert response.status_code == status.HTTP_200_OK
     assert response["Content-Type"].startswith("text/csv")
     text = response.content.decode()
-    assert "Project,Work item ID,Work item,Logged by,Email,Date,Start time,End time,Time" in text
+    assert "Timesheet No.,Project,Work item ID,Work item,Logged by,Email,Date,Start time,End time,Time" in text
+    assert f"{logged['timesheet_no']},Power Layout," in text
     assert "POWER-" in text and "10h 30m" in text and "10.5" in text
     assert "'=HYPERLINK(evil)" in text  # formula injection neutralised
 
@@ -338,9 +339,10 @@ def test_download_csv_and_xlsx(setup):
     assert response.status_code == status.HTTP_200_OK
     sheet = load_workbook(io.BytesIO(response.content)).active
     rows = list(sheet.iter_rows(values_only=True))
-    assert rows[0][0] == "Project"
-    assert rows[1][0] == "Power Layout" and rows[1][9] == 630
-    assert rows[1][6] and rows[1][7]  # start / end times
+    assert rows[0][:2] == ("Timesheet No.", "Project")
+    assert rows[1][0] == logged["timesheet_no"]
+    assert rows[1][1] == "Power Layout" and rows[1][10] == 630
+    assert rows[1][7] and rows[1][8]  # start / end times
 
     assert client.get(_ws_url(setup, "download/"), {"type": "pdf"}).status_code == 400
 
@@ -654,3 +656,81 @@ def test_editing_timer_entry_moves_end_time(setup):
     assert response.status_code == 200
     stored = IssueWorkLog.objects.get(pk=worklog["id"])
     assert stored.ended_at - stored.started_at == timedelta(minutes=120)
+
+
+# ---------------------------------------------------------------- Timesheet No.
+
+
+def _number(value):
+    assert value.startswith("TIME-BILLING-"), value
+    return int(value.removeprefix("TIME-BILLING-"))
+
+
+@pytest.mark.contract
+def test_each_new_entry_gets_the_next_timesheet_no(setup):
+    first, second = _log(setup), _log(setup, who="other")
+    assert _number(second["timesheet_no"]) == _number(first["timesheet_no"]) + 1
+    assert IssueWorkLog.objects.get(pk=first["id"]).timesheet_no == first["timesheet_no"]
+
+
+@pytest.mark.contract
+def test_saved_timer_gets_a_timesheet_no(setup):
+    client = setup["clients"]["member"]
+    before = _number(_log(setup)["timesheet_no"])
+    assert client.post(_start_url(setup)).status_code == status.HTTP_201_CREATED
+    timer = IssueWorkLogTimer.objects.get(user=setup["people"]["member"])
+    timer.started_at = timezone.now() - timedelta(minutes=30)
+    timer.save(update_fields=["started_at"])
+    client.post(_timer_url(setup, "stop/"))
+    saved = client.post(_timer_url(setup, "save/"), {"description": "Timed work", "status": "on_hold"}, format="json")
+    assert saved.status_code == status.HTTP_201_CREATED, saved.content
+    assert _number(saved.json()["timesheet_no"]) == before + 1
+
+
+@pytest.mark.contract
+def test_timesheet_no_cannot_be_changed(setup):
+    worklog = _log(setup)
+    payload = {"timesheet_no": "TIME-BILLING-1", "description": "edited"}
+    response = setup["clients"]["member"].patch(_url(setup, worklog_id=worklog["id"]), payload, format="json")
+    assert response.status_code == status.HTTP_200_OK, response.content
+    assert IssueWorkLog.objects.get(pk=worklog["id"]).timesheet_no == worklog["timesheet_no"]
+
+
+@pytest.mark.contract
+def test_time_sheet_shows_searches_and_exports_the_timesheet_no(setup):
+    worklog, other = _log(setup), _log(setup, description="another")
+    client = setup["clients"]["member"]
+    base = f"/api/workspaces/{setup['workspace'].slug}/timesheet/"
+    rows = client.get(base).json()["results"]
+    assert {row["timesheet_no"] for row in rows} == {worklog["timesheet_no"], other["timesheet_no"]}
+    found = client.get(base, {"search": worklog["timesheet_no"]}).json()["results"]
+    assert [row["id"] for row in found] == [worklog["id"]]
+    download = client.get(f"{base}download/", {"type": "csv"})
+    assert download.status_code == status.HTTP_200_OK
+    lines = download.content.decode("utf-8-sig").splitlines()
+    assert lines[0].startswith("Timesheet No.,")
+    assert any(line.startswith(f"{worklog['timesheet_no']},") for line in lines[1:])
+
+
+@pytest.mark.contract
+def test_migration_numbers_existing_entries_after_the_highest(setup):
+    from importlib import import_module
+
+    from django.apps import apps
+    from django.db import connection
+
+    migration = import_module("plane.db.migrations.0150_worklog_timesheet_no")
+    old, newer, imported = _log(setup), _log(setup), _log(setup)
+    IssueWorkLog.objects.filter(pk__in=[old["id"], newer["id"]]).update(timesheet_no="")
+    # an entry brought over from Workplace keeps its number; the others continue after it
+    IssueWorkLog.objects.filter(pk=imported["id"]).update(timesheet_no="TIME-BILLING-900000")
+
+    class SchemaEditor:
+        pass
+
+    editor = SchemaEditor()
+    editor.connection = connection
+    migration.number_existing_entries(apps, editor)
+    assert IssueWorkLog.objects.get(pk=old["id"]).timesheet_no == "TIME-BILLING-900001"
+    assert IssueWorkLog.objects.get(pk=newer["id"]).timesheet_no == "TIME-BILLING-900002"
+    assert _log(setup)["timesheet_no"] == "TIME-BILLING-900003"

@@ -23,6 +23,7 @@ import { Loader } from "@plane/blocks/skeleton";
 import { copyUrlToClipboard, cn, orderJoinedProjects } from "@plane/utils";
 // components
 import { CreateProjectModal } from "@/components/project/create-project-modal";
+import { CountChip } from "@/components/common/count-chip";
 import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
 // hooks
 import { useAppTheme } from "@/hooks/store/use-app-theme";
@@ -35,6 +36,7 @@ import { useProjectNavigationPreferences } from "@/hooks/use-navigation-preferen
 import type { TProject } from "@plane/types";
 // local imports
 import { SidebarProjectsListItem } from "./projects-list-item";
+import { useSidebarWorkingProjects } from "./use-working-projects";
 
 export const SidebarProjectsList = observer(function SidebarProjectsList() {
   // states
@@ -55,6 +57,7 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
     loader,
     getPartialProjectById,
     sidebarProjectIds: joinedProjects,
+    sidebarWorkingProjectIds,
     joinedProjectIds,
     updateProjectView,
   } = useProject();
@@ -63,6 +66,9 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
   // router params
   const { workspaceSlug } = useParams();
   const pathname = usePathname();
+  // the projects they're working on come first (latest timer activity) and stay there: not draggable
+  useSidebarWorkingProjects(workspaceSlug?.toString() ?? "");
+  const workingProjects = new Set(sidebarWorkingProjectIds);
 
   // auth
   const isAuthorizedUser =
@@ -97,14 +103,17 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
     if (!sourceId || !destinationId || !workspaceSlug) return;
     if (sourceId === destinationId) return;
 
+    // the person's own order: the projects below the ones they're working on
+    const orderedProjects = joinedProjects.filter((projectId) => !workingProjects.has(projectId));
     const joinedProjectsList: TProject[] = [];
-    joinedProjects.map((projectId) => {
+    orderedProjects.map((projectId) => {
       const projectDetails = getPartialProjectById(projectId);
       if (projectDetails) joinedProjectsList.push(projectDetails);
     });
 
-    const sourceIndex = joinedProjects.indexOf(sourceId);
-    const destinationIndex = shouldDropAtEnd ? joinedProjects.length : joinedProjects.indexOf(destinationId);
+    const sourceIndex = orderedProjects.indexOf(sourceId);
+    const destinationIndex = shouldDropAtEnd ? orderedProjects.length : orderedProjects.indexOf(destinationId);
+    if (sourceIndex < 0 || destinationIndex < 0) return;
 
     if (joinedProjectsList.length <= 0) return;
 
@@ -187,7 +196,15 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
             render={<div className="group/projects-section" />}
             open={isAllProjectsListOpen}
             onOpenChange={toggleListDisclosure}
-            trigger={<span className="text-13 font-semibold whitespace-nowrap text-placeholder">{t("projects")}</span>}
+            trigger={
+              <span className="flex items-center gap-1.5">
+                <span className="text-13 font-semibold whitespace-nowrap text-placeholder">{t("projects")}</span>
+                {/* the projects in their list, also those under "More" */}
+                {loader !== "init-loader" && joinedProjects.length > 0 && (
+                  <CountChip count={joinedProjects.length} className="py-0" />
+                )}
+              </span>
+            }
             trailing={
               isAuthorizedUser ? (
                 <span className="hidden text-placeholder group-focus-within/projects-section:inline-flex group-hover/projects-section:inline-flex">
@@ -221,8 +238,8 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
                   projectId={projectId}
                   handleCopyText={() => handleCopyText(projectId)}
                   projectListType={"JOINED"}
-                  disableDrag={false}
-                  disableDrop={false}
+                  disableDrag={workingProjects.has(projectId)}
+                  disableDrop={workingProjects.has(projectId)}
                   isLastChild={index === displayedProjects.length - 1}
                   handleOnProjectDrop={handleOnProjectDrop}
                 />

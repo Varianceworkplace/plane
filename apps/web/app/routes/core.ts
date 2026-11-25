@@ -126,6 +126,15 @@ export const coreRoutes: RouteConfigEntry[] = [
           ),
         ]),
 
+        // Project Tasks (every project task the person may see, newest first, like Workplace's Project Tasks list)
+        layout("./(all)/[workspaceSlug]/(projects)/project-tasks/layout.tsx", [
+          route(":workspaceSlug/project-tasks", "./(all)/[workspaceSlug]/(projects)/project-tasks/page.tsx"),
+          route(
+            ":workspaceSlug/project-tasks/:globalViewId",
+            "./(all)/[workspaceSlug]/(projects)/project-tasks/[globalViewId]/page.tsx"
+          ),
+        ]),
+
         // Time Sheet (time entries: own, team's, the levels below)
         layout("./(all)/[workspaceSlug]/(projects)/timesheet/layout.tsx", [
           route(":workspaceSlug/timesheet", "./(all)/[workspaceSlug]/(projects)/timesheet/page.tsx"),

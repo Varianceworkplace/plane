@@ -49,6 +49,11 @@ type TIssueDefaultPropertiesProps = {
   isDraft: boolean;
   handleFormChange: () => void;
   setSelectedParentIssue: (issue: ISearchIssueResponse) => void;
+  /**
+   * A project task's form: its fields already hold status, priority, assignee, dates and parent, so only the pills
+   * it has no field for show (cycle, module, estimate, when the project uses them), and nothing when it uses none.
+   */
+  onlyMissingFromForm?: boolean;
 };
 
 export const IssueDefaultProperties = observer(function IssueDefaultProperties(props: TIssueDefaultPropertiesProps) {
@@ -64,6 +69,7 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
     isDraft,
     handleFormChange,
     setSelectedParentIssue,
+    onlyMissingFromForm = false,
   } = props;
   // states
   const [parentIssueListModalOpen, setParentIssueListModalOpen] = useState(false);
@@ -87,151 +93,160 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
   const maxDate = getDate(targetDate);
   maxDate?.setDate(maxDate.getDate());
 
+  const showCycle = !!projectDetails?.cycle_view && !!projectId;
+  const showModule = !!projectDetails?.module_view && !!workspaceSlug && !!projectId;
+  const showEstimate = !!projectId && areEstimateEnabledByProjectId(projectId);
+  if (onlyMissingFromForm && !showCycle && !showModule && !showEstimate) return null;
+
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Controller
-        control={control}
-        name="state_id"
-        render={({ field: { value, onChange } }) => (
-          <StateSelect
-            testId="create-work-item-state-select"
-            // an empty state shows the project's default state, as the legacy dropdown did
-            value={value || getProjectDefaultStateId(projectId)}
-            onChange={(stateId) => {
-              onChange(stateId);
-              handleFormChange();
-            }}
-            projectId={projectId ?? undefined}
-            variant="pill-md"
-            tabIndex={getIndex("state_id")}
-          />
-        )}
-      />
-      <Controller
-        control={control}
-        name="priority"
-        render={({ field: { value, onChange } }) => (
-          <PrioritySelect
-            testId="create-work-item-priority-select"
-            value={value}
-            onChange={(priority) => {
-              onChange(priority);
-              handleFormChange();
-            }}
-            variant="pill-md"
-            tabIndex={getIndex("priority")}
-          />
-        )}
-      />
-      <Controller
-        control={control}
-        name="assignee_ids"
-        render={({ field: { value, onChange } }) => {
-          const assigneeTeam = isDraft
-            ? undefined
-            : {
-                value: teamField.value,
-                onChange: (teamId: string | null) => {
-                  teamField.onChange(teamId);
-                  if (teamId) onChange([]);
+      {!onlyMissingFromForm && (
+        <>
+          <Controller
+            control={control}
+            name="state_id"
+            render={({ field: { value, onChange } }) => (
+              <StateSelect
+                testId="create-work-item-state-select"
+                // an empty state shows the project's default state, as the legacy dropdown did
+                value={value || getProjectDefaultStateId(projectId)}
+                onChange={(stateId) => {
+                  onChange(stateId);
                   handleFormChange();
-                },
+                }}
+                projectId={projectId ?? undefined}
+                variant="pill-md"
+                tabIndex={getIndex("state_id")}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="priority"
+            render={({ field: { value, onChange } }) => (
+              <PrioritySelect
+                testId="create-work-item-priority-select"
+                value={value}
+                onChange={(priority) => {
+                  onChange(priority);
+                  handleFormChange();
+                }}
+                variant="pill-md"
+                tabIndex={getIndex("priority")}
+              />
+            )}
+          />
+          <Controller
+            control={control}
+            name="assignee_ids"
+            render={({ field: { value, onChange } }) => {
+              const assigneeTeam = isDraft
+                ? undefined
+                : {
+                    value: teamField.value,
+                    onChange: (teamId: string | null) => {
+                      teamField.onChange(teamId);
+                      if (teamId) onChange([]);
+                      handleFormChange();
+                    },
+                  };
+              const setPeople = (assigneeIds: string[]) => {
+                onChange(assigneeIds);
+                if (teamField.value) teamField.onChange(null);
+                handleFormChange();
               };
-          const setPeople = (assigneeIds: string[]) => {
-            onChange(assigneeIds);
-            if (teamField.value) teamField.onChange(null);
-            handleFormChange();
-          };
-          // projects with task details: one person, the "Assigned To" of the Project Task form
-          return projectDetails?.is_task_details_enabled ? (
-            <MemberSelect
-              testId="create-work-item-assignee-select"
-              projectId={projectId ?? undefined}
-              value={value?.[0] ?? null}
-              onChange={(assigneeId) => setPeople(assigneeId ? [assigneeId] : [])}
-              assigneeTeam={assigneeTeam}
-              placeholder="Assigned to"
-              clearable
-              clearLabel="No assignee"
-              variant="pill-md"
-              tabIndex={getIndex("assignee_ids")}
-            />
-          ) : (
-            <MemberSelect
-              testId="create-work-item-assignee-select"
-              projectId={projectId ?? undefined}
-              value={value}
-              onChange={setPeople}
-              assigneeTeam={assigneeTeam}
-              placeholder={t("assignees")}
-              multiple
-              variant={value?.length ? "avatar-group-md" : "pill-md"}
-              tabIndex={getIndex("assignee_ids")}
-            />
-          );
-        }}
-      />
-      <Controller
-        control={control}
-        name="label_ids"
-        render={({ field: { value, onChange } }) => (
-          <LabelSelect
-            testId="create-work-item-label-select"
-            projectId={projectId ?? undefined}
-            value={value ?? []}
-            onChange={(labelIds) => {
-              onChange(labelIds);
-              handleFormChange();
+              // projects with task details: one person, the "Assigned To" of the Project Task form
+              return projectDetails?.is_task_details_enabled ? (
+                <MemberSelect
+                  testId="create-work-item-assignee-select"
+                  projectId={projectId ?? undefined}
+                  value={value?.[0] ?? null}
+                  onChange={(assigneeId) => setPeople(assigneeId ? [assigneeId] : [])}
+                  assigneeTeam={assigneeTeam}
+                  placeholder="Assigned to"
+                  clearable
+                  clearLabel="No assignee"
+                  variant="pill-md"
+                  tabIndex={getIndex("assignee_ids")}
+                />
+              ) : (
+                <MemberSelect
+                  testId="create-work-item-assignee-select"
+                  projectId={projectId ?? undefined}
+                  value={value}
+                  onChange={setPeople}
+                  assigneeTeam={assigneeTeam}
+                  placeholder={t("assignees")}
+                  multiple
+                  variant={value?.length ? "avatar-group-md" : "pill-md"}
+                  tabIndex={getIndex("assignee_ids")}
+                />
+              );
             }}
-            variant="pill-md"
-            placeholder={t("labels")}
-            tabIndex={getIndex("label_ids")}
           />
-        )}
-      />
-      <Controller
-        control={control}
-        name="start_date"
-        render={({ field: { value, onChange } }) => (
-          <DateSelect
-            value={getDate(value) ?? null}
-            onChange={(date) => {
-              onChange(date ? renderFormattedPayloadDate(date) : null);
-              handleFormChange();
-            }}
-            maxDate={maxDate ?? undefined}
-            placeholder={t("start_date")}
-            icon={<CalendarOutline />}
-            weekStartsOn={userProfile?.start_of_the_week}
-            clearable
-            tabIndex={getIndex("start_date")}
-            variant="pill-md"
-            testId="create-work-item-start-date-select"
+          <Controller
+            control={control}
+            name="label_ids"
+            render={({ field: { value, onChange } }) => (
+              <LabelSelect
+                testId="create-work-item-label-select"
+                projectId={projectId ?? undefined}
+                value={value ?? []}
+                onChange={(labelIds) => {
+                  onChange(labelIds);
+                  handleFormChange();
+                }}
+                variant="pill-md"
+                placeholder={t("labels")}
+                tabIndex={getIndex("label_ids")}
+              />
+            )}
           />
-        )}
-      />
-      <Controller
-        control={control}
-        name="target_date"
-        render={({ field: { value, onChange } }) => (
-          <DateSelect
-            value={getDate(value) ?? null}
-            onChange={(date) => {
-              onChange(date ? renderFormattedPayloadDate(date) : null);
-              handleFormChange();
-            }}
-            minDate={minDate ?? undefined}
-            placeholder={t("due_date")}
-            icon={<CalendarOutline />}
-            weekStartsOn={userProfile?.start_of_the_week}
-            clearable
-            tabIndex={getIndex("target_date")}
-            variant="pill-md"
-            testId="create-work-item-due-date-select"
+          <Controller
+            control={control}
+            name="start_date"
+            render={({ field: { value, onChange } }) => (
+              <DateSelect
+                value={getDate(value) ?? null}
+                onChange={(date) => {
+                  onChange(date ? renderFormattedPayloadDate(date) : null);
+                  handleFormChange();
+                }}
+                maxDate={maxDate ?? undefined}
+                placeholder={t("start_date")}
+                icon={<CalendarOutline />}
+                weekStartsOn={userProfile?.start_of_the_week}
+                clearable
+                tabIndex={getIndex("start_date")}
+                variant="pill-md"
+                testId="create-work-item-start-date-select"
+              />
+            )}
           />
-        )}
-      />
-      {projectDetails?.cycle_view && projectId && (
+          <Controller
+            control={control}
+            name="target_date"
+            render={({ field: { value, onChange } }) => (
+              <DateSelect
+                value={getDate(value) ?? null}
+                onChange={(date) => {
+                  onChange(date ? renderFormattedPayloadDate(date) : null);
+                  handleFormChange();
+                }}
+                minDate={minDate ?? undefined}
+                placeholder={t("due_date")}
+                icon={<CalendarOutline />}
+                weekStartsOn={userProfile?.start_of_the_week}
+                clearable
+                tabIndex={getIndex("target_date")}
+                variant="pill-md"
+                testId="create-work-item-due-date-select"
+              />
+            )}
+          />
+        </>
+      )}
+      {showCycle && (
         <Controller
           control={control}
           name="cycle_id"
@@ -251,7 +266,7 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
           )}
         />
       )}
-      {projectDetails?.module_view && workspaceSlug && projectId && (
+      {showModule && (
         <Controller
           control={control}
           name="module_ids"
@@ -271,7 +286,7 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
           )}
         />
       )}
-      {projectId && areEstimateEnabledByProjectId(projectId) && (
+      {showEstimate && (
         <Controller
           control={control}
           name="estimate_point"
@@ -290,68 +305,72 @@ export const IssueDefaultProperties = observer(function IssueDefaultProperties(p
           )}
         />
       )}
-      {parentId ? (
-        <Menu>
-          <MenuTrigger
-            tabIndex={getIndex("parent_id")}
-            render={
-              // `PillChrome` renders its own `<button type="button">`, which becomes the menu trigger.
-              <PillChrome size="sm" variant="outline">
-                {selectedParentIssue?.project_id && (
-                  <IssueIdentifier
-                    projectId={selectedParentIssue.project_id}
-                    issueTypeId={selectedParentIssue.type_id}
-                    projectIdentifier={selectedParentIssue?.project__identifier}
-                    issueSequenceId={selectedParentIssue.sequence_id}
-                    size="xs"
-                  />
-                )}
-              </PillChrome>
-            }
-          />
-          <MenuContent side="bottom" align="start">
-            <MenuItem label={t("change_parent_issue")} onClick={() => setParentIssueListModalOpen(true)} />
-            <Controller
-              control={control}
-              name="parent_id"
-              render={({ field: { onChange } }) => (
-                <MenuItem
-                  label={t("remove_parent_issue")}
-                  onClick={() => {
-                    onChange(null);
-                    handleFormChange();
-                  }}
+      {!onlyMissingFromForm && (
+        <>
+          {parentId ? (
+            <Menu>
+              <MenuTrigger
+                tabIndex={getIndex("parent_id")}
+                render={
+                  // `PillChrome` renders its own `<button type="button">`, which becomes the menu trigger.
+                  <PillChrome size="sm" variant="outline">
+                    {selectedParentIssue?.project_id && (
+                      <IssueIdentifier
+                        projectId={selectedParentIssue.project_id}
+                        issueTypeId={selectedParentIssue.type_id}
+                        projectIdentifier={selectedParentIssue?.project__identifier}
+                        issueSequenceId={selectedParentIssue.sequence_id}
+                        size="xs"
+                      />
+                    )}
+                  </PillChrome>
+                }
+              />
+              <MenuContent side="bottom" align="start">
+                <MenuItem label={t("change_parent_issue")} onClick={() => setParentIssueListModalOpen(true)} />
+                <Controller
+                  control={control}
+                  name="parent_id"
+                  render={({ field: { onChange } }) => (
+                    <MenuItem
+                      label={t("remove_parent_issue")}
+                      onClick={() => {
+                        onChange(null);
+                        handleFormChange();
+                      }}
+                    />
+                  )}
                 />
-              )}
+              </MenuContent>
+            </Menu>
+          ) : (
+            <Pill
+              size="sm"
+              variant="outline"
+              startIcon={<PropelIcon icon={<ParentOutline className="size-3.5" />} />}
+              onClick={() => setParentIssueListModalOpen(true)}
+              label={t("add_parent")}
             />
-          </MenuContent>
-        </Menu>
-      ) : (
-        <Pill
-          size="sm"
-          variant="outline"
-          startIcon={<PropelIcon icon={<ParentOutline className="size-3.5" />} />}
-          onClick={() => setParentIssueListModalOpen(true)}
-          label={t("add_parent")}
-        />
-      )}
-      <Controller
-        control={control}
-        name="parent_id"
-        render={({ field: { onChange } }) => (
-          <ParentIssuesListModal
-            isOpen={parentIssueListModalOpen}
-            handleClose={() => setParentIssueListModalOpen(false)}
-            onChange={(issue) => {
-              onChange(issue.id);
-              handleFormChange();
-              setSelectedParentIssue(issue);
-            }}
-            projectId={projectId ?? undefined}
-            issueId={isDraft ? undefined : id}
+          )}
+          <Controller
+            control={control}
+            name="parent_id"
+            render={({ field: { onChange } }) => (
+              <ParentIssuesListModal
+                isOpen={parentIssueListModalOpen}
+                handleClose={() => setParentIssueListModalOpen(false)}
+                onChange={(issue) => {
+                  onChange(issue.id);
+                  handleFormChange();
+                  setSelectedParentIssue(issue);
+                }}
+                projectId={projectId ?? undefined}
+                issueId={isDraft ? undefined : id}
+              />
+            )}
           />
-        )}
-      />
+        </>
+      )}
     </div>
   );
 });

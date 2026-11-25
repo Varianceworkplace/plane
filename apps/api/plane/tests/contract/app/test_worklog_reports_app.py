@@ -328,12 +328,13 @@ def test_download_worklogs_csv_respects_filters_and_scope(setup):
     )
     assert response.status_code == status.HTTP_200_OK
     rows = _csv(response)
-    assert rows[0][:5] == ["Date", "Project", "Work item ID", "Work item", "Status"]
+    assert rows[0][:6] == ["Timesheet No.", "Date", "Project", "Work item ID", "Work item", "Status"]
     body = rows[1:-1]
-    assert {r[5] for r in body} == {"hiral"}  # only their own time
-    assert {r[1] for r in body} == {"Alpha"}
-    assert body[0][0] == DAY3.isoformat() and body[0][11] == "'=HYPERLINK(evil)"
-    assert rows[-1][0] == "Total" and rows[-1][9] == "3h 15m" and rows[-1][10] == "3.25"
+    assert {r[6] for r in body} == {"hiral"}  # only their own time
+    assert {r[2] for r in body} == {"Alpha"}
+    assert body[0][0].startswith("TIME-BILLING-")
+    assert body[0][1] == DAY3.isoformat() and body[0][12] == "'=HYPERLINK(evil)"
+    assert rows[-1][0] == "Total" and rows[-1][10] == "3h 15m" and rows[-1][11] == "3.25"
 
 
 @pytest.mark.contract
@@ -348,7 +349,7 @@ def test_download_xlsx_has_summary_and_worklogs(setup):
     assert summary[-1][0] == "Total" and summary[-1][4] == 5.75
     worklogs = list(workbook["Worklogs"].iter_rows(values_only=True))
     assert len(worklogs) == 1 + 5 + 1
-    assert worklogs[-1][0] == "Total" and worklogs[-1][10] == 5.75
+    assert worklogs[-1][0] == "Total" and worklogs[-1][11] == 5.75
 
 
 @pytest.mark.contract
@@ -543,5 +544,5 @@ def test_download_follows_the_work_item_grouping(setup):
         f"ALPHA-{setup['alpha_open'].sequence_id}",
         f"ALPHA-{Issue.objects.get(name='Alpha done task').sequence_id}",
     )
-    assert [r[2] for r in rows][:3] == [open_id, open_id, done_id]
-    assert [r[2] for r in rows][3:] == ["BETA-1", "BETA-1"]
+    assert [r[3] for r in rows][:3] == [open_id, open_id, done_id]
+    assert [r[3] for r in rows][3:] == ["BETA-1", "BETA-1"]

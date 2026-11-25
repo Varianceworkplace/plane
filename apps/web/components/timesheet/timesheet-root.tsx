@@ -126,7 +126,7 @@ export const TimesheetRoot = observer(function TimesheetRoot(props: { workspaceS
   const page = data?.page ?? 1;
   const pages = data ? Math.max(1, Math.ceil(data.total_count / PER_PAGE)) : 1;
   const showPerson = data?.person === EVERYONE;
-  const columns = showPerson ? 9 : 8;
+  const columns = showPerson ? 10 : 9;
   const pageIds = data?.results.map((entry) => entry.id) ?? [];
   const allPicked = pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
   const toggle = (id: string) =>
@@ -196,7 +196,7 @@ export const TimesheetRoot = observer(function TimesheetRoot(props: { workspaceS
             <SearchOutline className="ml-2 size-3.5 text-placeholder" />
             <Input
               size="md"
-              placeholder="Search tasks, projects, notes"
+              placeholder="Search numbers, tasks, projects, notes"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onBlur={() => update({ search: search.trim() || undefined })}
@@ -263,17 +263,19 @@ export const TimesheetRoot = observer(function TimesheetRoot(props: { workspaceS
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border-[0.5px] border-subtle">
-          <table className="w-full min-w-[900px] table-fixed text-left">
+          <table className="w-full min-w-[1000px] table-fixed text-left">
             <colgroup>
               <col className="w-10" />
-              <col className="w-[11%]" />
+              {/* "TIME-BILLING-336717" on one line */}
+              <col className={showPerson ? "w-[14%]" : "w-[16%]"} />
+              <col className="w-[9%]" />
               <col className="w-[8%]" />
               <col className="w-[8%]" />
-              <col className="w-[8%]" />
-              <col className={showPerson ? "w-[24%]" : "w-[30%]"} />
-              <col className="w-[13%]" />
-              {showPerson && <col className="w-[12%]" />}
-              <col className={showPerson ? "w-[16%]" : "w-[22%]"} />
+              <col className="w-[7%]" />
+              <col className={showPerson ? "w-[17%]" : "w-[22%]"} />
+              <col className={showPerson ? "w-[11%]" : "w-[12%]"} />
+              {showPerson && <col className="w-[11%]" />}
+              <col className={showPerson ? "w-[15%]" : "w-[18%]"} />
             </colgroup>
             <thead className="bg-layer-1">
               <tr className="text-body-xs-medium text-secondary">
@@ -286,6 +288,7 @@ export const TimesheetRoot = observer(function TimesheetRoot(props: { workspaceS
                     onCheckedChange={() => setSelected(allPicked ? [] : pageIds)}
                   />
                 </th>
+                <th className="px-3 py-2.5 font-medium">Timesheet No.</th>
                 <th className="px-3 py-2.5 font-medium">Date</th>
                 <th className="px-3 py-2.5 font-medium">Start</th>
                 <th className="px-3 py-2.5 font-medium">End</th>
@@ -317,6 +320,9 @@ export const TimesheetRoot = observer(function TimesheetRoot(props: { workspaceS
                           aria-label={`Select the entry of ${entry.work_date ?? ""} on ${entry.project.identifier}-${entry.issue.sequence_id}`}
                           onCheckedChange={() => toggle(entry.id)}
                         />
+                      </td>
+                      <td className="truncate px-3 py-2.5 whitespace-nowrap text-secondary" title={entry.timesheet_no}>
+                        {entry.timesheet_no || "—"}
                       </td>
                       <td className="px-3 py-2.5">
                         {entry.work_date ? renderFormattedDate(entry.work_date, "dd-MM-yyyy") : "—"}

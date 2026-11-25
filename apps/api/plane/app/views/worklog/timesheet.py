@@ -131,6 +131,7 @@ def timesheet_entries(request, slug):
     if search:
         worklogs = worklogs.filter(
             Q(issue__name__icontains=search)
+            | Q(timesheet_no__icontains=search)
             | Q(description__icontains=search)
             | Q(project__name__icontains=search)
             | Q(project__identifier__icontains=search)
@@ -180,6 +181,7 @@ class TimesheetEndpoint(BaseAPIView):
 
 
 EXPORT_HEADERS = [
+    "Timesheet No.",
     "Date Start",
     "Date End",
     "Time Start",
@@ -209,6 +211,7 @@ def export_rows(worklogs, tz):
         start_date = worklog.work_date.isoformat() if worklog.work_date else ""
         rows.append(
             [
+                worklog.timesheet_no,
                 start_date,
                 # entries logged by hand have no end: they're on their day
                 local(worklog.ended_at, "%Y-%m-%d") or start_date,
@@ -225,7 +228,7 @@ def export_rows(worklogs, tz):
                 worklog.description,
             ]
         )
-    rows.append(["Total", "", "", "", format_duration(total), round(total / 60, 2), "", "", "", "", "", "", ""])
+    rows.append(["Total", "", "", "", "", format_duration(total), round(total / 60, 2), *[""] * 7])
     return rows
 
 
