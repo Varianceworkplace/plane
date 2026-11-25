@@ -30,9 +30,12 @@ import type { TFileSignedURLResponse, TIssueComment } from "@plane/types";
 import { CommentCreate } from "@/components/comments/comment-create";
 import { refreshWorkItemTime, useIssueWorklogs } from "@/components/worklogs/helpers";
 import { DeleteWorklogModal, LogWorkModal } from "@/components/worklogs/log-work-modal";
+import { WorklogTimerControl } from "@/components/worklogs/timer-control";
 import type { TWorklog } from "@/components/worklogs/types";
+import { useShowSavedTime } from "@/components/worklogs/use-show-saved-time";
 import { WorklogActivityItem } from "@/components/worklogs/worklog-activity-item";
 // hooks
+import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useProject } from "@/hooks/store/use-project";
 import { useUser, useUserPermissions } from "@/hooks/store/user";
 // local imports
@@ -186,6 +189,8 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
   // time tracking
   const { worklogs } = useIssueWorklogs(workspaceSlug, projectId, issueId, !isIntakeIssue);
   const { mutate } = useSWRConfig();
+  const showSavedTime = useShowSavedTime(workspaceSlug);
+  const { fetchActivities } = useIssueDetail();
   const isTimeTrackingEnabled = !!project?.is_time_tracking_enabled;
   const isProjectAdmin = allowPermissions(
     [EUserPermissions.ADMIN],
@@ -243,6 +248,20 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
           </Tabs>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {/* Start / Stop timer, as in the list rows (it also shows a running timer here when they may no longer log) */}
+          {isTimeTrackingEnabled && !isIntakeIssue && (
+            <WorklogTimerControl
+              workspaceSlug={workspaceSlug}
+              projectId={projectId}
+              issueId={issueId}
+              canStart={canLogWork}
+              onSaved={(issueStateId) => {
+                showSavedTime(projectId, issueId, issueStateId);
+                // the time log, and a move to On Hold / Completed, in this activity
+                void fetchActivities(workspaceSlug, projectId, issueId);
+              }}
+            />
+          )}
           {canLogWork && (
             <Button
               stretch="auto"

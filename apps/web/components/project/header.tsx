@@ -11,14 +11,18 @@ import { EUserPermissions, EUserPermissionsLevel } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 // ui
 import { Button } from "@makeplane/propel/components/button";
+import { Tooltip } from "@makeplane/propel/components/tooltip";
 import { ProjectsOutline } from "@makeplane/propel/icons";
 import { Breadcrumbs } from "@plane/blocks/breadcrumb";
 import { Header } from "@plane/blocks/layout";
 // components
 import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
+import { CountChip } from "@/components/common/count-chip";
 // hooks
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
+import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
+import { usePlatformOS } from "@/hooks/use-platform-os";
 // plane web constants
 // components
 import HeaderFilters from "./filters";
@@ -30,6 +34,8 @@ export const ProjectsBaseHeader = observer(function ProjectsBaseHeader() {
   // store hooks
   const { toggleCreateProjectModal } = useCommandPalette();
   const { allowPermissions, canAccess } = useUserPermissions();
+  const { filteredProjectIds, loader, fetchStatus } = useProject();
+  const { isMobile } = usePlatformOS();
 
   const pathname = usePathname();
   // auth
@@ -37,22 +43,37 @@ export const ProjectsBaseHeader = observer(function ProjectsBaseHeader() {
     allowPermissions([EUserPermissions.ADMIN, EUserPermissions.MEMBER], EUserPermissionsLevel.WORKSPACE) &&
     canAccess("projects", "create");
   const isArchived = pathname.includes("/archives");
+  // the projects on the page: search and filters applied, as the cards below
+  const projectCount =
+    loader !== "init-loader" && fetchStatus === "complete" ? (filteredProjectIds?.length ?? null) : null;
 
   return (
     <Header>
       <Header.LeftItem>
-        <Breadcrumbs>
-          <Breadcrumbs.Item
-            component={
-              <BreadcrumbLink
-                // every project the person may see; the sidebar Projects list is their own selection of them
-                label="All Projects"
-                icon={<ProjectsOutline className="h-4 w-4 text-tertiary" />}
-              />
-            }
-          />
-          {isArchived && <Breadcrumbs.Item component={<BreadcrumbLink label="Archived" />} />}
-        </Breadcrumbs>
+        <div className="flex items-center gap-2.5">
+          <Breadcrumbs className="flex-grow-0">
+            <Breadcrumbs.Item
+              component={
+                <BreadcrumbLink
+                  // every project the person may see; the sidebar Projects list is their own selection of them
+                  label="All Projects"
+                  icon={<ProjectsOutline className="h-4 w-4 text-tertiary" />}
+                />
+              }
+            />
+            {isArchived && <Breadcrumbs.Item component={<BreadcrumbLink label="Archived" />} />}
+          </Breadcrumbs>
+          {projectCount !== null && (
+            <Tooltip
+              label={`${projectCount} ${projectCount === 1 ? "project" : "projects"} on this page`}
+              layout="stacked"
+              side="bottom"
+              disabled={isMobile}
+            >
+              <CountChip count={projectCount} />
+            </Tooltip>
+          )}
+        </div>
       </Header.LeftItem>
       <Header.RightItem>
         <ProjectSearch />

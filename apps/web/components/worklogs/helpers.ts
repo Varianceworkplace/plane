@@ -53,11 +53,18 @@ export const issueTimeEstimateKey = (issueId: string) => `ISSUE_TIME_ESTIMATE_${
 export const projectTimeEstimatesKey = (projectId: string) => `PROJECT_TIME_ESTIMATES_${projectId}`;
 
 /** After time is logged, changed or removed: refresh the work item's worklogs and its project's totals. */
+/** Sidebar › Projects order; the timer's state is part of the key, so starting, stopping or saving it reloads it. */
+export const MY_ACTIVE_PROJECTS_KEY = "MY_ACTIVE_PROJECTS_";
+export const myActiveProjectsKey = (workspaceSlug: string, timerState: string) =>
+  `${MY_ACTIVE_PROJECTS_KEY}${workspaceSlug}_${timerState}`;
+
 export const refreshWorkItemTime = (mutate: ScopedMutator, projectId: string, issueId: string) =>
   Promise.all([
     mutate(issueWorklogsKey(issueId)),
     mutate(issueTimeEstimateKey(issueId)),
     mutate(projectTimeEstimatesKey(projectId)),
+    // logging time on a project moves it up the sidebar
+    mutate((key) => typeof key === "string" && key.startsWith(MY_ACTIVE_PROJECTS_KEY)),
   ]);
 
 export const worklogTimerKey = (workspaceSlug: string) => `WORKLOG_TIMER_${workspaceSlug}`;

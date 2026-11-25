@@ -38,6 +38,7 @@ export interface IWorkspaceView {
   };
 }
 
-export const STATIC_VIEW_TYPES = ["all-issues", "assigned", "created", "subscribed"];
+// "all": Variance's sidebar › Project Tasks (every project task the person may see), kept apart from "all-issues"
+export const STATIC_VIEW_TYPES = ["all-issues", "assigned", "created", "subscribed", "all"];
 
 export type TStaticViewTypes = (typeof STATIC_VIEW_TYPES)[number];

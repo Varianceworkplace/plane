@@ -428,6 +428,7 @@ class WorkLogReportDetailEndpoint(ReportBaseEndpoint):
         if search:
             worklogs = worklogs.filter(
                 Q(issue__name__icontains=search)
+                | Q(timesheet_no__icontains=search)
                 | Q(description__icontains=search)
                 | Q(logged_by__display_name__icontains=search)
                 | Q(logged_by__first_name__icontains=search)
@@ -501,6 +502,7 @@ class WorkLogReportDownloadEndpoint(ReportBaseEndpoint):
     """
 
     WORKLOG_HEADERS = [
+        "Timesheet No.",
         "Date",
         "Project",
         "Work item ID",
@@ -577,6 +579,7 @@ class WorkLogReportDownloadEndpoint(ReportBaseEndpoint):
             state = worklog.issue.state
             rows.append(
                 [
+                    worklog.timesheet_no,
                     worklog.work_date.isoformat() if worklog.work_date else "",
                     worklog.project.name,
                     f"{worklog.project.identifier}-{worklog.issue.sequence_id}",
@@ -591,7 +594,7 @@ class WorkLogReportDownloadEndpoint(ReportBaseEndpoint):
                     worklog.description,
                 ]
             )
-        rows.append(["Total", "", "", "", "", "", "", "", "", format_duration(total), round(total / 60, 2), ""])
+        rows.append(["Total", *[""] * 9, format_duration(total), round(total / 60, 2), ""])
         return rows
 
     @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")

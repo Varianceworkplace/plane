@@ -27,6 +27,11 @@ type TIssueTitleInputProps = {
   issueTitleRef: React.MutableRefObject<HTMLInputElement | null>;
   formState: FormState<TIssue>;
   handleFormChange: () => void;
+  /** `md`: a field among others, as "Project task name" on the project task form */
+  size?: "2xl" | "md";
+  placeholder?: string;
+  /** shown when it's left empty, instead of "Title is required" */
+  requiredMessage?: string;
 };
 
 export const IssueTitleInput = observer(function IssueTitleInput(props: TIssueTitleInputProps) {
@@ -35,6 +40,9 @@ export const IssueTitleInput = observer(function IssueTitleInput(props: TIssueTi
     issueTitleRef,
     formState: { errors },
     handleFormChange,
+    size = "2xl",
+    placeholder,
+    requiredMessage,
   } = props;
   // store hooks
   const { isMobile } = usePlatformOS();
@@ -44,7 +52,7 @@ export const IssueTitleInput = observer(function IssueTitleInput(props: TIssueTi
 
   const validateWhitespace = (value: string) => {
     if (value.trim() === "") {
-      return t("title_is_required");
+      return requiredMessage ?? t("title_is_required");
     }
     return undefined;
   };
@@ -55,7 +63,7 @@ export const IssueTitleInput = observer(function IssueTitleInput(props: TIssueTi
         name="name"
         rules={{
           validate: validateWhitespace,
-          required: t("title_is_required"),
+          required: requiredMessage ?? t("title_is_required"),
           maxLength: {
             value: 255,
             message: t("title_should_be_less_than_255_characters"),
@@ -63,9 +71,9 @@ export const IssueTitleInput = observer(function IssueTitleInput(props: TIssueTi
         }}
         render={({ field: { value, onChange, ref } }) => (
           <Field name="name" invalid={Boolean(errors.name)}>
-            <InputGroup size="2xl">
+            <InputGroup size={size}>
               <Input
-                size="2xl"
+                size={size}
                 id="name"
                 name="name"
                 type="text"
@@ -75,7 +83,8 @@ export const IssueTitleInput = observer(function IssueTitleInput(props: TIssueTi
                   handleFormChange();
                 }}
                 ref={issueTitleRef || ref}
-                placeholder={t("title")}
+                placeholder={placeholder ?? t("title")}
+                // oxlint-disable-next-line jsx_a11y/no-autofocus -- the title is what's typed first in the create form
                 autoFocus
                 tabIndex={getIndex("name")}
               />

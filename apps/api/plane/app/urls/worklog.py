@@ -15,6 +15,7 @@ from plane.app.views.worklog.base import (
     WorkspaceWorkLogTimerSaveEndpoint,
     WorkspaceWorkLogTimerStopEndpoint,
 )
+from plane.app.views.worklog.active_projects import MyActiveProjectsEndpoint
 from plane.app.views.worklog.estimate import IssueTimeEstimateEndpoint, ProjectTimeEstimatesEndpoint
 from plane.app.views.worklog.timesheet import TimesheetDownloadEndpoint, TimesheetEndpoint
 from plane.app.views.worklog.analytics import WorkLogReportAnalyticsEndpoint, WorkLogReportOptionsEndpoint
@@ -69,6 +70,12 @@ urlpatterns = [
         name="worklog-timer-save",
     ),
     path("workspaces/<str:slug>/worklogs/", WorkspaceWorkLogEndpoint.as_view(), name="workspace-worklogs"),
+    # sidebar › Projects: the projects the person is working on, by their latest timer activity
+    path(
+        "workspaces/<str:slug>/my-active-projects/",
+        MyActiveProjectsEndpoint.as_view(),
+        name="my-active-projects",
+    ),
     path(
         "workspaces/<str:slug>/worklogs/download/",
         WorkspaceWorkLogDownloadEndpoint.as_view(),

@@ -14,6 +14,8 @@ export type TWorklogUser = {
 
 export type TWorklog = {
   id: string;
+  /** "Timesheet No." (TIME-BILLING-336717), given when the entry is created */
+  timesheet_no: string;
   /** minutes */
   duration: number;
   description: string;
@@ -43,6 +45,16 @@ export type TWorklogTimer = {
   /** minutes that will be logged */
   duration: number;
   server_now: string;
+};
+
+/** A project the signed-in person is working on (GET my-active-projects/), in the sidebar's order. */
+export type TMyActiveProject = {
+  project_id: string;
+  /** their ongoing tasks in it */
+  open_tasks: number;
+  /** their timer is on a task of it */
+  has_timer: boolean;
+  last_logged_at: string | null;
 };
 
 /** Expected vs worked time on a work item. Minutes throughout. */

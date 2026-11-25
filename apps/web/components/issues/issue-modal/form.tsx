@@ -25,6 +25,9 @@ import {
   DialogMain,
   DialogTitle,
 } from "@makeplane/propel/components/dialog";
+import { Icon } from "@makeplane/propel/components/icon";
+import { IconButton } from "@makeplane/propel/components/icon-button";
+import { CloseOutline } from "@makeplane/propel/icons";
 import { setToast } from "@plane/blocks/toast";
 import type { TIssue, TWorkspaceDraftIssue } from "@plane/types";
 // hooks
@@ -163,8 +166,28 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
   } = methods;
 
   const projectId = watch("project_id");
+  // a project task: laid out as Workplace's form, title first and description near the end (TaskDetailsFormSection)
+  const isTaskForm = !isDraft && !!workspaceSlug && !!projectId && !!getProjectById(projectId)?.is_task_details_enabled;
 
   const isDisabled = isSubmitting || isApplyingTemplate;
+
+  // a project task has no "Create more": it saves and closes, so a toggle left on elsewhere doesn't carry over
+  useEffect(() => {
+    if (isTaskForm && isCreateMoreToggleEnabled) onCreateMoreToggleChange(false);
+  }, [isTaskForm, isCreateMoreToggleEnabled, onCreateMoreToggleChange]);
+
+  /** Discard, and the Close button of a project task: closes once the description editor has caught up. */
+  const handleDiscard = () => {
+    if (editorRef.current?.isEditorReadyToDiscard()) {
+      onClose();
+    } else {
+      setToast({
+        type: "error",
+        title: "Error!",
+        message: "Editor is still processing changes. Please wait before proceeding.",
+      });
+    }
+  };
 
   const { getIndex } = getTabIndex(ETabIndices.ISSUE_FORM, isMobile);
 
@@ -362,6 +385,40 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
     };
   }, [formRef, modalContainerRef]);
 
+  const titleInput = (
+    <IssueTitleInput
+      control={control}
+      issueTitleRef={issueTitleRef}
+      formState={formState}
+      handleFormChange={handleFormChange}
+      size={isTaskForm ? "md" : "2xl"}
+      placeholder={isTaskForm ? "Project task name" : undefined}
+      requiredMessage={isTaskForm ? "Project task name is required" : undefined}
+    />
+  );
+  const descriptionEditor = (
+    <IssueDescriptionEditor
+      control={control}
+      isDraft={isDraft}
+      issueName={watch("name")}
+      issueId={data?.id}
+      descriptionHtmlData={data?.description_html}
+      editorRef={editorRef}
+      submitBtnRef={submitBtnRef}
+      gptAssistantModal={gptAssistantModal}
+      workspaceSlug={workspaceSlug?.toString()}
+      projectId={projectId}
+      handleFormChange={handleFormChange}
+      handleDescriptionHTMLDataChange={(description_html) =>
+        setValue<"description_html">("description_html", description_html)
+      }
+      setGptAssistantModal={setGptAssistantModal}
+      handleGptAssistantClose={() => reset(getValues())}
+      onAssetUpload={onAssetUpload}
+      onClose={onClose}
+    />
+  );
+
   return (
     <FormProvider {...methods}>
       {/* The form relays DialogContent's max-height into Main/Body: the description scrolls in
@@ -377,6 +434,18 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
               <DialogHeading>
                 <DialogTitle>{modalTitle}</DialogTitle>
               </DialogHeading>
+              {isTaskForm && (
+                // where propel's DialogCloseGroup puts it; its own `inset-e-4` isn't in this app's Tailwind build
+                <div className="absolute end-4 top-4 z-10">
+                  <IconButton
+                    size="sm"
+                    variant="tertiary"
+                    icon={<Icon icon={CloseOutline} />}
+                    aria-label="Close"
+                    onClick={handleDiscard}
+                  />
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-x-1">
                   <IssueProjectSelect
@@ -394,40 +463,21 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
                   setSelectedParentIssue={setSelectedParentIssue}
                 />
               )}
-              <IssueTitleInput
-                control={control}
-                issueTitleRef={issueTitleRef}
-                formState={formState}
-                handleFormChange={handleFormChange}
-              />
+              {!isTaskForm && titleInput}
             </DialogHeader>
             <DialogBody tabIndex={0} render={<div className="vertical-scrollbar scrollbar-sm" />}>
-              <IssueDescriptionEditor
-                control={control}
-                isDraft={isDraft}
-                issueName={watch("name")}
-                issueId={data?.id}
-                descriptionHtmlData={data?.description_html}
-                editorRef={editorRef}
-                submitBtnRef={submitBtnRef}
-                gptAssistantModal={gptAssistantModal}
-                workspaceSlug={workspaceSlug?.toString()}
-                projectId={projectId}
-                handleFormChange={handleFormChange}
-                handleDescriptionHTMLDataChange={(description_html) =>
-                  setValue<"description_html">("description_html", description_html)
-                }
-                setGptAssistantModal={setGptAssistantModal}
-                handleGptAssistantClose={() => reset(getValues())}
-                onAssetUpload={onAssetUpload}
-                onClose={onClose}
-              />
-              {!isDraft && workspaceSlug && (
+              {isTaskForm && workspaceSlug ? (
                 <TaskDetailsFormSection
                   workspaceSlug={workspaceSlug.toString()}
                   projectId={projectId}
                   issueId={data?.id}
+                  titleField={titleInput}
+                  descriptionField={descriptionEditor}
+                  isProjectSelectionDisabled={!!data?.id || !!data?.sourceIssueId || isProjectSelectionDisabled}
+                  handleFormChange={handleFormChange}
                 />
+              ) : (
+                descriptionEditor
               )}
             </DialogBody>
             <div className="shrink-0">
@@ -443,12 +493,13 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
                 isDraft={isDraft}
                 handleFormChange={handleFormChange}
                 setSelectedParentIssue={setSelectedParentIssue}
+                onlyMissingFromForm={isTaskForm}
               />
             </div>
           </DialogMain>
           {showActionButtons && (
             <DialogActions>
-              {!data?.id && (
+              {!data?.id && !isTaskForm && (
                 <label className="inline-flex cursor-pointer items-center gap-1.5" tabIndex={getIndex("create_more")}>
                   <Switch
                     size="sm"
@@ -460,23 +511,7 @@ export const IssueFormRoot = observer(function IssueFormRoot(props: IssueFormPro
                 </label>
               )}
               <div tabIndex={getIndex("discard_button")}>
-                <Button
-                  variant="secondary"
-                  size="md"
-                  stretch="auto"
-                  onClick={() => {
-                    if (editorRef.current?.isEditorReadyToDiscard()) {
-                      onClose();
-                    } else {
-                      setToast({
-                        type: "error",
-                        title: "Error!",
-                        message: "Editor is still processing changes. Please wait before proceeding.",
-                      });
-                    }
-                  }}
-                  label={t("discard")}
-                />
+                <Button variant="secondary" size="md" stretch="auto" onClick={handleDiscard} label={t("discard")} />
               </div>
               <div tabIndex={isDraft ? getIndex("submit_button") : getIndex("draft_button")}>
                 <Button

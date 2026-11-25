@@ -255,12 +255,13 @@ class TestExport:
         response = _export(setup, "a1")
         assert "timesheet-mine" in response["Content-Disposition"]
         rows = _csv_rows(response)
-        assert rows[0][:4] == ["Date Start", "Date End", "Time Start", "Time End"]
+        assert rows[0][:5] == ["Timesheet No.", "Date Start", "Date End", "Time Start", "Time End"]
         entries = rows[1:-1]
-        assert len(entries) == 2 and {row[10] for row in entries} == {setup["people"]["a1"].display_name}
-        assert rows[-1][0] == "Total" and rows[-1][5] == "1.5"  # 90 minutes
+        assert len(entries) == 2 and {row[11] for row in entries} == {setup["people"]["a1"].display_name}
+        assert rows[-1][0] == "Total" and rows[-1][6] == "1.5"  # 90 minutes
         newest = entries[0]
-        assert (newest[0], newest[2], newest[3], newest[4]) == ("2026-11-11", "09:00 AM", "09:30 AM", "30m")
+        assert newest[0].startswith("TIME-BILLING-")
+        assert (newest[1], newest[3], newest[4], newest[5]) == ("2026-11-11", "09:00 AM", "09:30 AM", "30m")
 
     def test_only_the_rows_picked(self, setup):
         mine = list(IssueWorkLog.objects.filter(logged_by=setup["people"]["a1"]).values_list("id", flat=True))
@@ -275,10 +276,10 @@ class TestExport:
         assert _export(setup, "a1", person=_id(setup, "a2")).status_code == status.HTTP_403_FORBIDDEN
         assert _export(setup, "a2", person=_id(setup, "b1")).status_code == status.HTTP_403_FORBIDDEN
         rows = _csv_rows(_export(setup, "a2", person=_id(setup, "a1")))
-        assert {row[10] for row in rows[1:-1]} == {setup["people"]["a1"].display_name}
+        assert {row[11] for row in rows[1:-1]} == {setup["people"]["a1"].display_name}
         assert "timesheet-" in _export(setup, "a2", person=_id(setup, "a1"))["Content-Disposition"]
         rows = _csv_rows(_export(setup, "a2", person="all"))
-        assert sorted({row[10] for row in rows[1:-1]}) == _names(setup, "a1", "a2")
+        assert sorted({row[11] for row in rows[1:-1]}) == _names(setup, "a1", "a2")
         rows = _csv_rows(_export(setup, "hr", person="all"))
         assert len(rows[1:-1]) == 6
 
@@ -291,14 +292,15 @@ class TestExport:
         assert response.status_code == status.HTTP_200_OK
         assert response["Content-Disposition"].endswith('.xlsx"')
         sheet = load_workbook(io.BytesIO(response.content))["Time Sheet"]
-        assert sheet.cell(1, 1).value == "Date Start" and sheet.cell(1, 1).font.bold
+        assert sheet.cell(1, 1).value == "Timesheet No." and sheet.cell(1, 1).font.bold
+        assert sheet.cell(1, 2).value == "Date Start"
         assert sheet.max_row == 1 + 4 + 1  # A1's two entries, A2's, PM A's, and the total
         assert _export(setup, "a1", type="pdf").status_code == status.HTTP_400_BAD_REQUEST
 
     def test_formulas_are_neutralised(self, setup):
         IssueWorkLog.objects.filter(logged_by=setup["people"]["a1"]).update(description="=HYPERLINK(1)")
         rows = _csv_rows(_export(setup, "a1"))
-        assert all(not row[12].startswith("=") for row in rows[1:-1])
+        assert all(not row[13].startswith("=") for row in rows[1:-1])
 
 
 @pytest.mark.contract
@@ -306,11 +308,11 @@ class TestTimezone:
     def test_dates_and_times_follow_the_browsers_timezone(self, setup):
         # A1's entries start at 09:00 UTC: 14:30 in India
         rows = _csv_rows(_export(setup, "a1", tz="Asia/Kolkata"))
-        assert rows[1][2] == "02:30 PM"
+        assert rows[1][3] == "02:30 PM"
         rows = _csv_rows(_export(setup, "a1"))
-        assert rows[1][2] == "09:00 AM"  # the profile's (UTC)
+        assert rows[1][3] == "09:00 AM"  # the profile's (UTC)
         # an unknown name falls back to the profile's
-        assert _csv_rows(_export(setup, "a1", tz="Mars/Base"))[1][2] == "09:00 AM"
+        assert _csv_rows(_export(setup, "a1", tz="Mars/Base"))[1][3] == "09:00 AM"
         # the date follows too: 09:00 UTC on Nov 11 is still Nov 10 in Honolulu (UTC-10)
         body = _timesheet(setup, "a1", tz="Pacific/Honolulu").json()
         assert body["results"][0]["work_date"] == "2026-11-10"

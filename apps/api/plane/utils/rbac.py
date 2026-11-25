@@ -502,7 +502,7 @@ def team_assigned_project_roles(workspace_id):
     }
 
 
-def desired_project_roles(workspace_id):
+def desired_project_roles(workspace_id, profiles=None):
     """(project_id, user_id) -> the project role role-based access gives:
 
     * Admin in the projects people may change: the ones they created (see AccessProfile.project_q).
@@ -514,6 +514,8 @@ def desired_project_roles(workspace_id):
 
     Workspace admins and workspace guests are left to Plane's own rules; Employees get nothing else here (they see
     projects through the project list and ask to join).
+
+    `profiles` (user id -> AccessProfile) reuses profiles the caller already loaded; the others are loaded here.
     """
     from plane.db.models import Project, User, WorkspaceMember
 
@@ -532,7 +534,9 @@ def desired_project_roles(workspace_id):
                 desired[(project_id, user_id)] = role
 
     for user in people:
-        profile = AccessProfile.load(user, workspace_id)
+        profile = profiles.get(user.id) if profiles else None
+        if profile is None:
+            profile = AccessProfile.load(user, workspace_id)
         visible_ids = set(projects.filter(profile.project_q("view")).values_list("id", flat=True))
         work_scopes = profile.scopes("work_items", "create") | profile.scopes("work_items", "edit")
         if "all" in work_scopes:

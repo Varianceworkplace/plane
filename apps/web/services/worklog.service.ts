@@ -8,6 +8,7 @@
 import { API_BASE_URL } from "@plane/constants";
 // types
 import type {
+  TMyActiveProject,
   TWorkItemTimeEstimate,
   TWorkItemTimeEstimatePayload,
   TWorklog,
@@ -92,6 +93,15 @@ export class WorklogService extends APIService {
   async projectTimeEstimates(workspaceSlug: string, projectId: string): Promise<Record<string, TWorkItemTimeEstimate>> {
     return this.get(`/api/workspaces/${workspaceSlug}/projects/${projectId}/time-estimates/`)
       .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  /** The projects the signed-in person is working on, by their latest timer activity (sidebar › Projects). */
+  async myActiveProjects(workspaceSlug: string): Promise<TMyActiveProject[]> {
+    return this.get(`/api/workspaces/${workspaceSlug}/my-active-projects/`)
+      .then((response) => response?.data?.results ?? [])
       .catch((error) => {
         throw error?.response?.data;
       });

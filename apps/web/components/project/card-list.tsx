@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react";
 // plane imports
 import { EUserPermissionsLevel, EUserPermissions } from "@plane/constants";
@@ -20,6 +21,9 @@ import { useProjectFilter } from "@/hooks/store/use-project-filter";
 import { useUserPermissions } from "@/hooks/store/user";
 // local imports
 import { ProjectCard } from "./card";
+
+/** Cards drawn at first, and added each time the end of the list comes near: 1,000+ projects at once took seconds. */
+const CARDS_PER_BATCH = 60;
 
 type TProjectCardListProps = {
   totalProjectIds?: string[];
@@ -45,6 +49,26 @@ export const ProjectCardList = observer(function ProjectCardList(props: TProject
   // derived values
   const workspaceProjectIds = totalProjectIdsProps ?? storeWorkspaceProjectIds;
   const filteredProjectIds = filteredProjectIdsProps ?? storeFilteredProjectIds;
+
+  // draw the cards in batches as the page scrolls; a new search, filter or order starts from the first batch again
+  const [shownCount, setShownCount] = useState(CARDS_PER_BATCH);
+  const moreRef = useRef<HTMLDivElement | null>(null);
+  const hasMore = !!filteredProjectIds && filteredProjectIds.length > shownCount;
+  useEffect(() => {
+    setShownCount(CARDS_PER_BATCH);
+  }, [filteredProjectIds]);
+  useEffect(() => {
+    const element = moreRef.current;
+    if (!element || !hasMore) return;
+    const watcher = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setShownCount((count) => count + CARDS_PER_BATCH);
+      },
+      { rootMargin: "800px 0px" }
+    );
+    watcher.observe(element);
+    return () => watcher.disconnect();
+  }, [hasMore, shownCount]);
 
   // permissions
   const canPerformEmptyStateActions =
@@ -102,12 +126,14 @@ export const ProjectCardList = observer(function ProjectCardList(props: TProject
   return (
     <ContentWrapper>
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-        {filteredProjectIds.map((projectId) => {
+        {filteredProjectIds.slice(0, shownCount).map((projectId) => {
           const projectDetails = getProjectById(projectId);
           if (!projectDetails) return;
           return <ProjectCard key={projectDetails.id} project={projectDetails} />;
         })}
       </div>
+      {/* reaching this draws the next batch */}
+      {hasMore && <div ref={moreRef} aria-hidden className="h-px w-full" />}
     </ContentWrapper>
   );
 });

@@ -8,7 +8,6 @@ import { useState } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useSWRConfig } from "swr";
 // plane imports
 import { Button } from "@makeplane/propel/components/button";
 import { Icon } from "@makeplane/propel/components/icon";
@@ -16,22 +15,10 @@ import { IconButton } from "@makeplane/propel/components/icon-button";
 import { Tooltip } from "@makeplane/propel/components/tooltip";
 import { EditOutline, StopOutline } from "@makeplane/propel/icons";
 import { setToast } from "@plane/blocks/toast";
-// hooks
-import { useIssueDetail } from "@/hooks/store/use-issue-detail";
-import { useIssues } from "@/hooks/store/use-issues";
-import { useProjectState } from "@/hooks/store/use-project-state";
-import { useIssueStoreType } from "@/hooks/use-issue-layout-store";
 // local imports
-import { formatTimerClock, refreshWorkItemTime, useWorklogTimer, worklogService } from "./helpers";
-import type { TLocalIssueUpdate } from "./list-row-timer";
+import { formatTimerClock, useWorklogTimer, worklogService } from "./helpers";
 import { SaveTimerModal, useTimerSeconds } from "./timer-control";
-
-/** Whether a list's work item ids (one list, lists per group, or per sub-group) include this work item. */
-const listIncludes = (grouped: unknown, issueId: string): boolean => {
-  if (Array.isArray(grouped)) return grouped.includes(issueId);
-  if (grouped && typeof grouped === "object") return Object.values(grouped).some((ids) => listIncludes(ids, issueId));
-  return false;
-};
+import { useShowSavedTime } from "./use-show-saved-time";
 
 /** The member's timer in the top bar, on every page: the time, the work item it's on (a link to it), and Stop, which
  * opens the same Save time log dialog as Stop in the work item list. Nothing shows without a timer. */
@@ -43,11 +30,7 @@ export const TopBarWorklogTimer = observer(function TopBarWorklogTimer() {
   // store hooks
   const { timer, mutate } = useWorklogTimer(workspaceSlug);
   const seconds = useTimerSeconds(timer);
-  const { mutate: globalMutate } = useSWRConfig();
-  const storeType = useIssueStoreType();
-  const { issues } = useIssues(storeType);
-  const { getStateById, fetchProjectStates } = useProjectState();
-  const { rootIssueStore } = useIssueDetail();
+  const showSaved = useShowSavedTime(workspaceSlug);
 
   if (!workspaceSlug || !timer) return null;
 
@@ -68,21 +51,6 @@ export const TopBarWorklogTimer = observer(function TopBarWorklogTimer() {
     } finally {
       setBusy(false);
     }
-  };
-
-  /** After the time is logged: the work item's time, and its new status (On Hold / Completed) wherever it shows. */
-  const showSaved = (projectId: string, issueId: string, issueStateId?: string) => {
-    void refreshWorkItemTime(globalMutate, projectId, issueId);
-    const issue = rootIssueStore.issues.getIssueById(issueId);
-    // not loaded on this page: it's fetched fresh when opened
-    if (!issueStateId || !issue || issue.state_id === issueStateId) return;
-    // On Hold may be new to the project
-    if (!getStateById(issueStateId)) void fetchProjectStates(workspaceSlug, projectId);
-    // in the list on screen: through the list's store, without syncing (the server already moved it), so it regroups
-    const layoutStore = issues as unknown as TLocalIssueUpdate & { groupedIssueIds?: unknown };
-    if (typeof layoutStore.issueUpdate === "function" && listIncludes(layoutStore.groupedIssueIds, issueId)) {
-      void layoutStore.issueUpdate(workspaceSlug, projectId, issueId, { state_id: issueStateId }, false);
-    } else rootIssueStore.issues.updateIssue(issueId, { state_id: issueStateId });
   };
 
   const clock = formatTimerClock(seconds);

@@ -39,7 +39,14 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
   const { t } = useTranslation();
   const { isExtendedProjectSidebarOpened, toggleExtendedProjectSidebar } = useAppTheme();
   // the person's own list (Show in List / Hide from List), as in the main sidebar
-  const { getPartialProjectById, sidebarProjectIds: joinedProjects, updateProjectView } = useProject();
+  const {
+    getPartialProjectById,
+    sidebarProjectIds: joinedProjects,
+    sidebarWorkingProjectIds,
+    updateProjectView,
+  } = useProject();
+  // the projects they're working on come first and stay there, as in the main sidebar
+  const workingProjects = new Set(sidebarWorkingProjectIds);
   const { allowPermissions } = useUserPermissions();
 
   const handleOnProjectDrop = (
@@ -50,14 +57,17 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
     if (!sourceId || !destinationId || !workspaceSlug) return;
     if (sourceId === destinationId) return;
 
+    // the person's own order: the projects below the ones they're working on
+    const orderedProjects = joinedProjects.filter((projectId) => !workingProjects.has(projectId));
     const joinedProjectsList: TProject[] = [];
-    joinedProjects.map((projectId) => {
+    orderedProjects.map((projectId) => {
       const projectDetails = getPartialProjectById(projectId);
       if (projectDetails) joinedProjectsList.push(projectDetails);
     });
 
-    const sourceIndex = joinedProjects.indexOf(sourceId);
-    const destinationIndex = shouldDropAtEnd ? joinedProjects.length : joinedProjects.indexOf(destinationId);
+    const sourceIndex = orderedProjects.indexOf(sourceId);
+    const destinationIndex = shouldDropAtEnd ? orderedProjects.length : orderedProjects.indexOf(destinationId);
+    if (sourceIndex < 0 || destinationIndex < 0) return;
 
     if (joinedProjectsList.length <= 0) return;
 
@@ -165,8 +175,8 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
                 projectId={projectId}
                 handleCopyText={() => handleCopyText(projectId)}
                 projectListType={"JOINED"}
-                disableDrag={false}
-                disableDrop={false}
+                disableDrag={workingProjects.has(projectId)}
+                disableDrop={workingProjects.has(projectId)}
                 isLastChild={index === filteredProjects.length - 1}
                 handleOnProjectDrop={handleOnProjectDrop}
                 renderInExtendedSidebar
