@@ -4,7 +4,7 @@
  * See the LICENSE file for details.
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react";
 import { useParams, useSearchParams } from "next/navigation";
 import useSWR from "swr";
@@ -29,25 +29,6 @@ import { useUserPermissions } from "@/hooks/store/user";
 import { IssuesStoreContext } from "@/hooks/use-issue-layout-store";
 import { useWorkspaceIssueProperties } from "@/hooks/use-workspace-issue-properties";
 
-/** Set once the page has opened in List the first time; after that the layout the person picks is kept. */
-const layoutChosenKey = (workspaceSlug: string) => `variance-project-tasks-layout:${workspaceSlug}`;
-
-const readFlag = (key: string) => {
-  try {
-    return window.localStorage.getItem(key) === "1";
-  } catch {
-    return true; // no storage: don't keep resetting their choice
-  }
-};
-
-const writeFlag = (key: string) => {
-  try {
-    window.localStorage.setItem(key, "1");
-  } catch {
-    // nothing to remember it in
-  }
-};
-
 /**
  * Sidebar › Project Tasks: every project task the person may see, across projects, in Variance's own list (the rows
  * of Projects › Project Tasks: time, timer, status, priority, dates, assignee, labels, actions) or spreadsheet, newest
@@ -60,6 +41,8 @@ export const ProjectTasksLayoutRoot = observer(function ProjectTasksLayoutRoot()
   const viewId = routeViewId?.toString();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  // Project Tasks always opens in List; Table can be picked while on the page
+  const [openedInList, setOpenedInList] = useState(false);
   // store hooks
   const {
     issuesFilter: { filters, fetchFilters, updateFilters, updateFilterExpression },
@@ -74,27 +57,32 @@ export const ProjectTasksLayoutRoot = observer(function ProjectTasksLayoutRoot()
       ? EIssueLayoutTypes.SPREADSHEET
       : EIssueLayoutTypes.LIST;
 
-  // filters first (List the first time); the list then loads its own pages, the spreadsheet is loaded here
+  // filters first; the list then loads its own pages, the spreadsheet is loaded here
   const { isLoading: filtersLoading } = useSWR(
     workspaceSlug && viewId ? `PROJECT_TASKS_FILTERS_${workspaceSlug}_${viewId}` : null,
     async () => {
       if (!workspaceSlug || !viewId) return;
       await fetchFilters(workspaceSlug, viewId);
-      if (!readFlag(layoutChosenKey(workspaceSlug))) {
-        writeFlag(layoutChosenKey(workspaceSlug));
-        await updateFilters(
-          workspaceSlug,
-          undefined,
-          EIssueFilterType.DISPLAY_FILTERS,
-          { layout: EIssueLayoutTypes.LIST },
-          viewId
-        );
-      }
     },
     { revalidateIfStale: false, revalidateOnFocus: false }
   );
+  // each time the page opens: List, whatever was picked last time (nothing is drawn until then)
+  useEffect(() => {
+    if (openedInList || !workspaceSlug || !viewId || !workItemFilters) return;
+    if (workItemFilters.displayFilters?.layout === EIssueLayoutTypes.LIST) {
+      setOpenedInList(true);
+      return;
+    }
+    void updateFilters(
+      workspaceSlug,
+      undefined,
+      EIssueFilterType.DISPLAY_FILTERS,
+      { layout: EIssueLayoutTypes.LIST },
+      viewId
+    ).finally(() => setOpenedInList(true));
+  }, [openedInList, workspaceSlug, viewId, workItemFilters, updateFilters]);
   const { isLoading: spreadsheetLoading } = useSWR(
-    workspaceSlug && viewId && workItemFilters && layout === EIssueLayoutTypes.SPREADSHEET
+    openedInList && workspaceSlug && viewId && workItemFilters && layout === EIssueLayoutTypes.SPREADSHEET
       ? `PROJECT_TASKS_SPREADSHEET_${workspaceSlug}_${viewId}`
       : null,
     async () => {
@@ -138,7 +126,7 @@ export const ProjectTasksLayoutRoot = observer(function ProjectTasksLayoutRoot()
       projectId
     );
 
-  if (!workspaceSlug || !viewId || filtersLoading || !workItemFilters) return null;
+  if (!workspaceSlug || !viewId || filtersLoading || !workItemFilters || !openedInList) return null;
 
   return (
     <IssuesStoreContext.Provider value={EIssuesStoreType.GLOBAL}>
