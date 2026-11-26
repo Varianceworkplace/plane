@@ -7,6 +7,7 @@
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 // icons
 import { HideOutline, ShowOutline } from "@makeplane/propel/icons";
@@ -15,6 +16,7 @@ import { Input, InputGroup } from "@makeplane/propel/components/input";
 import { E_PASSWORD_STRENGTH } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@makeplane/propel/components/button";
+import { AnchorButton } from "@makeplane/propel/components/anchor-button";
 import { setToast } from "@plane/blocks/toast";
 import { PasswordStrengthIndicator } from "@plane/blocks/auth";
 // components
@@ -78,11 +80,11 @@ export const SetPasswordForm = observer(function SetPasswordForm() {
 
   const isButtonDisabled = useMemo(
     () =>
-      !!passwordFormData.password &&
-      getPasswordStrength(passwordFormData.password) === E_PASSWORD_STRENGTH.STRENGTH_VALID &&
-      passwordFormData.password === passwordFormData.confirm_password
-        ? false
-        : true,
+      !(
+        !!passwordFormData.password &&
+        getPasswordStrength(passwordFormData.password) === E_PASSWORD_STRENGTH.STRENGTH_VALID &&
+        passwordFormData.password === passwordFormData.confirm_password
+      ),
     [passwordFormData]
   );
 
@@ -112,7 +114,7 @@ export const SetPasswordForm = observer(function SetPasswordForm() {
 
   return (
     <FormContainer>
-      <AuthFormHeader title="Set password" description="Create a new password." />
+      <AuthFormHeader title={t("auth.password_setup.title")} description={t("auth.password_setup.description")} />
       <form className="space-y-4" onSubmit={(e) => handleSubmit(e)}>
         <div className="space-y-1">
           <label className="text-13 font-medium text-tertiary" htmlFor="email">
@@ -148,6 +150,7 @@ export const SetPasswordForm = observer(function SetPasswordForm() {
               onFocus={() => setIsPasswordInputFocused(true)}
               onBlur={() => setIsPasswordInputFocused(false)}
               autoComplete="new-password"
+              // oxlint-disable-next-line jsx-a11y/no-autofocus -- the password is the one field to fill on this step
               autoFocus
             />
             <button
@@ -207,6 +210,10 @@ export const SetPasswordForm = observer(function SetPasswordForm() {
           label={t("common.continue")}
           disabled={isButtonDisabled}
         />
+        {/* signed in with a code: setting a password can wait (they're offered it again next time) */}
+        <div className="flex h-7 items-center justify-center">
+          <AnchorButton variant="primary" size="md" render={<Link href="/" />} label={t("auth.password_setup.skip")} />
+        </div>
       </form>
     </FormContainer>
   );

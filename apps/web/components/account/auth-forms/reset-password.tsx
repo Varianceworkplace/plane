@@ -6,6 +6,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 // icons
 import { HideOutline, ShowOutline } from "@makeplane/propel/icons";
@@ -15,12 +16,15 @@ import { Input, InputGroup } from "@makeplane/propel/components/input";
 import { API_BASE_URL, E_PASSWORD_STRENGTH } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@makeplane/propel/components/button";
+import { AnchorButton } from "@makeplane/propel/components/anchor-button";
 import { PasswordStrengthIndicator } from "@plane/blocks/auth";
 // components
 import { getPasswordStrength } from "@plane/utils";
 // helpers
 import type { EAuthenticationErrorCodes, TAuthErrorInfo } from "@/helpers/authentication.helper";
 import { EErrorAlertType, authErrorHandler } from "@/helpers/authentication.helper";
+// hooks
+import { useAppRouter } from "@/hooks/use-app-router";
 // services
 import { AuthService } from "@/services/auth.service";
 // local imports
@@ -48,6 +52,10 @@ export const ResetPasswordForm = observer(function ResetPasswordForm() {
   const token = searchParams.get("token");
   const email = searchParams.get("email");
   const error_code = searchParams.get("error_code");
+  // a first password (the account never had one): same link, worded "set your password"
+  const isFirstPassword = searchParams.get("setup") === "1";
+  // the link was refused (wrong or expired), or is missing its parts: nothing to submit
+  const hasLink = !!uidb64 && !!token;
   // states
   const [showPassword, setShowPassword] = useState({
     password: false,
@@ -63,6 +71,7 @@ export const ResetPasswordForm = observer(function ResetPasswordForm() {
   const [errorInfo, setErrorInfo] = useState<TAuthErrorInfo | undefined>(undefined);
   // plane hooks
   const { t } = useTranslation();
+  const router = useAppRouter();
 
   const handleShowPassword = (key: keyof typeof showPassword) =>
     setShowPassword((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -77,11 +86,11 @@ export const ResetPasswordForm = observer(function ResetPasswordForm() {
 
   const isButtonDisabled = useMemo(
     () =>
-      !!resetFormData.password &&
-      getPasswordStrength(resetFormData.password) === E_PASSWORD_STRENGTH.STRENGTH_VALID &&
-      resetFormData.password === resetFormData.confirm_password
-        ? false
-        : true,
+      !(
+        !!resetFormData.password &&
+        getPasswordStrength(resetFormData.password) === E_PASSWORD_STRENGTH.STRENGTH_VALID &&
+        resetFormData.password === resetFormData.confirm_password
+      ),
     [resetFormData]
   );
 
@@ -100,7 +109,10 @@ export const ResetPasswordForm = observer(function ResetPasswordForm() {
 
   return (
     <FormContainer>
-      <AuthFormHeader title="Reset password" description="Create a new password." />
+      <AuthFormHeader
+        title={isFirstPassword ? t("auth.password_setup.title") : "Reset password"}
+        description={isFirstPassword ? t("auth.password_setup.description") : "Create a new password."}
+      />
 
       {errorInfo && errorInfo?.type === EErrorAlertType.BANNER_ALERT && (
         <Banner
@@ -112,106 +124,133 @@ export const ResetPasswordForm = observer(function ResetPasswordForm() {
           onDismiss={() => setErrorInfo(undefined)}
         />
       )}
-      <form
-        className="space-y-4"
-        method="POST"
-        action={`${API_BASE_URL}/auth/reset-password/${uidb64?.toString()}/${token?.toString()}/`}
-      >
-        <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
-        <div className="space-y-1">
-          <label className="text-13 font-medium text-tertiary" htmlFor="email">
-            {t("auth.common.email.label")}
-          </label>
-          <InputGroup size="2xl">
-            <Input
-              size="2xl"
-              id="email"
-              name="email"
-              type="email"
-              value={resetFormData.email}
-              placeholder={t("auth.common.email.placeholder")}
-              autoComplete="off"
-              disabled
+      {!hasLink && (
+        <div className="space-y-4">
+          <p className="text-13 text-secondary">{t("auth.reset_password.invalid_link")}</p>
+          <Button
+            type="button"
+            variant="primary"
+            size="lg"
+            stretch="full"
+            onClick={() =>
+              router.push(`/accounts/forgot-password${email ? `?email=${encodeURIComponent(email)}` : ""}`)
+            }
+            label={t("auth.reset_password.request_new_link")}
+          />
+          <div className="flex h-7 items-center justify-center">
+            <AnchorButton
+              variant="primary"
+              size="md"
+              render={<Link href="/" />}
+              label={t("auth.common.back_to_sign_in")}
             />
-          </InputGroup>
+          </div>
         </div>
-        <div className="space-y-1">
-          <label className="text-13 font-medium text-tertiary" htmlFor="password">
-            {t("auth.common.password.label")}
-          </label>
-          <InputGroup size="2xl">
-            <Input
-              size="2xl"
-              type={showPassword.password ? "text" : "password"}
-              name="password"
-              id="password"
-              value={resetFormData.password}
-              onChange={(e) => handleFormChange("password", e.target.value)}
-              placeholder={t("auth.common.password.placeholder")}
-              minLength={8}
-              onFocus={() => setIsPasswordInputFocused(true)}
-              onBlur={() => setIsPasswordInputFocused(false)}
-              autoComplete="new-password"
-              autoFocus
-            />
-            <button
-              type="button"
-              onClick={() => handleShowPassword("password")}
-              className="grid size-5 place-items-center"
-            >
-              {showPassword.password ? (
-                <HideOutline className="size-5 text-placeholder" />
-              ) : (
-                <ShowOutline className="size-5 text-placeholder" />
+      )}
+      {hasLink && (
+        <form
+          className="space-y-4"
+          method="POST"
+          action={`${API_BASE_URL}/auth/reset-password/${uidb64?.toString()}/${token?.toString()}/`}
+        >
+          <input type="hidden" name="csrfmiddlewaretoken" value={csrfToken} />
+          {isFirstPassword && <input type="hidden" name="setup" value="1" />}
+          <div className="space-y-1">
+            <label className="text-13 font-medium text-tertiary" htmlFor="email">
+              {t("auth.common.email.label")}
+            </label>
+            <InputGroup size="2xl">
+              <Input
+                size="2xl"
+                id="email"
+                name="email"
+                type="email"
+                value={resetFormData.email}
+                placeholder={t("auth.common.email.placeholder")}
+                autoComplete="off"
+                disabled
+              />
+            </InputGroup>
+          </div>
+          <div className="space-y-1">
+            <label className="text-13 font-medium text-tertiary" htmlFor="password">
+              {t("auth.common.password.label")}
+            </label>
+            <InputGroup size="2xl">
+              <Input
+                size="2xl"
+                type={showPassword.password ? "text" : "password"}
+                name="password"
+                id="password"
+                value={resetFormData.password}
+                onChange={(e) => handleFormChange("password", e.target.value)}
+                placeholder={t("auth.common.password.placeholder")}
+                minLength={8}
+                onFocus={() => setIsPasswordInputFocused(true)}
+                onBlur={() => setIsPasswordInputFocused(false)}
+                autoComplete="new-password"
+                // oxlint-disable-next-line jsx-a11y/no-autofocus -- the password is the one field to fill on this step
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => handleShowPassword("password")}
+                className="grid size-5 place-items-center"
+              >
+                {showPassword.password ? (
+                  <HideOutline className="size-5 text-placeholder" />
+                ) : (
+                  <ShowOutline className="size-5 text-placeholder" />
+                )}
+              </button>
+            </InputGroup>
+            <PasswordStrengthIndicator password={resetFormData.password} isFocused={isPasswordInputFocused} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-13 font-medium text-tertiary" htmlFor="confirm_password">
+              {t("auth.common.password.confirm_password.label")}
+            </label>
+            <InputGroup size="2xl">
+              <Input
+                size="2xl"
+                type={showPassword.retypePassword ? "text" : "password"}
+                name="confirm_password"
+                id="confirm_password"
+                value={resetFormData.confirm_password}
+                onChange={(e) => handleFormChange("confirm_password", e.target.value)}
+                placeholder={t("auth.common.password.confirm_password.placeholder")}
+                onFocus={() => setIsRetryPasswordInputFocused(true)}
+                onBlur={() => setIsRetryPasswordInputFocused(false)}
+                autoComplete="new-password"
+              />
+              <button
+                type="button"
+                onClick={() => handleShowPassword("retypePassword")}
+                className="grid size-5 place-items-center"
+              >
+                {showPassword.retypePassword ? (
+                  <HideOutline className="size-5 text-placeholder" />
+                ) : (
+                  <ShowOutline className="size-5 text-placeholder" />
+                )}
+              </button>
+            </InputGroup>
+            {!!resetFormData.confirm_password &&
+              resetFormData.password !== resetFormData.confirm_password &&
+              renderPasswordMatchError && (
+                <span className="text-13 text-danger-primary">{t("auth.common.password.errors.match")}</span>
               )}
-            </button>
-          </InputGroup>
-          <PasswordStrengthIndicator password={resetFormData.password} isFocused={isPasswordInputFocused} />
-        </div>
-        <div className="space-y-1">
-          <label className="text-13 font-medium text-tertiary" htmlFor="confirm_password">
-            {t("auth.common.password.confirm_password.label")}
-          </label>
-          <InputGroup size="2xl">
-            <Input
-              size="2xl"
-              type={showPassword.retypePassword ? "text" : "password"}
-              name="confirm_password"
-              id="confirm_password"
-              value={resetFormData.confirm_password}
-              onChange={(e) => handleFormChange("confirm_password", e.target.value)}
-              placeholder={t("auth.common.password.confirm_password.placeholder")}
-              onFocus={() => setIsRetryPasswordInputFocused(true)}
-              onBlur={() => setIsRetryPasswordInputFocused(false)}
-              autoComplete="new-password"
-            />
-            <button
-              type="button"
-              onClick={() => handleShowPassword("retypePassword")}
-              className="grid size-5 place-items-center"
-            >
-              {showPassword.retypePassword ? (
-                <HideOutline className="size-5 text-placeholder" />
-              ) : (
-                <ShowOutline className="size-5 text-placeholder" />
-              )}
-            </button>
-          </InputGroup>
-          {!!resetFormData.confirm_password &&
-            resetFormData.password !== resetFormData.confirm_password &&
-            renderPasswordMatchError && (
-              <span className="text-13 text-danger-primary">{t("auth.common.password.errors.match")}</span>
-            )}
-        </div>
-        <Button
-          type="submit"
-          variant="primary"
-          size="lg"
-          stretch="full"
-          label={t("auth.common.password.submit")}
-          disabled={isButtonDisabled}
-        />
-      </form>
+          </div>
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            stretch="full"
+            label={t("auth.common.password.submit")}
+            disabled={isButtonDisabled}
+          />
+        </form>
+      )}
     </FormContainer>
   );
 });

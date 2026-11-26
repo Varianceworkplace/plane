@@ -199,18 +199,22 @@ const errorCodeMessages: {
 
   [EAuthenticationErrorCodes.USER_DOES_NOT_EXIST]: {
     title: `User does not exist`,
-    message: (email = undefined) => (
-      <div>
-        No account found.&nbsp;
-        <Link
-          className="font-medium underline underline-offset-4 transition-all hover:font-bold"
-          href={`/${email ? `?email=${encodeURIComponent(email)}` : ``}`}
-        >
-          Create one
-        </Link>
-        &nbsp;to get started.
-      </div>
-    ),
+    message: (email = undefined) =>
+      // signing in with a username (no "@"): there's no sign-up by username, so just say so
+      email && !email.includes("@") ? (
+        `No account has the username "${email}". Check it, or use your email address instead.`
+      ) : (
+        <div>
+          No account found.&nbsp;
+          <Link
+            className="font-medium underline underline-offset-4 transition-all hover:font-bold"
+            href={`/${email ? `?email=${encodeURIComponent(email)}` : ``}`}
+          >
+            Create one
+          </Link>
+          &nbsp;to get started.
+        </div>
+      ),
   },
   [EAuthenticationErrorCodes.REQUIRED_EMAIL_PASSWORD_SIGN_IN]: {
     title: `Email and password required`,

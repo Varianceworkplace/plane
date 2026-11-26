@@ -39,6 +39,8 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
   const invitation_id = searchParams.get("invitation_id");
   const workspaceSlug = searchParams.get("slug");
   const error_code = searchParams.get("error_code");
+  // back from the link that set (or reset) their password
+  const passwordSavedParam = searchParams.get("password_saved") === "1";
   // props
   const { authMode: currentAuthMode } = props;
   // states
@@ -46,6 +48,7 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
   const [authStep, setAuthStep] = useState<EAuthSteps>(EAuthSteps.EMAIL);
   const [email, setEmail] = useState(emailParam ? emailParam.toString() : "");
   const [errorInfo, setErrorInfo] = useState<TAuthErrorInfo | undefined>(undefined);
+  const [showPasswordSaved, setShowPasswordSaved] = useState(passwordSavedParam);
   // store hooks
   const { config } = useInstance();
   // translation
@@ -62,7 +65,10 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
 
   useEffect(() => {
     if (error_code && authMode) {
-      const errorhandler = authErrorHandler(error_code?.toString() as EAuthenticationErrorCodes);
+      const errorhandler = authErrorHandler(
+        error_code?.toString() as EAuthenticationErrorCodes,
+        emailParam ?? undefined
+      );
       if (errorhandler) {
         // password error handler
         if ([EAuthenticationErrorCodes.AUTHENTICATION_FAILED_SIGN_UP].includes(errorhandler.code)) {
@@ -100,7 +106,7 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
         setErrorInfo(errorhandler);
       }
     }
-  }, [error_code, authMode]);
+  }, [error_code, authMode, emailParam]);
 
   if (!authMode) return <></>;
 
@@ -117,6 +123,16 @@ export const AuthRoot = observer(function AuthRoot(props: TAuthRoot) {
 
   return (
     <AuthContainer>
+      {showPasswordSaved && !errorInfo && (
+        <Banner
+          placement="inline"
+          variant="info"
+          role="status"
+          description={t("auth.password_setup.saved")}
+          dismissLabel={t("close")}
+          onDismiss={() => setShowPasswordSaved(false)}
+        />
+      )}
       {errorInfo && errorInfo?.type === EErrorAlertType.BANNER_ALERT && (
         <Banner
           placement="inline"

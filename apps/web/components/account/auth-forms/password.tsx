@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
 // icons
-import { CloseCircleOutline, HideOutline, ShowOutline } from "@makeplane/propel/icons";
+import { CloseCircleOutline, HideOutline, ShowOutline, TickCircleOutline } from "@makeplane/propel/icons";
 // plane imports
 import { Banner } from "@makeplane/propel/components/banner";
 import { Input, InputGroup } from "@makeplane/propel/components/input";
@@ -16,18 +16,25 @@ import { API_BASE_URL, E_PASSWORD_STRENGTH } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@makeplane/propel/components/button";
 import { PasswordStrengthIndicator } from "@plane/blocks/auth";
+import { setToast } from "@plane/blocks/toast";
 import { getPasswordStrength } from "@plane/utils";
 // components
 import { ForgotPasswordPopover } from "@/components/account/auth-forms/forgot-password-popover";
 // constants
 // helpers
-import { EAuthModes, EAuthSteps } from "@/helpers/authentication.helper";
+import type { EAuthenticationErrorCodes } from "@/helpers/authentication.helper";
+import { EAuthModes, EAuthSteps, authErrorHandler } from "@/helpers/authentication.helper";
+// hooks
+import useTimer from "@/hooks/use-timer";
 // services
 import { AuthService } from "@/services/auth.service";
 
 type Props = {
+  /** what they typed at the first step: an email address, or (signing in) a username */
   email: string;
   isSMTPConfigured: boolean;
+  /** signing in to an account that has never had a password: offer to set one instead of asking for it */
+  needsPasswordSetup?: boolean;
   mode: EAuthModes;
   handleEmailClear: () => void;
   handleAuthStep: (step: EAuthSteps) => void;
@@ -48,7 +55,15 @@ const defaultValues: TPasswordFormValues = {
 const authService = new AuthService();
 
 export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props) {
-  const { email, isSMTPConfigured, handleAuthStep, handleEmailClear, mode, nextPath } = props;
+  const {
+    email,
+    isSMTPConfigured,
+    needsPasswordSetup = false,
+    handleAuthStep,
+    handleEmailClear,
+    mode,
+    nextPath,
+  } = props;
   // plane imports
   const { t } = useTranslation();
   // ref
@@ -64,6 +79,12 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
   const [isPasswordInputFocused, setIsPasswordInputFocused] = useState(false);
   const [isRetryPasswordInputFocused, setIsRetryPasswordInputFocused] = useState(false);
   const [isBannerMessage, setBannerMessage] = useState(false);
+  // first sign-in: the emailed link to set a password
+  const [isSendingSetupLink, setIsSendingSetupLink] = useState(false);
+  const [isSetupLinkSent, setIsSetupLinkSent] = useState(false);
+  const { timer: setupLinkTimer, setTimer: setSetupLinkTimer } = useTimer(0);
+  // signing in, the first step also takes a username
+  const isUsername = mode === EAuthModes.SIGN_IN && !email.includes("@");
 
   const handleShowPassword = (key: keyof typeof showPassword) =>
     setShowPassword((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -80,6 +101,29 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
 
   const redirectToUniqueCodeSignIn = async () => {
     handleAuthStep(EAuthSteps.UNIQUE_CODE);
+  };
+
+  // the same link as "Forgot password?", worded "set your password" in the email for a first password
+  const sendPasswordSetupLink = async () => {
+    setIsSendingSetupLink(true);
+    try {
+      await authService.sendResetPasswordLink({ email });
+      setIsSetupLinkSent(true);
+      setSetupLinkTimer(30);
+    } catch (error: unknown) {
+      const errorCode = (error as { data?: { error_code?: number | string } } | undefined)?.data?.error_code;
+      const errorInfo = errorCode
+        ? authErrorHandler(errorCode.toString() as EAuthenticationErrorCodes, email)
+        : undefined;
+      setToast({
+        type: "error",
+        title: t("auth.forgot_password.toast.error.title"),
+        message:
+          typeof errorInfo?.message === "string" ? errorInfo.message : t("auth.forgot_password.toast.error.message"),
+      });
+    } finally {
+      setIsSendingSetupLink(false);
+    }
   };
 
   const passwordSupport =
@@ -105,11 +149,11 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
 
   const isButtonDisabled = useMemo(
     () =>
-      !isSubmitting &&
-      !!passwordFormData.password &&
-      (mode === EAuthModes.SIGN_UP ? passwordFormData.password === passwordFormData.confirm_password : true)
-        ? false
-        : true,
+      !(
+        !isSubmitting &&
+        !!passwordFormData.password &&
+        (mode === EAuthModes.SIGN_UP ? passwordFormData.password === passwordFormData.confirm_password : true)
+      ),
     [isSubmitting, mode, passwordFormData.confirm_password, passwordFormData.password]
   );
 
@@ -124,6 +168,68 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
     const csrfElement = formRef.current.querySelector("input[name=csrfmiddlewaretoken]");
     csrfElement?.setAttribute("value", token?.csrf_token);
   };
+
+  // First sign-in to an account without a password (e.g. brought over from the old CRM): there's nothing to type
+  // yet, so offer the emailed link that sets one, or a sign-in code (which then offers to set one too).
+  if (mode === EAuthModes.SIGN_IN && needsPasswordSetup)
+    return (
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <label htmlFor="email" className="text-13 font-medium text-tertiary">
+            {t("auth.common.username_or_email.label")}
+          </label>
+          <InputGroup size="2xl">
+            <Input size="2xl" id="email" name="email" type={isUsername ? "text" : "email"} value={email} disabled />
+            <button
+              type="button"
+              className="grid size-5 place-items-center"
+              onClick={handleEmailClear}
+              aria-label={t("aria_labels.auth_forms.clear_email")}
+            >
+              <CloseCircleOutline className="size-5 text-placeholder" />
+            </button>
+          </InputGroup>
+        </div>
+        <div className="space-y-1">
+          <p className="text-13 font-semibold text-primary">{t("auth.password_setup.title")}</p>
+          <p className="text-13 text-secondary">
+            {isSMTPConfigured ? t("auth.password_setup.message") : t("auth.forgot_password.errors.smtp_not_enabled")}
+          </p>
+          {isSetupLinkSent && (
+            <p role="status" className="flex items-start gap-1 text-11 font-medium text-success-primary">
+              <TickCircleOutline height={12} width={12} className="mt-0.5 flex-shrink-0" />
+              {t("auth.password_setup.link_sent")}
+            </p>
+          )}
+        </div>
+        {isSMTPConfigured && (
+          <div className="space-y-2.5">
+            <Button
+              type="button"
+              variant="primary"
+              size="lg"
+              stretch="full"
+              onClick={sendPasswordSetupLink}
+              loading={isSendingSetupLink}
+              disabled={isSendingSetupLink || setupLinkTimer > 0}
+              label={
+                setupLinkTimer > 0
+                  ? t("auth.common.resend_in", { seconds: setupLinkTimer })
+                  : t("auth.password_setup.send_link")
+              }
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              size="lg"
+              stretch="full"
+              onClick={redirectToUniqueCodeSignIn}
+              label={t("auth.common.sign_in_with_unique_code")}
+            />
+          </div>
+        )}
+      </div>
+    );
 
   return (
     <>
@@ -164,14 +270,14 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
         {nextPath && <input type="hidden" value={nextPath} name="next_path" />}
         <div className="space-y-1">
           <label htmlFor="email" className="text-13 font-medium text-tertiary">
-            {t("auth.common.email.label")}
+            {mode === EAuthModes.SIGN_IN ? t("auth.common.username_or_email.label") : t("auth.common.email.label")}
           </label>
           <InputGroup size="2xl">
             <Input
               size="2xl"
               id="email"
               name="email"
-              type="email"
+              type={isUsername ? "text" : "email"}
               value={passwordFormData.email}
               onChange={(e) => handleFormChange("email", e.target.value)}
               placeholder={t("auth.common.email.placeholder")}
@@ -206,6 +312,7 @@ export const AuthPasswordForm = observer(function AuthPasswordForm(props: Props)
               onFocus={() => setIsPasswordInputFocused(true)}
               onBlur={() => setIsPasswordInputFocused(false)}
               autoComplete="off"
+              // oxlint-disable-next-line jsx-a11y/no-autofocus -- the password is the one field to fill on this step
               autoFocus
             />
             <button

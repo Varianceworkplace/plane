@@ -27,3 +27,11 @@ def signup_allowed(email):
         [{"key": "ENABLE_SIGNUP", "default": os.environ.get("ENABLE_SIGNUP", "1")}]
     )
     return enable_signup != "0" or open_invites(WorkspaceMemberInvite.objects.filter(email=email)).exists()
+
+
+def password_login_enabled():
+    """Email + password sign-in is on (the sign-in itself refuses only "0", see EmailProvider)."""
+    (enable_email_password,) = get_configuration_value(
+        [{"key": "ENABLE_EMAIL_PASSWORD", "default": os.environ.get("ENABLE_EMAIL_PASSWORD", "1")}]
+    )
+    return enable_email_password != "0"

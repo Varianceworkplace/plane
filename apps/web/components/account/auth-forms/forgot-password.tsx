@@ -18,13 +18,15 @@ import { Button } from "@makeplane/propel/components/button";
 import { AnchorButton } from "@makeplane/propel/components/anchor-button";
 import { setToast } from "@plane/blocks/toast";
 
-import { checkEmailValidity } from "@plane/utils";
+import type { EAuthenticationErrorCodes } from "@/helpers/authentication.helper";
+import { authErrorHandler } from "@/helpers/authentication.helper";
 // hooks
 import useTimer from "@/hooks/use-timer";
 // services
 import { AuthService } from "@/services/auth.service";
 // local components
 import { FormContainer } from "./common/container";
+import { isValidLoginIdentifier } from "./email";
 import { AuthFormHeader } from "./common/header";
 
 type TForgotPasswordFormValues = {
@@ -62,7 +64,8 @@ export const ForgotPasswordForm = observer(function ForgotPasswordForm() {
   const handleForgotPassword = async (formData: TForgotPasswordFormValues) => {
     await authService
       .sendResetPasswordLink({
-        email: formData.email,
+        // an email address or a username: the link goes to the account's own address either way
+        email: formData.email.trim(),
       })
       .then(() => {
         setToast({
@@ -71,12 +74,20 @@ export const ForgotPasswordForm = observer(function ForgotPasswordForm() {
           message: t("auth.forgot_password.toast.success.message"),
         });
         setResendCodeTimer(30);
+        return undefined;
       })
       .catch((err) => {
+        const errorCode = err?.data?.error_code;
+        const errorInfo = errorCode
+          ? authErrorHandler(errorCode.toString() as EAuthenticationErrorCodes, formData.email)
+          : undefined;
         setToast({
           type: "error",
           title: t("auth.forgot_password.toast.error.title"),
-          message: err?.error ?? t("auth.forgot_password.toast.error.message"),
+          message:
+            typeof errorInfo?.message === "string"
+              ? errorInfo.message
+              : (err?.error ?? t("auth.forgot_password.toast.error.message")),
         });
       });
   };
@@ -87,14 +98,14 @@ export const ForgotPasswordForm = observer(function ForgotPasswordForm() {
       <form onSubmit={handleSubmit(handleForgotPassword)} className="space-y-4">
         <div className="space-y-1">
           <label className="text-13 font-medium text-tertiary" htmlFor="email">
-            {t("auth.common.email.label")}
+            {t("auth.common.username_or_email.label")}
           </label>
           <Controller
             control={control}
             name="email"
             rules={{
-              required: t("auth.common.email.errors.required"),
-              validate: (value) => checkEmailValidity(value) || t("auth.common.email.errors.invalid"),
+              required: t("auth.common.username_or_email.errors.required"),
+              validate: (value) => isValidLoginIdentifier(value) || t("auth.common.username_or_email.errors.invalid"),
             }}
             render={({ field: { value, onChange, ref } }) => (
               <Field name="email" invalid={Boolean(errors.email)}>
@@ -103,11 +114,13 @@ export const ForgotPasswordForm = observer(function ForgotPasswordForm() {
                     size="2xl"
                     id="email"
                     name="email"
-                    type="email"
+                    type="text"
                     value={value}
                     onChange={onChange}
                     ref={ref}
-                    placeholder={t("auth.common.email.placeholder")}
+                    placeholder={t("auth.common.username_or_email.placeholder")}
+                    autoCapitalize="none"
+                    spellCheck={false}
                     autoComplete="off"
                     disabled={resendTimerCode > 0}
                   />

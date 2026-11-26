@@ -26,7 +26,8 @@ from plane.authentication.adapter.error import (
     AuthenticationException,
     AUTHENTICATION_ERROR_CODES,
 )
-from plane.authentication.utils.account_access import is_deactivated, signup_allowed
+from plane.authentication.utils.account_access import is_deactivated, password_login_enabled, signup_allowed
+from plane.authentication.utils.login_identifier import as_typed, is_username, login_email
 from plane.authentication.rate_limit import (
     AuthenticationThrottle,
     throttle_auth_redirect,
@@ -49,8 +50,17 @@ class MagicGenerateEndpoint(APIView):
             )
             return Response(exc.get_error_dict(), status=status.HTTP_400_BAD_REQUEST)
 
-        email = request.data.get("email", "").strip().lower()
+        # an email address, or a username (see login_identifier)
+        identifier = str(request.data.get("email", "") or "").strip()
+        email = login_email(identifier)
         try:
+            if is_username(identifier):
+                # a username must be someone's (it can't sign up), and whose address it is stays private
+                if not email:
+                    raise AuthenticationException(
+                        error_code=AUTHENTICATION_ERROR_CODES["USER_DOES_NOT_EXIST"],
+                        error_message="USER_DOES_NOT_EXIST",
+                    )
             validate_email(email)
             # no code for a disabled account, or for a new address that can't sign up
             user = User.objects.filter(email=email).first()
@@ -68,7 +78,8 @@ class MagicGenerateEndpoint(APIView):
             key, token = adapter.initiate()
             # If the smtp is configured send through here
             magic_link.delay(email, key, token)
-            return Response({"key": str(key)}, status=status.HTTP_200_OK)
+            # the key names the address: only for an address that was typed
+            return Response({"key": "" if is_username(identifier) else str(key)}, status=status.HTTP_200_OK)
         except AuthenticationException as e:
             params = e.get_error_dict()
             return Response(params, status=status.HTTP_400_BAD_REQUEST)
@@ -79,10 +90,12 @@ class MagicSignInEndpoint(View):
     def post(self, request):
         # set the referer as session to redirect after login
         code = request.POST.get("code", "").strip()
-        email = request.POST.get("email", "").strip().lower()
+        # an email address, or a username (see login_identifier): errors go back with what was typed
+        identifier = request.POST.get("email", "").strip()
+        email = login_email(identifier)
         next_path = request.POST.get("next_path")
 
-        if code == "" or email == "":
+        if code == "" or identifier == "":
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["MAGIC_SIGN_IN_EMAIL_CODE_REQUIRED"],
                 error_message="MAGIC_SIGN_IN_EMAIL_CODE_REQUIRED",
@@ -126,8 +139,9 @@ class MagicSignInEndpoint(View):
                 # back to where they were going (e.g. the invitation they opened)
                 path = str(next_path)
             elif user.is_password_autoset and profile.is_onboarded:
-                # Redirect to the home page
-                path = "/"
+                # No password yet: offer to set one now (it can be skipped), so the password works next time.
+                # The web app's root opens next_path for someone signed in.
+                path = "/accounts/set-password" if password_login_enabled() else "/"
             else:
                 # Get the redirection path
                 path = str(get_redirection_path(user=user))
@@ -140,7 +154,7 @@ class MagicSignInEndpoint(View):
             return HttpResponseRedirect(url)
 
         except AuthenticationException as e:
-            params = e.get_error_dict()
+            params = as_typed(e.get_error_dict(), identifier)
             url = get_safe_redirect_url(
                 base_url=base_host(request=request, is_app=True),
                 next_path=next_path,

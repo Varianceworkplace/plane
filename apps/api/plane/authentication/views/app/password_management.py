@@ -34,6 +34,7 @@ from plane.authentication.adapter.error import (
     AUTHENTICATION_ERROR_CODES,
 )
 from plane.authentication.utils.account_access import is_deactivated
+from plane.authentication.utils.login_identifier import is_username, login_email
 from plane.authentication.rate_limit import AuthenticationThrottle
 
 
@@ -50,7 +51,9 @@ class ForgotPasswordEndpoint(APIView):
     throttle_classes = [AuthenticationThrottle]
 
     def post(self, request):
-        email = request.data.get("email")
+        # an email address, or a username (see login_identifier); the link only ever goes to the account's address
+        identifier = request.data.get("email")
+        email = login_email(identifier)
 
         # Check instance configuration
         instance = Instance.objects.first()
@@ -67,6 +70,13 @@ class ForgotPasswordEndpoint(APIView):
             exc = AuthenticationException(
                 error_message="SMTP_NOT_CONFIGURED",
                 error_code=AUTHENTICATION_ERROR_CODES["SMTP_NOT_CONFIGURED"],
+            )
+            return Response(exc.get_error_dict(), status=status.HTTP_400_BAD_REQUEST)
+
+        if str(identifier or "").strip() and is_username(identifier) and not email:
+            exc = AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["USER_DOES_NOT_EXIST"],
+                error_message="USER_DOES_NOT_EXIST",
             )
             return Response(exc.get_error_dict(), status=status.HTTP_400_BAD_REQUEST)
 
@@ -92,8 +102,10 @@ class ForgotPasswordEndpoint(APIView):
             # Get the reset token for user
             uidb64, token = generate_password_token(user=user)
             current_site = base_host(request=request, is_app=True)
-            # send the forgot password email
-            forgot_password.delay(user.first_name, user.email, uidb64, token, current_site)
+            # send the forgot password email (worded "set your password" for someone who hasn't set one yet)
+            forgot_password.delay(
+                user.first_name, user.email, uidb64, token, current_site, first_time=user.is_password_autoset
+            )
             return Response(
                 {"message": "Check your email to reset your password"},
                 status=status.HTTP_200_OK,
@@ -150,6 +162,10 @@ class ResetPasswordEndpoint(View):
                 return HttpResponseRedirect(url)
 
             password = request.POST.get("password", False)
+            # a refused password keeps the (still valid) link, so they can try another one straight away
+            link = {"uidb64": uidb64, "token": token, "email": user.email}
+            if request.POST.get("setup") == "1":
+                link["setup"] = "1"
 
             if not password:
                 exc = AuthenticationException(
@@ -158,7 +174,7 @@ class ResetPasswordEndpoint(View):
                 )
                 url = urljoin(
                     base_host(request=request, is_app=True),
-                    "accounts/reset-password?" + urlencode(exc.get_error_dict()),
+                    "accounts/reset-password?" + urlencode({**link, **exc.get_error_dict()}),
                 )
                 return HttpResponseRedirect(url)
 
@@ -171,7 +187,7 @@ class ResetPasswordEndpoint(View):
                 )
                 url = urljoin(
                     base_host(request=request, is_app=True),
-                    "accounts/reset-password?" + urlencode(exc.get_error_dict()),
+                    "accounts/reset-password?" + urlencode({**link, **exc.get_error_dict()}),
                 )
                 return HttpResponseRedirect(url)
 
@@ -182,9 +198,10 @@ class ResetPasswordEndpoint(View):
             confirm_email_ownership(user)
             user.save()
 
+            # back to sign-in, which says the password is saved and has their address filled in
             url = urljoin(
                 base_host(request=request, is_app=True),
-                "sign-in?" + urlencode({"success": True}),
+                "?" + urlencode({"password_saved": "1", "email": user.email}),
             )
             return HttpResponseRedirect(url)
         except DjangoUnicodeDecodeError:

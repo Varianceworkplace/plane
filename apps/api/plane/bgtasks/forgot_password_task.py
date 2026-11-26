@@ -20,9 +20,12 @@ from plane.utils.exception_logger import log_exception
 
 
 @shared_task
-def forgot_password(first_name, email, uidb64, token, current_site):
+def forgot_password(first_name, email, uidb64, token, current_site, first_time=False):
+    """The reset link. first_time: they've never set a password, so it's worded "set your password"."""
     try:
         relative_link = f"/accounts/reset-password/?uidb64={uidb64}&token={token}&email={email}"
+        if first_time:
+            relative_link += "&setup=1"
         abs_url = str(current_site) + relative_link
 
         (
@@ -35,12 +38,15 @@ def forgot_password(first_name, email, uidb64, token, current_site):
             EMAIL_FROM,
         ) = get_email_configuration()
 
-        subject = "A new password to your Variance account has been requested"
+        subject = (
+            "Set your Variance password" if first_time else "A new password to your Variance account has been requested"
+        )
 
         context = {
             "first_name": first_name,
             "forgot_password_url": abs_url,
             "email": email,
+            "first_time": first_time,
         }
 
         html_content = render_to_string("emails/auth/forgot_password.html", context)
