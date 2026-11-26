@@ -146,15 +146,18 @@ class MemberPasswordResetEndpoint(BaseAPIView):
             "Password reset link issued",
             extra={"actor_id": str(request.user.id), "member_id": str(user.id), "send": send},
         )
+        # someone who has never had a password (e.g. brought over from the old CRM): "set your password"
+        first_time = user.is_password_autoset
         if send == "email":
-            forgot_password.delay(user.first_name, user.email, uidb64, token, site)
+            forgot_password.delay(user.first_name, user.email, uidb64, token, site, first_time=first_time)
             return Response(
                 {"message": f"A reset link is on its way to {user.email}. It works once, for 1 hour."},
                 status=status.HTTP_200_OK,
             )
         return Response(
             {
-                "link": f"{site}/accounts/reset-password/?uidb64={uidb64}&token={token}&email={user.email}",
+                "link": f"{site}/accounts/reset-password/?uidb64={uidb64}&token={token}&email={user.email}"
+                + ("&setup=1" if first_time else ""),
                 "expires_in_minutes": 60,
             },
             status=status.HTTP_200_OK,

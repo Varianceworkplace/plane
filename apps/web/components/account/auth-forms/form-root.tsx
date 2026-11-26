@@ -44,6 +44,8 @@ export const AuthFormRoot = observer(function AuthFormRoot(props: TAuthFormRoot)
   const nextPath = searchParams.get("next_path");
   // states
   const [isExistingEmail, setIsExistingEmail] = useState(false);
+  // an existing account that has never had a password (e.g. brought over from the old CRM)
+  const [needsPasswordSetup, setNeedsPasswordSetup] = useState(false);
   // hooks
   const { config } = useInstance();
 
@@ -74,6 +76,7 @@ export const AuthFormRoot = observer(function AuthFormRoot(props: TAuthFormRoot)
           }
         }
         setIsExistingEmail(response.existing);
+        setNeedsPasswordSetup(response.existing && !!response.is_password_autoset);
         return undefined;
       })
       .catch((error) => {
@@ -108,7 +111,7 @@ export const AuthFormRoot = observer(function AuthFormRoot(props: TAuthFormRoot)
     return (
       <AuthEmailForm
         defaultEmail={email}
-        placeholder={currentAuthMode === EAuthModes.SIGN_IN ? "name@varianceinfotech.com" : undefined}
+        allowUsername={currentAuthMode === EAuthModes.SIGN_IN}
         onSubmit={handleEmailVerification}
       />
     );
@@ -130,6 +133,7 @@ export const AuthFormRoot = observer(function AuthFormRoot(props: TAuthFormRoot)
       <AuthPasswordForm
         mode={authMode}
         isSMTPConfigured={isSMTPConfigured}
+        needsPasswordSetup={authMode === EAuthModes.SIGN_IN && needsPasswordSetup}
         email={email}
         handleEmailClear={handleEmailClear}
         handleAuthStep={(step: EAuthSteps) => {

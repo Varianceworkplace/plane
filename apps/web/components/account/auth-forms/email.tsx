@@ -20,26 +20,34 @@ import { checkEmailValidity } from "@plane/utils";
 type TAuthEmailForm = {
   defaultEmail: string;
   placeholder?: string;
+  /** sign-in: a username works as well as an email address */
+  allowUsername?: boolean;
   onSubmit: (data: IEmailCheckData) => Promise<void>;
 };
 
+/** A username is one word without "@"; anything with "@" has to be a whole email address. */
+export const isValidLoginIdentifier = (value: string) =>
+  value.includes("@") ? checkEmailValidity(value) : /^\S+$/.test(value.trim());
+
 export const AuthEmailForm = observer(function AuthEmailForm(props: TAuthEmailForm) {
-  const { onSubmit, defaultEmail, placeholder } = props;
+  const { onSubmit, defaultEmail, placeholder, allowUsername = false } = props;
   // states
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [email, setEmail] = useState(defaultEmail);
   // plane hooks
   const { t } = useTranslation();
-  const emailError = useMemo(
-    () => (email && !checkEmailValidity(email) ? { email: "auth.common.email.errors.invalid" } : undefined),
-    [email]
-  );
+  const emailError = useMemo(() => {
+    if (!email) return undefined;
+    if (allowUsername)
+      return isValidLoginIdentifier(email) ? undefined : { email: "auth.common.username_or_email.errors.invalid" };
+    return checkEmailValidity(email) ? undefined : { email: "auth.common.email.errors.invalid" };
+  }, [email, allowUsername]);
 
   const handleFormSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
     const payload: IEmailCheckData = {
-      email: email,
+      email: allowUsername ? email.trim() : email,
     };
     await onSubmit(payload);
     setIsSubmitting(false);
@@ -54,7 +62,7 @@ export const AuthEmailForm = observer(function AuthEmailForm(props: TAuthEmailFo
     <form onSubmit={handleFormSubmit} className="space-y-4">
       <div className="space-y-1">
         <label htmlFor="email" className="text-13 font-medium text-tertiary">
-          {t("auth.common.email.label")}
+          {allowUsername ? t("auth.common.username_or_email.label") : t("auth.common.email.label")}
         </label>
         <Field name="email" invalid={!isFocused && Boolean(emailError?.email)}>
           <InputGroup
@@ -70,11 +78,16 @@ export const AuthEmailForm = observer(function AuthEmailForm(props: TAuthEmailFo
               size="2xl"
               id="email"
               name="email"
-              type="email"
+              type={allowUsername ? "text" : "email"}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder={placeholder ?? t("auth.common.email.placeholder")}
-              autoComplete="off"
+              placeholder={
+                placeholder ??
+                (allowUsername ? t("auth.common.username_or_email.placeholder") : t("auth.common.email.placeholder"))
+              }
+              autoComplete={allowUsername ? "username" : "off"}
+              autoCapitalize="none"
+              spellCheck={false}
               // oxlint-disable-next-line jsx-a11y/no-autofocus -- sole primary field of a dedicated auth step; matches standard sign-in flows
               autoFocus
               ref={inputRef}

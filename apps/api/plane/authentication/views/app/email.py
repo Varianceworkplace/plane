@@ -16,6 +16,7 @@ from plane.license.models import Instance
 from plane.authentication.utils.host import base_host
 from plane.authentication.utils.redirection_path import get_redirection_path
 from plane.authentication.utils.user_auth_workflow import post_user_auth_workflow
+from plane.authentication.utils.login_identifier import as_typed, is_username, login_email
 from plane.db.models import User
 from plane.authentication.adapter.error import (
     AuthenticationException,
@@ -69,15 +70,21 @@ class SignInAuthEndpoint(View):
             )
             return HttpResponseRedirect(url)
 
-        # Validate email
-        email = email.strip().lower()
+        # an email address, or a username (see login_identifier): errors go back with what was typed
+        identifier = str(email).strip()
+        email = login_email(identifier)
+
+        # Validate email (a username nobody has gets the same answer as before usernames worked; the email
+        # check before this step already says "no account has that username")
         try:
+            if is_username(identifier) and not email:
+                raise ValidationError("no such username")
             validate_email(email)
         except ValidationError:
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["INVALID_EMAIL_SIGN_IN"],
                 error_message="INVALID_EMAIL_SIGN_IN",
-                payload={"email": str(email)},
+                payload={"email": identifier},
             )
             params = exc.get_error_dict()
             url = get_safe_redirect_url(
@@ -93,7 +100,7 @@ class SignInAuthEndpoint(View):
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["USER_DOES_NOT_EXIST"],
                 error_message="USER_DOES_NOT_EXIST",
-                payload={"email": str(email)},
+                payload={"email": identifier},
             )
             params = exc.get_error_dict()
             url = get_safe_redirect_url(
@@ -128,7 +135,7 @@ class SignInAuthEndpoint(View):
             )
             return HttpResponseRedirect(url)
         except AuthenticationException as e:
-            params = e.get_error_dict()
+            params = as_typed(e.get_error_dict(), identifier)
             url = get_safe_redirect_url(
                 base_url=base_host(request=request, is_app=True),
                 next_path=next_path,

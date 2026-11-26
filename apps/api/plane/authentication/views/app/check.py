@@ -23,7 +23,8 @@ from plane.authentication.adapter.error import (
     AUTHENTICATION_ERROR_CODES,
 )
 from plane.authentication.rate_limit import AuthenticationThrottle
-from plane.authentication.utils.account_access import is_deactivated, signup_allowed
+from plane.authentication.utils.account_access import is_deactivated, password_login_enabled, signup_allowed
+from plane.authentication.utils.login_identifier import is_username, login_email
 from plane.license.utils.instance_value import get_configuration_value
 
 
@@ -54,19 +55,27 @@ class EmailCheckEndpoint(APIView):
 
         smtp_configured = bool(EMAIL_HOST)
         is_magic_login_enabled = ENABLE_MAGIC_LINK_LOGIN == "1"
+        is_password_login_enabled = password_login_enabled()
 
-        email = request.data.get("email", False)
+        # an email address, or a username (see login_identifier)
+        identifier = request.data.get("email", False)
 
         # Return error if email is not present
-        if not email:
+        if not identifier or not str(identifier).strip():
             exc = AuthenticationException(
                 error_code=AUTHENTICATION_ERROR_CODES["EMAIL_REQUIRED"],
                 error_message="EMAIL_REQUIRED",
             )
             return Response(exc.get_error_dict(), status=status.HTTP_400_BAD_REQUEST)
 
-        # Lower the email
-        email = str(email).lower().strip()
+        email = login_email(identifier)
+        # a username nobody has: there's no account to sign in to, and a username can't sign up
+        if is_username(identifier) and not email:
+            exc = AuthenticationException(
+                error_code=AUTHENTICATION_ERROR_CODES["USER_DOES_NOT_EXIST"],
+                error_message="USER_DOES_NOT_EXIST",
+            )
+            return Response(exc.get_error_dict(), status=status.HTTP_400_BAD_REQUEST)
 
         # Validate email
         try:
@@ -97,15 +106,20 @@ class EmailCheckEndpoint(APIView):
 
         # If existing user
         if existing_user:
-            # Return response
+            # The password step comes next whenever passwords are on: someone who hasn't set one yet is offered a
+            # link to set it, or a sign-in code, from there (is_password_autoset). Only with passwords off does a
+            # sign-in code go out straight away.
+            code_only = (
+                existing_user.is_password_autoset
+                and smtp_configured
+                and is_magic_login_enabled
+                and not is_password_login_enabled
+            )
             return Response(
                 {
                     "existing": True,
-                    "status": (
-                        "MAGIC_CODE"
-                        if existing_user.is_password_autoset and smtp_configured and is_magic_login_enabled
-                        else "CREDENTIAL"
-                    ),
+                    "status": "MAGIC_CODE" if code_only else "CREDENTIAL",
+                    "is_password_autoset": existing_user.is_password_autoset,
                 },
                 status=status.HTTP_200_OK,
             )
@@ -114,6 +128,7 @@ class EmailCheckEndpoint(APIView):
             {
                 "existing": False,
                 "status": ("MAGIC_CODE" if smtp_configured and is_magic_login_enabled else "CREDENTIAL"),
+                "is_password_autoset": False,
             },
             status=status.HTTP_200_OK,
         )

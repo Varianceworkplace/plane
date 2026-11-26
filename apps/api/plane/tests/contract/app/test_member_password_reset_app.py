@@ -97,6 +97,23 @@ class TestTheLink:
         assert mail.call_args[0][1] == setup["people"]["a1"].email
 
     @patch(f"{VIEW}.forgot_password.delay")
+    @patch(f"{VIEW}.email_is_configured", return_value=True)
+    def test_someone_who_never_had_a_password_is_asked_to_set_one(self, _configured, mail, setup):
+        a1 = setup["people"]["a1"]
+        User.objects.filter(id=a1.id).update(is_password_autoset=True)
+        _reset(setup, "hr", "a1", send="email")
+        assert mail.call_args[1] == {"first_time": True}
+        link = _reset(setup, "hr", "a1").json()["link"]
+        assert parse_qs(urlparse(link).query)["setup"] == ["1"]
+
+    @patch(f"{VIEW}.forgot_password.delay")
+    @patch(f"{VIEW}.email_is_configured", return_value=True)
+    def test_someone_with_a_password_gets_the_reset_wording(self, _configured, mail, setup):
+        _reset(setup, "hr", "a1", send="email")
+        assert mail.call_args[1] == {"first_time": False}
+        assert "setup" not in _reset(setup, "hr", "a1").json()["link"]
+
+    @patch(f"{VIEW}.forgot_password.delay")
     @patch(f"{VIEW}.email_is_configured", return_value=False)
     def test_without_email_set_up_it_can_only_be_copied(self, _configured, mail, setup):
         response = _reset(setup, "hr", "a1", send="email")
