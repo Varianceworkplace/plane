@@ -142,16 +142,19 @@ class ProjectViewSet(BaseViewSet):
         fields = [field for field in request.GET.get("fields", "").split(",") if field]
         # members come from with_member_ids, not the prefetch (much faster with many members)
         projects = self.get_queryset().prefetch_related(None).order_by("sort_order", "name")
+        # an active membership of theirs, checked per project: joining the memberships multiplied each project by its
+        # members before DISTINCT, ~8 s once projects had ~75,000 memberships. all_objects, as the join it replaces
+        # didn't leave out soft-deleted rows either.
+        is_member = Exists(
+            ProjectMember.all_objects.filter(project_id=OuterRef("pk"), member=self.request.user, is_active=True)
+        )
         if WorkspaceMember.objects.filter(
             member=request.user,
             workspace__slug=slug,
             is_active=True,
             role=ROLE.GUEST.value,
         ).exists():
-            projects = projects.filter(
-                project_projectmember__member=self.request.user,
-                project_projectmember__is_active=True,
-            )
+            projects = projects.filter(is_member)
 
         if WorkspaceMember.objects.filter(
             member=request.user,
@@ -159,13 +162,7 @@ class ProjectViewSet(BaseViewSet):
             is_active=True,
             role=ROLE.MEMBER.value,
         ).exists():
-            projects = projects.filter(
-                Q(
-                    project_projectmember__member=self.request.user,
-                    project_projectmember__is_active=True,
-                )
-                | Q(network=2)
-            )
+            projects = projects.filter(Q(is_member) | Q(network=2))
 
         # role-based access: only the projects the person's roles reach
         profile = rbac_profile(request, slug)

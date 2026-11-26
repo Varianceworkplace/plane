@@ -340,6 +340,27 @@ class TestProjectAPIGet(TestProjectBase):
         assert data[0]["description"] == "A detailed test project"
 
     @pytest.mark.django_db
+    def test_list_detail_member_and_guest_scope(self, session_client, workspace):
+        """Members see public projects and private ones they're active in; guests only the ones they're active in"""
+        member = User.objects.create_user(email="member-scope@example.com", username="member_scope")
+        guest = User.objects.create_user(email="guest-scope@example.com", username="guest_scope")
+        WorkspaceMember.objects.create(workspace=workspace, member=member, role=15, is_active=True)
+        WorkspaceMember.objects.create(workspace=workspace, member=guest, role=5, is_active=True)
+        Project.objects.create(name="Public", identifier="PUB", workspace=workspace, network=2)
+        mine = Project.objects.create(name="Private Mine", identifier="PRM", workspace=workspace, network=0)
+        Project.objects.create(name="Private Other", identifier="PRO", workspace=workspace, network=0)
+        left = Project.objects.create(name="Private Left", identifier="PRL", workspace=workspace, network=0)
+        for user, role in ((member, 15), (guest, 5)):
+            ProjectMember.objects.create(project=mine, member=user, role=role, is_active=True)
+            ProjectMember.objects.create(project=left, member=user, role=role, is_active=False)
+
+        url = self.get_project_url(workspace.slug, details=True)
+        session_client.force_authenticate(user=member)
+        assert sorted(p["name"] for p in session_client.get(url).json()) == ["Private Mine", "Public"]
+        session_client.force_authenticate(user=guest)
+        assert [p["name"] for p in session_client.get(url).json()] == ["Private Mine"]
+
+    @pytest.mark.django_db
     def test_list_detail_members(self, session_client, workspace, create_user):
         """Each project's members: active people only (no bots, nobody who left), newest first; [] when none"""
 
