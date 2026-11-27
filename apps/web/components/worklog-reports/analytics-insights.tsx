@@ -78,7 +78,7 @@ export const hasProductivity = (rows: TChartRow[]) => rows.some((row) => Number(
 export const PRODUCTIVITY_HINT = "Expected hours of completed work against hours logged";
 export const PRODUCTIVITY_EMPTY = "No completed work items with expected time in this period.";
 
-const projectName = (project: TWorklogAnalytics["projects"][number]) => project.identifier || project.name;
+const projectName = (project: TWorklogAnalytics["projects"][number]) => project.name;
 
 /** Task completion, people's hours, status split and milestones per project. */
 export const projectWiseCharts = (
@@ -139,6 +139,7 @@ export const projectWiseCharts = (
       series: COMPLETION_SERIES,
       format: "count",
       xAxisLabel: "Projects",
+      namedRows: true,
       onSelect: onSelectProject,
       selectHint: "Click to see this project",
     },
@@ -165,6 +166,7 @@ export const projectWiseCharts = (
       series: peopleSeries,
       format: "hours",
       xAxisLabel: "Projects",
+      namedRows: true,
       onSelect: onSelectProject,
       selectHint: "Click to see this project",
     },
