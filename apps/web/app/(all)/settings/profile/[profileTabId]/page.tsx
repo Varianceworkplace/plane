@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { useEffect } from "react";
 import { observer } from "mobx-react";
 // plane imports
 import { PROFILE_SETTINGS_TABS } from "@plane/constants";
@@ -30,6 +31,11 @@ function ProfileSettingsPage(props: Route.ComponentProps) {
   const { t } = useTranslation();
   // derived values
   const isAValidTab = PROFILE_SETTINGS_TABS.includes(profileTabId as TProfileSettingsTabs);
+
+  // a tab that doesn't exist (an old Personal Access Tokens link, say) opens the profile instead of spinning
+  useEffect(() => {
+    if (!isAValidTab) router.replace("/settings/profile/general");
+  }, [isAValidTab, router]);
 
   if (!currentUser || !isAValidTab)
     return (
