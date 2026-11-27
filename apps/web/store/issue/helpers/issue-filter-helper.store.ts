@@ -7,6 +7,7 @@
 import { isEmpty } from "lodash-es";
 // plane constants
 import type { EIssueFilterType } from "@plane/constants";
+import { UNUSED_DISPLAY_PROPERTIES } from "@plane/constants";
 import {
   EIssueGroupByToServerOptions,
   EServerGroupByToFilterOptions,
@@ -193,8 +194,11 @@ export class IssueFilterHelperStore implements IIssueFilterHelperStore {
    * @param {IIssueDisplayProperties} displayProperties
    * @returns {IIssueDisplayProperties}
    */
-  computedDisplayProperties = (displayProperties: IIssueDisplayProperties): IIssueDisplayProperties =>
-    getComputedDisplayProperties(displayProperties);
+  // the details Workplace doesn't use stay hidden, whatever was saved before (UNUSED_DISPLAY_PROPERTIES)
+  computedDisplayProperties = (displayProperties: IIssueDisplayProperties): IIssueDisplayProperties => ({
+    ...getComputedDisplayProperties(displayProperties),
+    ...Object.fromEntries(UNUSED_DISPLAY_PROPERTIES.map((key) => [key, false])),
+  });
 
   handleIssuesLocalFilters = {
     fetchFiltersFromStorage: () => {

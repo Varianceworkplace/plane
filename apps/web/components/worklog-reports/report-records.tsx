@@ -18,7 +18,7 @@ import { cn, renderFormattedDate } from "@plane/utils";
 import { formatWorklogDuration, getWorklogUserName } from "@/components/worklogs/helpers";
 // local imports
 import { useWorklogReportDetail } from "./helpers";
-import { HEAD_CELL, ROW_CLASSNAME, Section, TABLE_CLASSNAME, UserCell } from "./report-parts";
+import { HEAD_CELL, ROW_CLASSNAME, Section, TABLE_CLASSNAME, TABLE_HEAD, UserCell } from "./report-parts";
 import type { TWorklogReportFilters, TWorklogReportListOptions, TWorklogReportSortKey } from "./types";
 
 const PAGE_SIZE = 25;
@@ -101,7 +101,7 @@ export function WorklogReportRecords(props: { workspaceSlug: string; filters: TW
                 <col className="w-[12%]" />
                 <col className="w-[19%]" />
               </colgroup>
-              <thead className="bg-layer-1 text-body-xs-medium text-secondary">
+              <thead className={cn(TABLE_HEAD, "text-body-xs-medium text-secondary")}>
                 <tr>
                   {COLUMNS.map((column) => {
                     const active = column.key && ordering?.replace("-", "") === column.key;

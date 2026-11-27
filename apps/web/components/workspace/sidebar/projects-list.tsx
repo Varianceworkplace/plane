@@ -32,11 +32,15 @@ import { useProject } from "@/hooks/store/use-project";
 import { useProjectFilter } from "@/hooks/store/use-project-filter";
 import { useUserPermissions } from "@/hooks/store/user";
 import { useProjectNavigationPreferences } from "@/hooks/use-navigation-preferences";
+import { useRenderInBatches } from "@/hooks/use-render-in-batches";
 // plane web imports
 import type { TProject } from "@plane/types";
 // local imports
 import { SidebarProjectsListItem } from "./projects-list-item";
 import { useSidebarWorkingProjects } from "./use-working-projects";
+
+/** sidebar project entries drawn at a time (see useRenderInBatches) */
+const SIDEBAR_PROJECTS_BATCH = 40;
 
 export const SidebarProjectsList = observer(function SidebarProjectsList() {
   // states
@@ -64,7 +68,7 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
   const hiddenCount = joinedProjectIds.length - joinedProjects.length;
   const { updateDisplayFilters } = useProjectFilter();
   // router params
-  const { workspaceSlug } = useParams();
+  const { workspaceSlug, projectId: openProjectId } = useParams();
   const pathname = usePathname();
   // the projects they're working on come first (latest timer activity) and stay there: not draggable
   useSidebarWorkingProjects(workspaceSlug?.toString() ?? "");
@@ -79,6 +83,18 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
   const displayedProjects = projectPreferences.showLimitedProjects
     ? joinedProjects.slice(0, projectPreferences.limitedProjectsCount)
     : joinedProjects;
+
+  // Most people's list holds 650–1,300 projects, and each entry follows the route (all of them re-rendered on every
+  // click): they're drawn 40 at a time as the list scrolls, the open project's entry always among them
+  const {
+    shownItems: renderedProjects,
+    hasMore: moreToRender,
+    endRef,
+  } = useRenderInBatches(
+    displayedProjects,
+    SIDEBAR_PROJECTS_BATCH,
+    openProjectId ? displayedProjects.indexOf(openProjectId.toString()) : -1
+  );
 
   // Check if there are more projects to show
   const hasMoreProjects =
@@ -232,7 +248,7 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
                   ))}
                 </Loader>
               )}
-              {displayedProjects.map((projectId, index) => (
+              {renderedProjects.map((projectId, index) => (
                 <SidebarProjectsListItem
                   key={projectId}
                   projectId={projectId}
@@ -244,6 +260,7 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
                   handleOnProjectDrop={handleOnProjectDrop}
                 />
               ))}
+              {moreToRender && <div ref={endRef} aria-hidden className="h-px w-full" />}
               {hasMoreProjects && (
                 <SidebarNavItem>
                   <button

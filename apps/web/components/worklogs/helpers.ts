@@ -10,6 +10,8 @@ import type { ScopedMutator } from "swr";
 import { renderFormattedDate, renderFormattedTime } from "@plane/utils";
 // services
 import { WorklogService } from "@/services/worklog.service";
+// local imports
+import type { TWorkItemTimeEstimate } from "./types";
 
 export const worklogService = new WorklogService();
 
@@ -50,19 +52,20 @@ export const issueWorklogsKey = (issueId: string) => `ISSUE_WORKLOGS_${issueId}`
 
 export const issueTimeEstimateKey = (issueId: string) => `ISSUE_TIME_ESTIMATE_${issueId}`;
 
-export const projectTimeEstimatesKey = (projectId: string) => `PROJECT_TIME_ESTIMATES_${projectId}`;
+/** A list row's expected vs worked time (null: neither an estimate nor logged time). */
+export const rowTimeEstimateKey = (issueId: string) => `ROW_TIME_ESTIMATE_${issueId}`;
 
-/** After time is logged, changed or removed: refresh the work item's worklogs and its project's totals. */
 /** Sidebar › Projects order; the timer's state is part of the key, so starting, stopping or saving it reloads it. */
 export const MY_ACTIVE_PROJECTS_KEY = "MY_ACTIVE_PROJECTS_";
 export const myActiveProjectsKey = (workspaceSlug: string, timerState: string) =>
   `${MY_ACTIVE_PROJECTS_KEY}${workspaceSlug}_${timerState}`;
 
-export const refreshWorkItemTime = (mutate: ScopedMutator, projectId: string, issueId: string) =>
+/** After time is logged, changed or removed: refresh the work item's worklogs, its totals and its list row. */
+export const refreshWorkItemTime = (mutate: ScopedMutator, issueId: string) =>
   Promise.all([
     mutate(issueWorklogsKey(issueId)),
     mutate(issueTimeEstimateKey(issueId)),
-    mutate(projectTimeEstimatesKey(projectId)),
+    mutate(rowTimeEstimateKey(issueId)),
     // logging time on a project moves it up the sidebar
     mutate((key) => typeof key === "string" && key.startsWith(MY_ACTIVE_PROJECTS_KEY)),
   ]);
@@ -108,12 +111,52 @@ export const useIssueTimeEstimate = (workspaceSlug: string, projectId: string, i
   return { estimate: data, mutate, isLoading };
 };
 
-/** One request per project, shared by every list row of it. */
-export const useProjectTimeEstimates = (workspaceSlug: string, projectId: string, enabled = true) => {
+// ------------------------------------------------------------ list rows: one request for the rows on screen
+
+/** work items per request (their ids fit comfortably in the address) */
+const ROW_BATCH_SIZE = 100;
+/** how long to gather the rows that render together before asking */
+const ROW_BATCH_WAIT_MS = 30;
+
+type TRowWaiter = { resolve: (estimate: TWorkItemTimeEstimate | null) => void; reject: (error: unknown) => void };
+/** workspace -> work item -> the rows waiting for it */
+const queuedRows = new Map<string, Map<string, TRowWaiter[]>>();
+let rowBatchTimer: ReturnType<typeof setTimeout> | undefined;
+
+const askForQueuedRows = () => {
+  rowBatchTimer = undefined;
+  const queued = [...queuedRows.entries()];
+  queuedRows.clear();
+  queued.forEach(([workspaceSlug, waiting]) => {
+    const issueIds = [...waiting.keys()];
+    for (let start = 0; start < issueIds.length; start += ROW_BATCH_SIZE) {
+      const batch = issueIds.slice(start, start + ROW_BATCH_SIZE);
+      worklogService.timeEstimatesFor(workspaceSlug, batch).then(
+        (found) => batch.forEach((id) => waiting.get(id)?.forEach((row) => row.resolve(found[id] ?? null))),
+        (error: unknown) => batch.forEach((id) => waiting.get(id)?.forEach((row) => row.reject(error)))
+      );
+    }
+  });
+};
+
+/** One work item's row totals, asked for together with every other row that renders within a moment of it. */
+const loadRowTimeEstimate = (workspaceSlug: string, issueId: string) =>
+  new Promise<TWorkItemTimeEstimate | null>((resolve, reject) => {
+    const waiting = queuedRows.get(workspaceSlug) ?? new Map<string, TRowWaiter[]>();
+    queuedRows.set(workspaceSlug, waiting);
+    waiting.set(issueId, [...(waiting.get(issueId) ?? []), { resolve, reject }]);
+    rowBatchTimer ??= setTimeout(askForQueuedRows, ROW_BATCH_WAIT_MS);
+  });
+
+/**
+ * A list row's expected vs worked time. The rows on screen are fetched in one request (across projects), instead of
+ * one request per project with every work item of it; a row seen in the last minute isn't asked for again.
+ */
+export const useRowTimeEstimate = (workspaceSlug: string, issueId: string, enabled = true) => {
   const { data } = useSWR(
-    enabled && workspaceSlug && projectId ? projectTimeEstimatesKey(projectId) : null,
-    () => worklogService.projectTimeEstimates(workspaceSlug, projectId),
-    { revalidateOnFocus: false, dedupingInterval: 10000 }
+    enabled && workspaceSlug && issueId ? rowTimeEstimateKey(issueId) : null,
+    () => loadRowTimeEstimate(workspaceSlug, issueId),
+    { revalidateOnFocus: false, dedupingInterval: 60_000 }
   );
-  return data;
+  return data ?? undefined;
 };

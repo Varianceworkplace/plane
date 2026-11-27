@@ -326,7 +326,7 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
         worklog={worklogModal.worklog}
         onClose={(saved) => {
           setWorklogModal({ open: false, worklog: null });
-          if (saved) void refreshWorkItemTime(mutate, projectId, issueId);
+          if (saved) void refreshWorkItemTime(mutate, issueId);
         }}
       />
       <DeleteWorklogModal
@@ -337,7 +337,7 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
         worklog={deleteWorklog}
         onClose={(deleted) => {
           setDeleteWorklog(null);
-          if (deleted) void refreshWorkItemTime(mutate, projectId, issueId);
+          if (deleted) void refreshWorkItemTime(mutate, issueId);
         }}
       />
     </div>

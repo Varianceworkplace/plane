@@ -7,7 +7,7 @@
 import React, { useRef } from "react";
 import { observer } from "mobx-react";
 // plane constants
-import { SPREADSHEET_SELECT_GROUP, SPREADSHEET_PROPERTY_LIST } from "@plane/constants";
+import { SPREADSHEET_SELECT_GROUP, SPREADSHEET_PROPERTY_LIST, UNUSED_DISPLAY_PROPERTIES } from "@plane/constants";
 // types
 import type { TIssue, IIssueDisplayFilterOptions, IIssueDisplayProperties } from "@plane/types";
 import { EIssueLayoutTypes } from "@plane/types";
@@ -67,9 +67,11 @@ export const SpreadsheetView = observer(function SpreadsheetView(props: Props) {
 
   const isEstimateEnabled: boolean = currentProjectDetails?.estimate !== null;
 
+  // columns Workplace doesn't use are never shown (UNUSED_DISPLAY_PROPERTIES)
+  const usedColumns = SPREADSHEET_PROPERTY_LIST.filter((property) => !UNUSED_DISPLAY_PROPERTIES.includes(property));
   const spreadsheetColumnsList = isWorkspaceLevel
-    ? SPREADSHEET_PROPERTY_LIST
-    : SPREADSHEET_PROPERTY_LIST.filter((property) => {
+    ? usedColumns
+    : usedColumns.filter((property) => {
         if (property === "cycle" && !currentProjectDetails?.cycle_view) return false;
         if (property === "modules" && !currentProjectDetails?.module_view) return false;
         return true;

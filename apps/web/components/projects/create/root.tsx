@@ -172,6 +172,8 @@ export const CreateProjectForm = observer(function CreateProjectForm(props: TCre
 
           if (nameError || identifierError || nameSpecialCharError) {
             if (nameError) {
+              // under the name too: the name may be a project's they can't see, which the form couldn't know
+              methods.setError("name", { type: "server", message: t("project_name_already_taken") });
               setToast({
                 type: "error",
                 title: t("toast.error"),

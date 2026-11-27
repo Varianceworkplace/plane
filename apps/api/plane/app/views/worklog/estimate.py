@@ -21,9 +21,9 @@ from rest_framework.response import Response
 # Module imports
 from plane.app.permissions import ROLE, allow_permission
 from plane.app.views.base import BaseAPIView
-from plane.db.models import MAX_WORKLOG_DURATION, Issue, IssueTimeEstimate, Project
+from plane.db.models import MAX_WORKLOG_DURATION, Issue, IssueTimeEstimate, Project, ProjectMember
 
-from .base import worklog_queryset
+from .base import _uuid_list, worklog_queryset
 
 
 def serialize_time_estimate(estimate, worked_duration, worklog_count):
@@ -143,4 +143,56 @@ class ProjectTimeEstimatesEndpoint(BaseAPIView):
         return Response(result, status=status.HTTP_200_OK)
 
 
-__all__ = ["IssueTimeEstimateEndpoint", "ProjectTimeEstimatesEndpoint"]
+# work items per request; the app asks for the rows on screen, a few at a time
+MAX_BATCH_ISSUES = 200
+
+
+class WorkspaceTimeEstimatesEndpoint(BaseAPIView):
+    """Expected and worked minutes for the work items asked for (?issues=<id>,<id>…), across projects: one request for
+    the rows a list shows, rather than one per project with every work item of it.
+
+    As the project listing: only work items in projects the person is an active member of, never helpdesk tickets,
+    and (through the work item managers) only work items they can see. Work items with neither an estimate nor logged
+    time, and ids they can't reach, are simply not in the answer."""
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER, ROLE.GUEST], level="WORKSPACE")
+    def get(self, request, slug):
+        asked = _uuid_list(request.GET.get("issues"))
+        if len(asked) > MAX_BATCH_ISSUES:
+            return Response(
+                {"issues": f"Ask for at most {MAX_BATCH_ISSUES} work items at a time."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not asked:
+            return Response({}, status=status.HTTP_200_OK)
+        member_projects = ProjectMember.objects.filter(
+            member=request.user,
+            workspace__slug=slug,
+            is_active=True,
+            role__in=[ROLE.ADMIN.value, ROLE.MEMBER.value, ROLE.GUEST.value],
+        ).values("project_id")
+        issue_ids = list(
+            Issue.issue_objects.filter(
+                pk__in=asked,
+                workspace__slug=slug,
+                project_id__in=member_projects,
+                project__is_ticket_project=False,
+            ).values_list("id", flat=True)
+        )
+        worked = {
+            row["issue_id"]: row
+            for row in worklog_queryset(slug)
+            .filter(issue_id__in=issue_ids)
+            .order_by()
+            .values("issue_id")
+            .annotate(worked=Sum("duration"), count=Count("id"))
+        }
+        estimates = {e.issue_id: e for e in IssueTimeEstimate.objects.filter(issue_id__in=issue_ids)}
+        result = {}
+        for issue_id in {*worked, *estimates}:
+            row = worked.get(issue_id) or {"worked": 0, "count": 0}
+            result[str(issue_id)] = serialize_time_estimate(estimates.get(issue_id), row["worked"], row["count"])
+        return Response(result, status=status.HTTP_200_OK)
+
+
+__all__ = ["IssueTimeEstimateEndpoint", "ProjectTimeEstimatesEndpoint", "WorkspaceTimeEstimatesEndpoint"]

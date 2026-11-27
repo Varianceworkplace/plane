@@ -194,8 +194,10 @@ def report_worklogs(request, slug, scope):
     if group_by not in ("", "work_item"):
         raise ReportFilterError({"group_by": "Group by work_item, or leave it out."})
     if group_by == "work_item":
-        # one work item after the other, newest entries first within each
-        return worklogs.order_by("project__identifier", "issue__sequence_id", "-work_at", "-created_at")
+        # one work item after the other, the newest work item first, and newest entries first within each
+        return worklogs.order_by(
+            "project__identifier", "-issue__created_at", "-issue__sequence_id", "-work_at", "-created_at"
+        )
     return worklogs.order_by("-work_at", "-created_at")
 
 

@@ -39,6 +39,7 @@ from plane.db.models import (
     ProjectPage,
 )
 from plane.bgtasks.webhook_task import model_activity, webhook_activity
+from plane.utils.project_names import project_name_taken
 from plane.utils.exception_logger import log_exception
 from .base import BaseAPIView
 from plane.utils.host import base_host
@@ -233,6 +234,13 @@ class ProjectListCreateAPIEndpoint(BaseAPIView):
         """
         try:
             workspace = Workspace.objects.get(slug=slug)
+
+            # the same answer as the database gives an exact repeat, now whatever the case (plane.utils.project_names)
+            if project_name_taken(workspace.id, request.data.get("name")):
+                return Response(
+                    {"name": "The project name is already taken"},
+                    status=status.HTTP_409_CONFLICT,
+                )
 
             serializer = ProjectCreateSerializer(
                 data={**NEW_PROJECT_FEATURES, **request.data}, context={"workspace_id": workspace.id}
@@ -569,6 +577,17 @@ class ProjectDetailAPIEndpoint(BaseAPIView):
                 return Response(
                     {"error": "Archived project cannot be updated"},
                     status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            new_name = request.data.get("name")
+            if (
+                new_name is not None
+                and new_name != project.name
+                and project_name_taken(workspace.id, new_name, exclude_project_id=project.id)
+            ):
+                return Response(
+                    {"name": "The project name is already taken"},
+                    status=status.HTTP_409_CONFLICT,
                 )
 
             serializer = ProjectUpdateSerializer(

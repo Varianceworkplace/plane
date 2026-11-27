@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { useCallback } from "react";
 import { observer } from "mobx-react";
 import { useParams } from "next/navigation";
 // icons
@@ -22,6 +23,8 @@ import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
 import { CountChip } from "@/components/common/count-chip";
 // constants
 import { HeaderFilters } from "@/components/issues/filters";
+import { WorkItemDateFilter } from "@/components/issues/work-item-date-filter";
+import { WorkItemSearchBox } from "@/components/issues/work-item-search-box";
 // helpers
 // hooks
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
@@ -40,6 +43,7 @@ export const IssuesHeader = observer(function IssuesHeader() {
   // store hooks
   const {
     issues: { getGroupIssueCount },
+    issuesFilter: { searchQuery, updateSearchQuery, dateFilter, updateDateFilter },
   } = useIssues(EIssuesStoreType.PROJECT);
   // i18n
   const { t } = useTranslation();
@@ -56,6 +60,14 @@ export const IssuesHeader = observer(function IssuesHeader() {
   const publishedURL = `${SPACE_APP_URL}/issues/${currentProjectDetails?.anchor}`;
 
   const issuesCount = getGroupIssueCount(undefined, undefined, false);
+  // the search box: a name, or a task number such as ACMEWEB-6
+  const activeSearch = projectId ? (searchQuery[projectId.toString()] ?? "") : "";
+  const handleSearch = useCallback(
+    (query: string) => {
+      if (workspaceSlug && projectId) updateSearchQuery(workspaceSlug.toString(), projectId.toString(), query);
+    },
+    [workspaceSlug, projectId, updateSearchQuery]
+  );
   const canUserCreateIssue =
     allowPermissions([EUserPermissions.ADMIN, EUserPermissions.MEMBER], EUserPermissionsLevel.PROJECT) &&
     canCreateWorkItem(projectId?.toString());
@@ -84,7 +96,11 @@ export const IssuesHeader = observer(function IssuesHeader() {
           </Breadcrumbs>
           {issuesCount && issuesCount > 0 ? (
             <Tooltip
-              label={`There are ${issuesCount} ${issuesCount > 1 ? "project tasks" : "project task"} in this project`}
+              label={
+                activeSearch
+                  ? `${issuesCount} ${issuesCount > 1 ? "project tasks match" : "project task matches"} "${activeSearch}"`
+                  : `There are ${issuesCount} ${issuesCount > 1 ? "project tasks" : "project task"} in this project`
+              }
               layout="stacked"
               side="bottom"
               disabled={isMobile}
@@ -109,6 +125,13 @@ export const IssuesHeader = observer(function IssuesHeader() {
         )}
       </Header.LeftItem>
       <Header.RightItem>
+        <WorkItemSearchBox key={projectId?.toString()} value={activeSearch} onSearch={handleSearch} />
+        <WorkItemDateFilter
+          value={projectId ? dateFilter[projectId.toString()] : undefined}
+          onChange={(filter) => {
+            if (workspaceSlug && projectId) updateDateFilter(workspaceSlug.toString(), projectId.toString(), filter);
+          }}
+        />
         <div className="hidden gap-2 md:flex">
           <HeaderFilters
             projectId={projectId}
@@ -128,7 +151,9 @@ export const IssuesHeader = observer(function IssuesHeader() {
             }}
           >
             <div className="block sm:hidden">{t("issue.label", { count: 1 })}</div>
-            <div className="hidden sm:block">{t("issue.add.label")}</div>
+            {/* "Add" until the header is wide: it also carries the search box and the date filter */}
+            <div className="hidden sm:block @6xl:hidden">{t("common.add")}</div>
+            <div className="hidden @6xl:block">{t("issue.add.label")}</div>
           </Button>
         )}
       </Header.RightItem>

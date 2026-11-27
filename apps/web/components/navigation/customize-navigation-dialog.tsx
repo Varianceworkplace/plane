@@ -56,7 +56,6 @@ type TWorkspaceNavigationItem = {
 const PERSONAL_ITEMS: Array<{ key: TPersonalNavigationItemKey; labelTranslationKey: string }> = [
   { key: "stickies", labelTranslationKey: "sidebar.stickies" },
   { key: "your_work", labelTranslationKey: "sidebar.your_work" },
-  { key: "drafts", labelTranslationKey: "drafts" },
 ];
 
 export const CustomizeNavigationDialog = observer(function CustomizeNavigationDialog(
@@ -224,8 +223,8 @@ export const CustomizeNavigationDialog = observer(function CustomizeNavigationDi
             <DialogHeading>
               <DialogTitle>{t("customize_navigation")}</DialogTitle>
               <DialogDescription>
-                Selected items will always stay visible in your sidebar. You can still find the others anytime from the
-                More menu. These changes are personal to you and won&apos;t affect anyone else on your workspace.
+                Selected items will always stay visible in your sidebar. These changes are personal to you and
+                won&apos;t affect anyone else on your workspace.
               </DialogDescription>
             </DialogHeading>
           </DialogHeader>

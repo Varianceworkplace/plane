@@ -88,7 +88,35 @@ export type TIssueParams =
   | "issue_type"
   | "layout"
   | "expand"
-  | "filters";
+  | "filters"
+  // the search box of Projects › Project Tasks: a name, or a task number such as ACMEWEB-6
+  | "search"
+  // the date filter of a work item list (TWorkItemDateFilter)
+  | "date_field"
+  | "date_from"
+  | "date_to";
+
+/** The date the date filter of a work item list reads (Project Tasks, a project's task list). */
+export type TWorkItemDateField = "start_date" | "due_date" | "created_on" | "updated_on";
+
+/** The date filter of a work item list: the work items whose `field` is on or between `from` and `to` (YYYY-MM-DD). */
+export type TWorkItemDateFilter = {
+  field: TWorkItemDateField;
+  from?: string;
+  to?: string;
+};
+
+/** The query params of a date filter, when a day or range is picked. */
+export const getWorkItemDateFilterParams = (
+  filter: TWorkItemDateFilter | undefined
+): Partial<Record<"date_field" | "date_from" | "date_to", string>> => {
+  if (!filter || !(filter.from || filter.to)) return {};
+  return {
+    date_field: filter.field,
+    ...(filter.from ? { date_from: filter.from } : {}),
+    ...(filter.to ? { date_to: filter.to } : {}),
+  };
+};
 
 export type TCalendarLayouts = "month" | "week";
 

@@ -21,6 +21,8 @@ import { Header } from "@plane/blocks/layout";
 import { BreadcrumbLink } from "@/components/common/breadcrumb-link";
 import { CountChip } from "@/components/common/count-chip";
 import { DisplayFiltersSelection, FiltersDropdown, LayoutSelection } from "@/components/issues/issue-layouts/filters";
+import { WorkItemDateFilter } from "@/components/issues/work-item-date-filter";
+import { WorkItemSearchBox } from "@/components/issues/work-item-search-box";
 import { WorkItemFiltersToggle } from "@/components/work-item-filters/filters-toggle";
 // hooks
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
@@ -39,7 +41,7 @@ export const ProjectTasksHeader = observer(function ProjectTasksHeader() {
   const { isMobile } = usePlatformOS();
   const { toggleCreateIssueModal } = useCommandPalette();
   const {
-    issuesFilter: { filters, updateFilters },
+    issuesFilter: { filters, updateFilters, searchQuery, updateSearchQuery, dateFilter, updateDateFilter },
     issues: { getGroupIssueCount },
   } = useIssues(EIssuesStoreType.GLOBAL);
 
@@ -49,6 +51,13 @@ export const ProjectTasksHeader = observer(function ProjectTasksHeader() {
       ? EIssueLayoutTypes.SPREADSHEET
       : EIssueLayoutTypes.LIST;
   const issuesCount = getGroupIssueCount(undefined, undefined, false);
+  const activeSearch = viewId ? (searchQuery[viewId] ?? "") : "";
+  const handleSearch = useCallback(
+    (query: string) => {
+      if (workspaceSlug && viewId) updateSearchQuery(workspaceSlug, viewId, query);
+    },
+    [workspaceSlug, viewId, updateSearchQuery]
+  );
   const layoutOptions = useMemo(
     () => ISSUE_DISPLAY_FILTERS_BY_PAGE.my_issues.layoutOptions[activeLayout],
     [activeLayout]
@@ -88,7 +97,11 @@ export const ProjectTasksHeader = observer(function ProjectTasksHeader() {
           </Breadcrumbs>
           {issuesCount && issuesCount > 0 ? (
             <Tooltip
-              label={`There are ${issuesCount} ${issuesCount > 1 ? "project tasks" : "project task"} you can see`}
+              label={
+                activeSearch
+                  ? `${issuesCount} ${issuesCount > 1 ? "project tasks match" : "project task matches"} "${activeSearch}"`
+                  : `There are ${issuesCount} ${issuesCount > 1 ? "project tasks" : "project task"} you can see`
+              }
               layout="stacked"
               side="bottom"
               disabled={isMobile}
@@ -99,6 +112,13 @@ export const ProjectTasksHeader = observer(function ProjectTasksHeader() {
         </div>
       </Header.LeftItem>
       <Header.RightItem>
+        <WorkItemSearchBox key={viewId} value={activeSearch} onSearch={handleSearch} />
+        <WorkItemDateFilter
+          value={viewId ? dateFilter[viewId] : undefined}
+          onChange={(filter) => {
+            if (workspaceSlug && viewId) updateDateFilter(workspaceSlug, viewId, filter);
+          }}
+        />
         <div className="hidden items-center gap-2 md:flex">
           <LayoutSelection
             layouts={LAYOUTS}

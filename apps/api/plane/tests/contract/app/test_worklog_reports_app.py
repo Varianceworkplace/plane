@@ -515,8 +515,8 @@ def test_detail_grouped_by_work_item(setup):
     alpha_done = Issue.objects.get(name="Alpha done task")
     alpha_open = setup["alpha_open"]
     detail = _get(setup, "ws_admin", "worklogs/", project=str(setup["alpha"].id), group_by="work_item")
-    # one work item after the other (by identifier), newest first within each
-    assert [w["issue"]["id"] for w in detail["results"]] == [str(alpha_open.id)] * 2 + [str(alpha_done.id)]
+    # one work item after the other, the newest work item first, newest entries first within each
+    assert [w["issue"]["id"] for w in detail["results"]] == [str(alpha_done.id)] + [str(alpha_open.id)] * 2
     assert {w["id"]: (w["total_duration"], w["worklog_count"]) for w in detail["work_items"]} == {
         str(alpha_open.id): (150, 2),
         str(alpha_done.id): (60, 1),
@@ -544,5 +544,6 @@ def test_download_follows_the_work_item_grouping(setup):
         f"ALPHA-{setup['alpha_open'].sequence_id}",
         f"ALPHA-{Issue.objects.get(name='Alpha done task').sequence_id}",
     )
-    assert [r[3] for r in rows][:3] == [open_id, open_id, done_id]
+    # the newest work item first
+    assert [r[3] for r in rows][:3] == [done_id, open_id, open_id]
     assert [r[3] for r in rows][3:] == ["BETA-1", "BETA-1"]

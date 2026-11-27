@@ -19,8 +19,9 @@ import type {
   IssuePaginationOptions,
   TWorkItemFilterExpression,
   TSupportedFilterForUpdate,
+  TWorkItemDateFilter,
 } from "@plane/types";
-import { EIssuesStoreType } from "@plane/types";
+import { EIssuesStoreType, getWorkItemDateFilterParams } from "@plane/types";
 import { handleIssueQueryParamsByLayout } from "@plane/utils";
 import type { IBaseIssueFilterStore } from "../helpers/issue-filter-helper.store";
 import { IssueFilterHelperStore } from "../helpers/issue-filter-helper.store";
@@ -41,6 +42,12 @@ export interface IProjectIssuesFilter extends IBaseIssueFilterStore {
     subGroupId: string | undefined
   ) => Partial<Record<TIssueParams, string | boolean>>;
   getIssueFilters(projectId: string): IIssueFilters | undefined;
+  // the search box of the project's task list, per project (sent as `search`)
+  searchQuery: { [projectId: string]: string };
+  updateSearchQuery: (workspaceSlug: string, projectId: string, query: string) => void;
+  // the date filter next to it, per project (sent as date_field / date_from / date_to)
+  dateFilter: { [projectId: string]: TWorkItemDateFilter | undefined };
+  updateDateFilter: (workspaceSlug: string, projectId: string, filter: TWorkItemDateFilter | undefined) => void;
   // action
   fetchFilters: (workspaceSlug: string, projectId: string) => Promise<void>;
   updateFilterExpression: (
@@ -59,6 +66,8 @@ export interface IProjectIssuesFilter extends IBaseIssueFilterStore {
 export class ProjectIssuesFilter extends IssueFilterHelperStore implements IProjectIssuesFilter {
   // observables
   filters: { [projectId: string]: IIssueFilters } = {};
+  searchQuery: { [projectId: string]: string } = {};
+  dateFilter: { [projectId: string]: TWorkItemDateFilter | undefined } = {};
   // root store
   rootIssueStore: IIssueRootStore;
   // services
@@ -69,6 +78,8 @@ export class ProjectIssuesFilter extends IssueFilterHelperStore implements IProj
     makeObservable(this, {
       // observables
       filters: observable,
+      searchQuery: observable,
+      dateFilter: observable,
       // computed
       issueFilters: computed,
       appliedFilters: computed,
@@ -76,6 +87,8 @@ export class ProjectIssuesFilter extends IssueFilterHelperStore implements IProj
       fetchFilters: action,
       updateFilterExpression: action,
       updateFilters: action,
+      updateSearchQuery: action,
+      updateDateFilter: action,
     });
     // root store
     this.rootIssueStore = _rootStore;
@@ -128,7 +141,10 @@ export class ProjectIssuesFilter extends IssueFilterHelperStore implements IProj
       groupId: string | undefined,
       subGroupId: string | undefined
     ) => {
-      const filterParams = this.getAppliedFilters(projectId);
+      let filterParams = this.getAppliedFilters(projectId);
+      const search = this.searchQuery[projectId]?.trim();
+      if (search) filterParams = { ...filterParams, search };
+      filterParams = { ...filterParams, ...getWorkItemDateFilterParams(this.dateFilter[projectId]) };
       const paginationParams = this.getPaginationParams(filterParams, options, cursor, groupId, subGroupId);
       return paginationParams;
     }
@@ -164,6 +180,21 @@ export class ProjectIssuesFilter extends IssueFilterHelperStore implements IProj
       set(this.filters, [projectId, "displayProperties"], displayProperties);
       set(this.filters, [projectId, "kanbanFilters"], kanbanFilters);
     });
+  };
+
+  /** Search the project's work items (name or task number); an empty query shows them all again. */
+  updateSearchQuery = (workspaceSlug: string, projectId: string, query: string) => {
+    if ((this.searchQuery[projectId] ?? "") === query) return;
+    set(this.searchQuery, [projectId], query);
+    void this.rootIssueStore.projectIssues.fetchIssuesWithExistingPagination(workspaceSlug, projectId, "mutation");
+  };
+
+  /** Narrow the project's work items to a day or range of one of their dates; undefined shows them all again. */
+  updateDateFilter = (workspaceSlug: string, projectId: string, filter: TWorkItemDateFilter | undefined) => {
+    const before = getWorkItemDateFilterParams(this.dateFilter[projectId]);
+    set(this.dateFilter, [projectId], filter);
+    if (JSON.stringify(before) === JSON.stringify(getWorkItemDateFilterParams(filter))) return;
+    void this.rootIssueStore.projectIssues.fetchIssuesWithExistingPagination(workspaceSlug, projectId, "mutation");
   };
 
   /**

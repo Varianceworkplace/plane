@@ -7,7 +7,6 @@
 import React, { useMemo } from "react";
 import { observer } from "mobx-react";
 import { Collapsible } from "@makeplane/propel/components/collapsible";
-import { MoreHorizontalOutline } from "@makeplane/propel/icons";
 // plane imports
 import {
   WORKSPACE_SIDEBAR_DYNAMIC_NAVIGATION_ITEMS_LINKS,
@@ -16,10 +15,7 @@ import {
   WORKSPACE_SIDEBAR_STATIC_PINNED_NAVIGATION_ITEMS_LINKS,
 } from "@plane/constants";
 import { useTranslation } from "@plane/i18n";
-// components
-import { SidebarNavItem } from "@/components/sidebar/sidebar-navigation";
 // store hooks
-import { useAppTheme } from "@/hooks/store/use-app-theme";
 import useLocalStorage from "@/hooks/use-local-storage";
 import {
   usePersonalNavigationPreferences,
@@ -34,8 +30,6 @@ export const SidebarMenuItems = observer(function SidebarMenuItems() {
     true
   );
 
-  // store hooks
-  const { isExtendedSidebarOpened, toggleExtendedSidebar } = useAppTheme();
   // hooks
   const { preferences: personalPreferences } = usePersonalNavigationPreferences();
   const { preferences: workspacePreferences } = useWorkspaceNavigationPreferences();
@@ -65,12 +59,7 @@ export const SidebarMenuItems = observer(function SidebarMenuItems() {
         sort_order: personalPreferences.items.your_work.sort_order,
       });
     }
-    if (personalPreferences.items.drafts?.enabled && WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS["drafts"]) {
-      personalItems.push({
-        ...WORKSPACE_SIDEBAR_STATIC_NAVIGATION_ITEMS["drafts"],
-        sort_order: personalPreferences.items.drafts.sort_order,
-      });
-    }
+    // (no Drafts: Variance doesn't use them)
 
     // Sort personal items by sort_order
     personalItems.sort((a, b) => a.sort_order - b.sort_order);
@@ -113,26 +102,11 @@ export const SidebarMenuItems = observer(function SidebarMenuItems() {
             // oxlint-disable-next-line react/no-array-index-key
             <SidebarItemBase key={`static_${_index}`} item={item} />
           ))}
+          {/* Views, Analytics and Archives: only once pinned (Customize navigation); there's no "More" list of them */}
           {sortedNavigationItems.map((item, _index) => (
             // oxlint-disable-next-line react/no-array-index-key
             <SidebarItemBase key={`dynamic_${_index}`} item={item} />
           ))}
-          <SidebarNavItem>
-            <button
-              type="button"
-              onClick={() => toggleExtendedSidebar()}
-              className="flex flex-grow items-center gap-1.5 text-13 font-medium text-tertiary"
-              id="extended-sidebar-toggle"
-              aria-label={t(
-                isExtendedSidebarOpened
-                  ? "aria_labels.app_sidebar.close_extended_sidebar"
-                  : "aria_labels.app_sidebar.open_extended_sidebar"
-              )}
-            >
-              <MoreHorizontalOutline className="size-4 flex-shrink-0" />
-              <span>{isExtendedSidebarOpened ? "Hide" : "More"}</span>
-            </button>
-          </SidebarNavItem>
         </div>
       </Collapsible>
     </>

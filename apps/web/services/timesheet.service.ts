@@ -7,7 +7,7 @@
 // plane imports
 import { API_BASE_URL } from "@plane/constants";
 // types
-import type { TTimesheet, TTimesheetQuery } from "@/components/timesheet/types";
+import type { TTimesheet, TTimesheetEntry, TTimesheetQuery } from "@/components/timesheet/types";
 // services
 import { APIService } from "@/services/api.service";
 
@@ -30,6 +30,15 @@ export class TimesheetService extends APIService {
   /** Time entries the signed-in person may see (the server decides whose: own, team, levels below). */
   async list(workspaceSlug: string, query: TTimesheetQuery): Promise<TTimesheet> {
     return this.get(`/api/workspaces/${workspaceSlug}/timesheet/?${this.params(query).toString()}`)
+      .then((response) => response?.data)
+      .catch((error) => {
+        throw error?.response?.data;
+      });
+  }
+
+  /** One entry, every detail of it (only one the list would show the signed-in person; any other is not found). */
+  async retrieve(workspaceSlug: string, entryId: string): Promise<TTimesheetEntry> {
+    return this.get(`/api/workspaces/${workspaceSlug}/timesheet/${entryId}/?${this.params({}).toString()}`)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

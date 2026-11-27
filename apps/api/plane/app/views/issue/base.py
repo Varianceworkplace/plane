@@ -63,6 +63,7 @@ from plane.db.models import (
     UserRecentVisit,
 )
 from plane.utils.filters import ComplexFilterBackend, IssueFilterSet
+from plane.utils.work_item_search import apply_list_search
 from plane.utils.global_paginator import paginate
 from plane.utils.grouper import (
     issue_group_values,
@@ -287,6 +288,9 @@ class IssueViewSet(BaseViewSet):
 
         # Apply legacy filters
         issue_queryset = issue_queryset.filter(**filters, **extra_filters)
+
+        # the search box and date filter of a project's task list (see plane.utils.work_item_search)
+        issue_queryset = apply_list_search(issue_queryset, request)
 
         # Keeping a copy of the queryset before applying annotations
         filtered_issue_queryset = copy.deepcopy(issue_queryset)
@@ -1088,6 +1092,9 @@ class IssueDetailEndpoint(BaseAPIView):
 
         # Apply legacy filters
         issue = issue.filter(**filters)
+
+        # the search box and date filter of a project's task list (this list answers the table layout)
+        issue = apply_list_search(issue, request)
 
         # Total count queryset
         total_issue_queryset = copy.deepcopy(issue)

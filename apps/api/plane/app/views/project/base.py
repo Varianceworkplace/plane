@@ -7,9 +7,11 @@ import json
 
 
 # Django imports
+from django.contrib.postgres.aggregates import StringAgg
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import transaction
-from django.db.models import Exists, F, Max, OuterRef, Prefetch, Q, Subquery, Count
+from django.db.models import Exists, F, Max, OuterRef, Prefetch, Q, Subquery, Count, TextField
+from django.db.models.functions import Cast
 from django.utils import timezone
 
 # Third Party imports
@@ -54,15 +56,20 @@ from plane.utils.rbac import is_rbac_enabled, rbac_profile
 
 
 def with_member_ids(projects):
-    """Each project's active, non-bot member ids (newest first), as ProjectListSerializer's `members` gives them, from
-    one query of ids alone. The member prefetch builds a ProjectMember and a User object per membership, which took
-    seconds once the projects had ~75,000 memberships between them."""
+    """Each project's active, non-bot member ids (newest first), as ProjectListSerializer's `members` gives them.
+
+    The member prefetch built a ProjectMember and a User object per membership, which took seconds once the projects
+    had ~75,000 memberships between them; one row per membership still made a UUID object of each and turned it back
+    into text for the response. So the database joins each project's ids into one text, split here."""
     projects = list(projects)
     member_ids = {project.id: [] for project in projects}
-    for project_id, member_id in ProjectMember.objects.filter(
-        project_id__in=list(member_ids), is_active=True, member__is_bot=False
-    ).values_list("project_id", "member_id"):
-        member_ids[project_id].append(member_id)
+    for row in (
+        ProjectMember.objects.filter(project_id__in=list(member_ids), is_active=True, member__is_bot=False)
+        .order_by()
+        .values("project_id")
+        .annotate(ids=StringAgg(Cast("member_id", TextField()), delimiter=",", order_by=("-created_at",)))
+    ):
+        member_ids[row["project_id"]] = row["ids"].split(",") if row["ids"] else []
     for project in projects:
         project.member_ids = member_ids[project.id]
     return projects
@@ -243,16 +250,20 @@ class ProjectViewSet(BaseViewSet):
             "updated_by",
         )
 
+        # an active membership of theirs, checked per project (as in list_detail): joining the memberships for the
+        # "member, or a public project" test kept every membership row of each public project, which multiplied the
+        # rows before DISTINCT (and the pending intake count with them). all_objects, as the join it replaces didn't
+        # leave out soft-deleted rows either.
+        is_member = Exists(
+            ProjectMember.all_objects.filter(project_id=OuterRef("pk"), member=self.request.user, is_active=True)
+        )
         if WorkspaceMember.objects.filter(
             member=request.user,
             workspace__slug=slug,
             is_active=True,
             role=ROLE.GUEST.value,
         ).exists():
-            projects = projects.filter(
-                project_projectmember__member=self.request.user,
-                project_projectmember__is_active=True,
-            )
+            projects = projects.filter(is_member)
 
         if WorkspaceMember.objects.filter(
             member=request.user,
@@ -260,13 +271,7 @@ class ProjectViewSet(BaseViewSet):
             is_active=True,
             role=ROLE.MEMBER.value,
         ).exists():
-            projects = projects.filter(
-                Q(
-                    project_projectmember__member=self.request.user,
-                    project_projectmember__is_active=True,
-                )
-                | Q(network=2)
-            )
+            projects = projects.filter(Q(is_member) | Q(network=2))
         # role-based access: only the projects the person's roles reach
         profile = rbac_profile(request, slug)
         if profile is not None:

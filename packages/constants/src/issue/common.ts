@@ -33,6 +33,7 @@ export enum EIssueGroupByToServerOptions {
   "cycle" = "cycle_id",
   "module" = "issue_module__module_id",
   "target_date" = "target_date",
+  // oxlint-disable-next-line typescript/no-duplicate-enum-values -- "team_project" groups by the same field on purpose
   "project" = "project_id",
   "created_by" = "created_by",
   // eslint-disable-next-line @typescript-eslint/no-duplicate-enum-values
@@ -208,6 +209,19 @@ export const ISSUE_DISPLAY_PROPERTIES: {
   },
   { key: "modules", titleTranslationKey: "common.module" },
   { key: "cycle", titleTranslationKey: "common.cycle" },
+];
+
+/**
+ * Work item details Variance Workplace doesn't use: never shown as a column or on a list row, and left out of the
+ * Display menu (labels, modules, cycle, estimate, links, sub-task count).
+ */
+export const UNUSED_DISPLAY_PROPERTIES: (keyof IIssueDisplayProperties)[] = [
+  "labels",
+  "modules",
+  "cycle",
+  "estimate",
+  "link",
+  "sub_issue_count",
 ];
 
 export const SPREADSHEET_PROPERTY_LIST: (keyof IIssueDisplayProperties)[] = [

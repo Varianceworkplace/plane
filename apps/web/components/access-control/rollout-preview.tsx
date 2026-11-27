@@ -4,22 +4,40 @@
  * See the LICENSE file for details.
  */
 
+import { useState } from "react";
 import { observer } from "mobx-react";
+import { useSWRConfig } from "swr";
 // plane imports
 import { Button } from "@makeplane/propel/components/button";
 import { Icon } from "@makeplane/propel/components/icon";
 import { RefreshOutline, WarningTriangleOutline } from "@makeplane/propel/icons";
 import { cn } from "@plane/utils";
 // local imports
-import { useRolloutPreview } from "./helpers";
+import { accessKeys, useRolloutPreview } from "./helpers";
 import { Person, usePersonName } from "./person";
 
 /** Per person: what role-based access gives them, next to what they have today (step 8: before switching on). */
 export const RolloutPreview = observer(function RolloutPreview(props: { workspaceSlug: string }) {
   const { workspaceSlug } = props;
-  const { preview, mutate, isLoading } = useRolloutPreview(workspaceSlug);
+  // working it out for everyone takes a while, so it waits to be asked for (once asked, it's shown on every return)
+  const { cache } = useSWRConfig();
+  const [requested, setRequested] = useState(() => cache.get(accessKeys.preview(workspaceSlug)) !== undefined);
+  const { preview, mutate, isLoading } = useRolloutPreview(workspaceSlug, requested);
   const personName = usePersonName();
 
+  if (!requested)
+    return (
+      <section className="flex items-start justify-between gap-3 rounded-lg border-[0.5px] border-subtle px-4 py-3">
+        <div className="flex flex-col gap-0.5">
+          <h3 className="text-body-sm-medium text-primary">What each person gets</h3>
+          <p className="text-body-xs-regular text-tertiary">
+            Everyone&apos;s roles, teams, project tasks and projects, worked out from their roles, teams and shares. It
+            takes a little while for the whole workspace, so it&apos;s shown when you ask.
+          </p>
+        </div>
+        <Button stretch="auto" variant="secondary" size="sm" label="Show" onClick={() => setRequested(true)} />
+      </section>
+    );
   if (!preview) return isLoading ? <div className="h-32 animate-pulse rounded-lg bg-layer-1" /> : null;
 
   const { warnings } = preview;

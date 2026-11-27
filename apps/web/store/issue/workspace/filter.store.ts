@@ -20,8 +20,9 @@ import type {
   IssuePaginationOptions,
   TWorkItemFilterExpression,
   TSupportedFilterForUpdate,
+  TWorkItemDateFilter,
 } from "@plane/types";
-import { EIssuesStoreType, EIssueLayoutTypes, STATIC_VIEW_TYPES } from "@plane/types";
+import { EIssuesStoreType, EIssueLayoutTypes, STATIC_VIEW_TYPES, getWorkItemDateFilterParams } from "@plane/types";
 import { handleIssueQueryParamsByLayout } from "@plane/utils";
 // services
 import { WorkspaceService } from "@/services/workspace.service";
@@ -45,6 +46,12 @@ export interface IWorkspaceIssuesFilter extends TBaseFilterStore {
     filters: TSupportedFilterForUpdate,
     viewId: string
   ) => Promise<void>;
+  // the search box of Projects › Project Tasks, per view (sent as `search`)
+  searchQuery: { [viewId: string]: string };
+  updateSearchQuery: (workspaceSlug: string, viewId: string, query: string) => void;
+  // the date filter next to it, per view (sent as date_field / date_from / date_to)
+  dateFilter: { [viewId: string]: TWorkItemDateFilter | undefined };
+  updateDateFilter: (workspaceSlug: string, viewId: string, filter: TWorkItemDateFilter | undefined) => void;
   //helper action
   getIssueFilters: (viewId: string | undefined) => IIssueFilters | undefined;
   getAppliedFilters: (viewId: string) => Partial<Record<TIssueParams, string | boolean>> | undefined;
@@ -60,6 +67,8 @@ export interface IWorkspaceIssuesFilter extends TBaseFilterStore {
 export class WorkspaceIssuesFilter extends IssueFilterHelperStore implements IWorkspaceIssuesFilter {
   // observables
   filters: { [viewId: string]: IIssueFilters } = {};
+  searchQuery: { [viewId: string]: string } = {};
+  dateFilter: { [viewId: string]: TWorkItemDateFilter | undefined } = {};
   // root store
   rootIssueStore;
   // services
@@ -70,6 +79,10 @@ export class WorkspaceIssuesFilter extends IssueFilterHelperStore implements IWo
     makeObservable(this, {
       // observables
       filters: observable,
+      searchQuery: observable,
+      updateSearchQuery: action,
+      dateFilter: observable,
+      updateDateFilter: action,
       // computed
       issueFilters: computed,
       appliedFilters: computed,
@@ -136,6 +149,10 @@ export class WorkspaceIssuesFilter extends IssueFilterHelperStore implements IWo
         filterParams = {};
       }
 
+      const search = this.searchQuery[viewId]?.trim();
+      if (search) filterParams = { ...filterParams, search };
+      filterParams = { ...filterParams, ...getWorkItemDateFilterParams(this.dateFilter[viewId]) };
+
       if (STATIC_VIEW_TYPES.includes(viewId)) {
         const currentUserId = this.rootIssueStore.currentUserId;
         const paramForStaticView = this.getFilterConditionBasedOnViews(currentUserId, viewId);
@@ -171,13 +188,13 @@ export class WorkspaceIssuesFilter extends IssueFilterHelperStore implements IWo
 
     // Get the view details if the view is not a static view
     if (STATIC_VIEW_TYPES.includes(viewId) === false) {
-      const _filters = await this.issueFilterService.getViewDetails(workspaceSlug, viewId);
-      richFilters = _filters?.rich_filters;
-      displayFilters = this.computedDisplayFilters(_filters?.display_filters, {
+      const viewDetails = await this.issueFilterService.getViewDetails(workspaceSlug, viewId);
+      richFilters = viewDetails?.rich_filters;
+      displayFilters = this.computedDisplayFilters(viewDetails?.display_filters, {
         layout: EIssueLayoutTypes.SPREADSHEET,
         order_by: "-created_at",
       });
-      displayProperties = this.computedDisplayProperties(_filters?.display_properties);
+      displayProperties = this.computedDisplayProperties(viewDetails?.display_properties);
     }
 
     // override existing order by if ordered by manual sort_order
@@ -191,6 +208,21 @@ export class WorkspaceIssuesFilter extends IssueFilterHelperStore implements IWo
       set(this.filters, [viewId, "displayProperties"], displayProperties);
       set(this.filters, [viewId, "kanbanFilters"], kanbanFilters);
     });
+  };
+
+  /** Search the view's work items (name or task number); an empty query shows them all again. */
+  updateSearchQuery = (workspaceSlug: string, viewId: string, query: string) => {
+    if ((this.searchQuery[viewId] ?? "") === query) return;
+    set(this.searchQuery, [viewId], query);
+    void this.rootIssueStore.workspaceIssues.fetchIssuesWithExistingPagination(workspaceSlug, viewId, "mutation");
+  };
+
+  /** Narrow the view's work items to a day or range of one of their dates; undefined shows them all again. */
+  updateDateFilter = (workspaceSlug: string, viewId: string, filter: TWorkItemDateFilter | undefined) => {
+    const before = getWorkItemDateFilterParams(this.dateFilter[viewId]);
+    set(this.dateFilter, [viewId], filter);
+    if (JSON.stringify(before) === JSON.stringify(getWorkItemDateFilterParams(filter))) return;
+    void this.rootIssueStore.workspaceIssues.fetchIssuesWithExistingPagination(workspaceSlug, viewId, "mutation");
   };
 
   /**

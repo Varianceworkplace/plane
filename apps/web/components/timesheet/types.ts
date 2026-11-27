@@ -22,6 +22,9 @@ export type TTimesheet = {
   can_view_others: boolean;
 };
 
+/** GET timesheet/<id>/: one entry, its date in the browser's timezone. */
+export type TTimesheetEntry = TWorklogReportEntry;
+
 export type TTimesheetQuery = {
   /** a person's id, "all", or empty for the signed-in person */
   person?: string;
