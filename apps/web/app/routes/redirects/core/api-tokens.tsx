@@ -6,8 +6,9 @@
 
 import { redirect } from "react-router";
 
+// Personal Access Tokens were removed from Variance: an old link opens the profile instead
 export const clientLoader = () => {
-  throw redirect(`/settings/profile/api-tokens/`);
+  throw redirect(`/settings/profile/general/`);
 };
 
 export default function ApiTokens() {

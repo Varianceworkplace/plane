@@ -80,9 +80,15 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
     canAccess("projects", "create");
 
   // Compute limited projects for main sidebar
-  const displayedProjects = projectPreferences.showLimitedProjects
+  const limitedProjects = projectPreferences.showLimitedProjects
     ? joinedProjects.slice(0, projectPreferences.limitedProjectsCount)
     : joinedProjects;
+  // the open project always shows (opened on its Summary, Project tasks…), first, when it's past the limit ("More")
+  // or hidden from the list: a project opened from All Projects is there in the sidebar too
+  const openId = openProjectId?.toString();
+  const extraOpenProjectId =
+    openId && !limitedProjects.includes(openId) && getPartialProjectById(openId) ? openId : undefined;
+  const displayedProjects = extraOpenProjectId ? [extraOpenProjectId, ...limitedProjects] : limitedProjects;
 
   // Most people's list holds 650–1,300 projects, and each entry follows the route (all of them re-rendered on every
   // click): they're drawn 40 at a time as the list scrolls, the open project's entry always among them
@@ -90,11 +96,7 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
     shownItems: renderedProjects,
     hasMore: moreToRender,
     endRef,
-  } = useRenderInBatches(
-    displayedProjects,
-    SIDEBAR_PROJECTS_BATCH,
-    openProjectId ? displayedProjects.indexOf(openProjectId.toString()) : -1
-  );
+  } = useRenderInBatches(displayedProjects, SIDEBAR_PROJECTS_BATCH, openId ? displayedProjects.indexOf(openId) : -1);
 
   // Check if there are more projects to show
   const hasMoreProjects =
@@ -254,8 +256,9 @@ export const SidebarProjectsList = observer(function SidebarProjectsList() {
                   projectId={projectId}
                   handleCopyText={() => handleCopyText(projectId)}
                   projectListType={"JOINED"}
-                  disableDrag={workingProjects.has(projectId)}
-                  disableDrop={workingProjects.has(projectId)}
+                  // the open project shown out of its place isn't part of the person's order
+                  disableDrag={workingProjects.has(projectId) || projectId === extraOpenProjectId}
+                  disableDrop={workingProjects.has(projectId) || projectId === extraOpenProjectId}
                   isLastChild={index === displayedProjects.length - 1}
                   handleOnProjectDrop={handleOnProjectDrop}
                 />
