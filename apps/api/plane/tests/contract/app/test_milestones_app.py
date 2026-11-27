@@ -97,7 +97,10 @@ def test_create_list_sorted_and_search(setup):
     _create(setup, "Beta", "2026-11-01")
     client = setup["clients"]["member"]
     titles = [m["title"] for m in client.get(_base(setup) + "milestones/").json()]
-    assert titles == ["Beta", "Launch", "No date"]
+    # newest first, whatever the dates; the workspace's Project Milestones list too
+    assert titles == ["Beta", "No date", "Launch"]
+    workspace_list = client.get(f"/api/workspaces/{setup['workspace'].slug}/milestones/").json()
+    assert [m["title"] for m in workspace_list] == ["Beta", "No date", "Launch"]
     assert [m["title"] for m in client.get(_base(setup) + "milestones/", {"search": "lau"}).json()] == ["Launch"]
 
 
@@ -138,7 +141,8 @@ def test_link_work_items_and_progress(setup):
     assert body["completed_items"] == 1 and body["progress"] == 50
 
     linked = client.get(url + "work-items/").json()
-    assert {i["id"] for i in linked} == {str(i.id) for i in setup["issues"][:2]}
+    # newest first
+    assert [i["id"] for i in linked] == [str(setup["issues"][1].id), str(setup["issues"][0].id)]
     assert len(client.get(url + "available-work-items/").json()) == 1
 
     body = client.post(url + "work-items/", {"remove": [str(setup["issues"][1].id)]}, format="json").json()

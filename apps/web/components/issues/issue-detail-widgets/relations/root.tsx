@@ -14,7 +14,6 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // local imports
 import { RelationsCollapsibleContent } from "./content";
 import { RelationsCollapsibleTitle } from "./title";
-import { RelationActionButton } from "./quick-action-button";
 
 type Props = {
   workspaceSlug: string;
@@ -34,12 +33,8 @@ export const RelationsCollapsible = observer(function RelationsCollapsible(props
     <Collapsible
       open={isCollapsibleOpen}
       onOpenChange={() => toggleOpenWidget("relations")}
+      // the relations a task already has (Workplace's "related task") are listed; no new ones are added
       trigger={<RelationsCollapsibleTitle issueId={issueId} issueServiceType={issueServiceType} />}
-      trailing={
-        isCollapsibleOpen && !disabled ? (
-          <RelationActionButton issueId={issueId} disabled={disabled} issueServiceType={issueServiceType} />
-        ) : undefined
-      }
     >
       <RelationsCollapsibleContent
         workspaceSlug={workspaceSlug}

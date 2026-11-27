@@ -115,8 +115,9 @@ export const useAccessMembers = (workspaceSlug: string, enabled = true, includeD
   return { members: data, mutate };
 };
 
-export const useRolloutPreview = (workspaceSlug: string) => {
-  const { data, mutate, isLoading } = useSWR(workspaceSlug ? accessKeys.preview(workspaceSlug) : null, () =>
+/** What each person gets: worked out for everyone at once (seconds with ~90 people), so only when it's shown. */
+export const useRolloutPreview = (workspaceSlug: string, enabled = true) => {
+  const { data, mutate, isLoading } = useSWR(enabled && workspaceSlug ? accessKeys.preview(workspaceSlug) : null, () =>
     accessControlService.preview(workspaceSlug)
   );
   return { preview: data, mutate, isLoading };

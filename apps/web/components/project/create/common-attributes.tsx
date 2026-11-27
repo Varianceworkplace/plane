@@ -18,6 +18,8 @@ import type { TProject } from "@plane/types";
 // ui
 import { Tooltip } from "@makeplane/propel/components/tooltip";
 import { projectIdentifierSanitizer, getTabIndex } from "@plane/utils";
+// local imports
+import { useProjectNameTaken } from "../use-project-name-taken";
 
 type Props = {
   setValue: UseFormSetValue<TProject>;
@@ -32,20 +34,29 @@ function ProjectCommonAttributes(props: Props) {
   const {
     formState: { errors },
     control,
+    trigger,
   } = useFormContext<TProject>();
+  // project names are unique whatever their case: said as it's typed, and saving is stopped
+  const isNameTaken = useProjectNameTaken();
 
   const { getIndex } = getTabIndex(ETabIndices.PROJECT_CREATE, isMobile);
   const { t } = useTranslation();
 
   const handleNameChange =
     (onChange: (event: ChangeEvent<HTMLInputElement>) => void) => (e: ChangeEvent<HTMLInputElement>) => {
+      // a name in use shows "already exists" straight away (and clears once changed), not only on Create
+      const checkName = () => {
+        if (isNameTaken(e.target.value) || errors.name) void trigger("name");
+      };
       if (!shouldAutoSyncIdentifier) {
         onChange(e);
+        checkName();
         return;
       }
       if (e.target.value === "") setValue("identifier", "");
       else setValue("identifier", projectIdentifierSanitizer(e.target.value).substring(0, 10));
       onChange(e);
+      checkName();
       handleFormOnChange?.();
     };
 
@@ -68,6 +79,7 @@ function ProjectCommonAttributes(props: Props) {
               value: 255,
               message: t("title_should_be_less_than_255_characters"),
             },
+            validate: (value) => !isNameTaken(value) || t("project_name_already_taken"),
           }}
           render={({ field: { value, onChange } }) => (
             <Field name="name" invalid={Boolean(errors.name)}>

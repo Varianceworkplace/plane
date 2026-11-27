@@ -33,7 +33,18 @@ import { WorklogReportRecords } from "./report-records";
 import { WorklogReportChart } from "./report-chart";
 import { WorklogReportFilters } from "./report-filters";
 import type { TReportExportFormat } from "./report-parts";
-import { HEAD_CELL, OwnTimeNotice, ReportExportMenu, Section, Stat, TABLE_CLASSNAME, UserCell } from "./report-parts";
+import {
+  CHART_BOX_CLASSNAME,
+  HEAD_CELL,
+  OwnTimeNotice,
+  ReportExportMenu,
+  Section,
+  Stat,
+  TABLE_CLASSNAME,
+  TABLE_FOOT,
+  TABLE_HEAD,
+  UserCell,
+} from "./report-parts";
 import type {
   TWorklogMonthMinutes,
   TWorklogMonthlyProject,
@@ -261,7 +272,7 @@ export const MonthlyWorklogReport = observer(function MonthlyWorklogReport({ wor
           </div>
 
           <Section title="Hours by month" hint="Click a month to look at it on its own">
-            <div className={cn(TABLE_CLASSNAME, "px-2 pt-4")}>
+            <div className={CHART_BOX_CLASSNAME}>
               <WorklogReportChart
                 data={chartData}
                 series={series}
@@ -295,116 +306,114 @@ export const MonthlyWorklogReport = observer(function MonthlyWorklogReport({ wor
             }
           >
             <div className={TABLE_CLASSNAME}>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left" style={{ minWidth: 380 + months.length * 96 }}>
-                  <thead className="bg-layer-1">
-                    <tr className="text-body-xs-medium text-secondary">
-                      <th className={cn(HEAD_CELL, "sticky left-0 z-[1] w-[320px] min-w-[260px] bg-layer-1")}>
-                        User / Project / Project task
+              <table className="w-full text-left" style={{ minWidth: 380 + months.length * 96 }}>
+                <thead className={TABLE_HEAD}>
+                  <tr className="text-body-xs-medium text-secondary">
+                    <th className={cn(HEAD_CELL, "sticky left-0 z-[1] w-[320px] min-w-[260px] bg-layer-1")}>
+                      User / Project / Project task
+                    </th>
+                    {months.map((month) => (
+                      <th key={month} className={cn(HEAD_CELL, "text-right whitespace-nowrap")}>
+                        {formatReportMonth(month)}
                       </th>
-                      {months.map((month) => (
-                        <th key={month} className={cn(HEAD_CELL, "text-right whitespace-nowrap")}>
-                          {formatReportMonth(month)}
-                        </th>
-                      ))}
-                      <th className={cn(HEAD_CELL, "text-right")}>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {monthly.users.map((user) => {
-                      const userOpen = !collapsedUsers.has(user.id);
-                      return (
-                        <Fragment key={user.id}>
-                          <tr className="border-t-[0.5px] border-subtle bg-layer-1/40 text-body-xs-medium text-primary">
-                            <td className="sticky left-0 z-[1] bg-surface-1 px-3 py-2">
-                              <span className="flex min-w-0 items-center gap-1.5">
-                                <Toggle
-                                  open={userOpen}
-                                  label={`${userOpen ? "Hide" : "Show"} ${getWorklogUserName(user)}'s projects`}
-                                  onClick={() => setCollapsedUsers((set) => toggle(set, user.id))}
-                                />
-                                <UserCell user={user} />
-                              </span>
-                            </td>
-                            <MonthCells
-                              months={months}
-                              minutes={user.months}
-                              total={user.total_duration}
-                              onOpen={(month) => open(user, month)}
-                            />
-                          </tr>
-                          {userOpen &&
-                            user.projects.map((project) => {
-                              const key = projectKey(user, project);
-                              const projectOpen = openProjects.has(key);
-                              return (
-                                <Fragment key={key}>
-                                  <tr className="border-t-[0.5px] border-subtle text-body-xs-regular text-primary hover:bg-layer-transparent-hover">
-                                    <td className="sticky left-0 z-[1] bg-surface-1 py-2 pr-3 pl-9">
-                                      <span className="flex min-w-0 items-center gap-1.5">
-                                        <Toggle
-                                          open={projectOpen}
-                                          label={`${projectOpen ? "Hide" : "Show"} project tasks in ${project.name}`}
-                                          onClick={() => setOpenProjects((set) => toggle(set, key))}
-                                        />
-                                        <span className="shrink-0 text-caption-md-regular text-tertiary">
-                                          {project.identifier}
-                                        </span>
-                                        <span className="truncate font-medium" title={project.name}>
-                                          {project.name}
-                                        </span>
+                    ))}
+                    <th className={cn(HEAD_CELL, "text-right")}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthly.users.map((user) => {
+                    const userOpen = !collapsedUsers.has(user.id);
+                    return (
+                      <Fragment key={user.id}>
+                        <tr className="border-t-[0.5px] border-subtle bg-layer-1/40 text-body-xs-medium text-primary">
+                          <td className="sticky left-0 z-[1] bg-surface-1 px-3 py-2">
+                            <span className="flex min-w-0 items-center gap-1.5">
+                              <Toggle
+                                open={userOpen}
+                                label={`${userOpen ? "Hide" : "Show"} ${getWorklogUserName(user)}'s projects`}
+                                onClick={() => setCollapsedUsers((set) => toggle(set, user.id))}
+                              />
+                              <UserCell user={user} />
+                            </span>
+                          </td>
+                          <MonthCells
+                            months={months}
+                            minutes={user.months}
+                            total={user.total_duration}
+                            onOpen={(month) => open(user, month)}
+                          />
+                        </tr>
+                        {userOpen &&
+                          user.projects.map((project) => {
+                            const key = projectKey(user, project);
+                            const projectOpen = openProjects.has(key);
+                            return (
+                              <Fragment key={key}>
+                                <tr className="border-t-[0.5px] border-subtle text-body-xs-regular text-primary hover:bg-layer-transparent-hover">
+                                  <td className="sticky left-0 z-[1] bg-surface-1 py-2 pr-3 pl-9">
+                                    <span className="flex min-w-0 items-center gap-1.5">
+                                      <Toggle
+                                        open={projectOpen}
+                                        label={`${projectOpen ? "Hide" : "Show"} project tasks in ${project.name}`}
+                                        onClick={() => setOpenProjects((set) => toggle(set, key))}
+                                      />
+                                      <span className="shrink-0 text-caption-md-regular text-tertiary">
+                                        {project.identifier}
                                       </span>
-                                    </td>
-                                    <MonthCells
-                                      months={months}
-                                      minutes={project.months}
-                                      total={project.total_duration}
-                                      onOpen={(month) => open(user, month, project)}
-                                    />
-                                  </tr>
-                                  {projectOpen &&
-                                    project.issues.map((issue) => (
-                                      <tr
-                                        key={issue.id}
-                                        className="border-t-[0.5px] border-subtle text-body-xs-regular text-secondary hover:bg-layer-transparent-hover"
-                                      >
-                                        <td className="sticky left-0 z-[1] bg-surface-1 py-2 pr-3 pl-[4.25rem]">
-                                          <Link
-                                            href={`/${workspaceSlug}/browse/${project.identifier}-${issue.sequence_id}/`}
-                                            className="flex min-w-0 items-center gap-2 hover:underline"
-                                            title={issue.name}
-                                          >
-                                            <span className="shrink-0 text-caption-md-regular text-tertiary">
-                                              {project.identifier}-{issue.sequence_id}
-                                            </span>
-                                            <span className="truncate">{issue.name}</span>
-                                          </Link>
-                                        </td>
-                                        <MonthCells
-                                          months={months}
-                                          minutes={issue.months}
-                                          total={issue.total_duration}
-                                          onOpen={(month) =>
-                                            open(user, month, project, { id: issue.id, name: issue.name })
-                                          }
-                                        />
-                                      </tr>
-                                    ))}
-                                </Fragment>
-                              );
-                            })}
-                        </Fragment>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot className="bg-layer-1">
-                    <tr className="border-t-[0.5px] border-subtle text-body-xs-medium text-primary">
-                      <td className="sticky left-0 z-[1] bg-layer-1 px-3 py-2.5">Total</td>
-                      <MonthCells months={months} minutes={monthly.month_totals} total={monthly.total_duration} />
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
+                                      <span className="truncate font-medium" title={project.name}>
+                                        {project.name}
+                                      </span>
+                                    </span>
+                                  </td>
+                                  <MonthCells
+                                    months={months}
+                                    minutes={project.months}
+                                    total={project.total_duration}
+                                    onOpen={(month) => open(user, month, project)}
+                                  />
+                                </tr>
+                                {projectOpen &&
+                                  project.issues.map((issue) => (
+                                    <tr
+                                      key={issue.id}
+                                      className="border-t-[0.5px] border-subtle text-body-xs-regular text-secondary hover:bg-layer-transparent-hover"
+                                    >
+                                      <td className="sticky left-0 z-[1] bg-surface-1 py-2 pr-3 pl-[4.25rem]">
+                                        <Link
+                                          href={`/${workspaceSlug}/browse/${project.identifier}-${issue.sequence_id}/`}
+                                          className="flex min-w-0 items-center gap-2 hover:underline"
+                                          title={issue.name}
+                                        >
+                                          <span className="shrink-0 text-caption-md-regular text-tertiary">
+                                            {project.identifier}-{issue.sequence_id}
+                                          </span>
+                                          <span className="truncate">{issue.name}</span>
+                                        </Link>
+                                      </td>
+                                      <MonthCells
+                                        months={months}
+                                        minutes={issue.months}
+                                        total={issue.total_duration}
+                                        onOpen={(month) =>
+                                          open(user, month, project, { id: issue.id, name: issue.name })
+                                        }
+                                      />
+                                    </tr>
+                                  ))}
+                              </Fragment>
+                            );
+                          })}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+                <tfoot className={TABLE_FOOT}>
+                  <tr className="border-t-[0.5px] border-subtle text-body-xs-medium text-primary">
+                    <td className="sticky left-0 z-[1] bg-layer-1 px-3 py-2.5">Total</td>
+                    <MonthCells months={months} minutes={monthly.month_totals} total={monthly.total_duration} />
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </Section>
 

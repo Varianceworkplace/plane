@@ -24,6 +24,7 @@ import { SidebarProjectsListItem } from "@/components/workspace/sidebar/projects
 import { useAppTheme } from "@/hooks/store/use-app-theme";
 import { useProject } from "@/hooks/store/use-project";
 import { useUserPermissions } from "@/hooks/store/user";
+import { useRenderInBatches } from "@/hooks/use-render-in-batches";
 import type { TProject } from "@plane/types";
 import { ExtendedSidebarWrapper } from "./extended-sidebar-wrapper";
 
@@ -34,7 +35,7 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
   // states
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   // routers
-  const { workspaceSlug } = useParams();
+  const { workspaceSlug, projectId: openProjectId } = useParams();
   // store hooks
   const { t } = useTranslation();
   const { isExtendedProjectSidebarOpened, toggleExtendedProjectSidebar } = useAppTheme();
@@ -107,6 +108,18 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
       return undefined;
     });
   };
+  // This panel is always mounted (hidden while closed): its entries are drawn only while it's open, 40 at a time as
+  // it scrolls, rather than every joined project on every page
+  const {
+    shownItems: renderedProjects,
+    hasMore: moreToRender,
+    endRef,
+  } = useRenderInBatches(
+    isExtendedProjectSidebarOpened ? filteredProjects : [],
+    40,
+    openProjectId ? filteredProjects.indexOf(openProjectId.toString()) : -1
+  );
+
   return (
     <>
       {workspaceSlug && (
@@ -169,7 +182,7 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
           </div>
         ) : (
           <div className="vertical-scrollbar mt-4 scrollbar-sm flex flex-grow flex-col gap-0.5 overflow-x-hidden overflow-y-auto pr-2 pl-9">
-            {filteredProjects.map((projectId, index) => (
+            {renderedProjects.map((projectId, index) => (
               <SidebarProjectsListItem
                 key={projectId}
                 projectId={projectId}
@@ -182,6 +195,7 @@ export const ExtendedProjectSidebar = observer(function ExtendedProjectSidebar()
                 renderInExtendedSidebar
               />
             ))}
+            {moreToRender && <div ref={endRef} aria-hidden className="h-px w-full shrink-0" />}
           </div>
         )}
       </ExtendedSidebarWrapper>

@@ -138,6 +138,7 @@ export const coreRoutes: RouteConfigEntry[] = [
         // Time Sheet (time entries: own, team's, the levels below)
         layout("./(all)/[workspaceSlug]/(projects)/timesheet/layout.tsx", [
           route(":workspaceSlug/timesheet", "./(all)/[workspaceSlug]/(projects)/timesheet/page.tsx"),
+          route(":workspaceSlug/timesheet/:entryId", "./(all)/[workspaceSlug]/(projects)/timesheet/[entryId]/page.tsx"),
         ]),
 
         // Holidays (the company's holiday list: everyone reads it, admins and HR keep it)

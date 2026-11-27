@@ -23,11 +23,11 @@ import { useProject } from "@/hooks/store/use-project";
 // local imports
 import {
   formatWorklogDuration,
-  projectTimeEstimatesKey,
+  rowTimeEstimateKey,
   toNumber,
   useIssueTimeEstimate,
   useIssueWorklogs,
-  useProjectTimeEstimates,
+  useRowTimeEstimate,
   worklogService,
 } from "./helpers";
 import type { TWorkItemTimeEstimate, TWorkItemTimeEstimatePayload } from "./types";
@@ -98,7 +98,7 @@ export function WorkItemTimeEstimate(props: Props) {
     try {
       const updated = await worklogService.updateTimeEstimate(workspaceSlug, projectId, issueId, payload);
       await mutateEstimate(updated, { revalidate: false });
-      void mutate(projectTimeEstimatesKey(projectId));
+      void mutate(rowTimeEstimateKey(issueId));
       setIsOpen(false);
     } catch (err) {
       const data = (err ?? {}) as Record<string, string>;
@@ -274,8 +274,7 @@ export const ListRowTimeEstimate = observer(function ListRowTimeEstimate(props: 
   const { getProjectById } = useProject();
   const projectId = issue.project_id ?? "";
   const enabled = !!(projectId && getProjectById(projectId)?.is_time_tracking_enabled);
-  const estimates = useProjectTimeEstimates(workspaceSlug, projectId, enabled);
-  const estimate: TWorkItemTimeEstimate | undefined = estimates?.[issue.id];
+  const estimate: TWorkItemTimeEstimate | undefined = useRowTimeEstimate(workspaceSlug, issue.id, enabled);
   if (!enabled || !estimate || (!estimate.expected_duration && !estimate.worked_duration)) return null;
 
   const { worked_duration: worked, expected_duration: expected, over_by: overBy } = estimate;

@@ -47,7 +47,9 @@ function WorklogReportsPage({ params }: Route.ComponentProps) {
             value={reportType}
             onValueChange={(value) => router.push(`/${workspaceSlug}/reports/${value}`)}
           >
-            <div className="flex w-full items-center border-b border-subtle bg-surface-1 px-6 py-2">
+            {/* on a narrow screen the eight tabs scroll sideways: their scrollbar stays visible (it otherwise shows only
+                while hovered), so the last tabs aren't missed */}
+            <div className="flex w-full items-center border-b border-subtle bg-surface-1 px-6 py-2 [&_[data-has-overflow-x][data-id$='-scrollbar']]:pointer-events-auto [&_[data-has-overflow-x][data-id$='-scrollbar']]:opacity-100 [&_[role=tablist][data-has-overflow-x]]:pb-2">
               <TabsList>
                 {WORKLOG_REPORT_TYPES.map((type) => (
                   <Tab key={type.key} value={type.key} label={`${type.label} report`} />
@@ -55,7 +57,8 @@ function WorklogReportsPage({ params }: Route.ComponentProps) {
               </TabsList>
             </div>
           </Tabs>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          {/* the report scrolls with a visible scrollbar (the app hides them unless asked) */}
+          <div className="vertical-scrollbar scrollbar-md min-h-0 flex-1 overflow-y-auto">
             {/* keyed so each report keeps its own filters */}
             {reportType === "attendance" ? (
               <AttendanceReport workspaceSlug={workspaceSlug} />

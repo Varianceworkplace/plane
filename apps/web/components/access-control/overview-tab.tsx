@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { observer } from "mobx-react";
+import { useSWRConfig } from "swr";
 // plane imports
 import { Button } from "@makeplane/propel/components/button";
 import { Dialog, DialogActions, DialogContent, DialogMain, DialogTitle } from "@makeplane/propel/components/dialog";
@@ -16,7 +17,7 @@ import { cn } from "@plane/utils";
 // hooks
 import { useUserPermissions } from "@/hooks/store/user";
 // local imports
-import { accessControlService, toastError, useAccessMembers, useRoles, useRolloutPreview, useTeams } from "./helpers";
+import { accessControlService, accessKeys, toastError, useAccessMembers, useRoles, useTeams } from "./helpers";
 import { RolloutPreview } from "./rollout-preview";
 import type { TAccessControl } from "./types";
 
@@ -54,7 +55,8 @@ export const AccessOverviewTab = observer(function AccessOverviewTab(props: Prop
   const { roles } = useRoles(workspaceSlug);
   const { teams } = useTeams(workspaceSlug);
   const { members } = useAccessMembers(workspaceSlug);
-  const { mutate: refreshPreview } = useRolloutPreview(workspaceSlug);
+  // the preview below, if it's shown (it's worked out only when asked for)
+  const { mutate: revalidate } = useSWRConfig();
   const { fetchWorkspaceAccess } = useUserPermissions();
   const [confirming, setConfirming] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
@@ -76,7 +78,7 @@ export const AccessOverviewTab = observer(function AccessOverviewTab(props: Prop
       onChanged();
       // menus and buttons follow the switch straight away
       void fetchWorkspaceAccess(workspaceSlug);
-      void refreshPreview();
+      void revalidate(accessKeys.preview(workspaceSlug));
       setConfirming(null);
     } catch (error) {
       toastError("Not changed", error);

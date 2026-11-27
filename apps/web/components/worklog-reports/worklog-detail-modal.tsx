@@ -7,7 +7,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 // plane imports
-import { Dialog, DialogClose, DialogCloseGroup, DialogContent, DialogTitle } from "@makeplane/propel/components/dialog";
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "@makeplane/propel/components/dialog";
 import { Icon } from "@makeplane/propel/components/icon";
 import { IconButton } from "@makeplane/propel/components/icon-button";
 import { Menu, MenuContent, MenuItem } from "@makeplane/propel/components/menu";
@@ -73,7 +73,9 @@ export function WorklogReportDetailModal(props: Props) {
   return (
     <Dialog open={!!selection} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent size="xl">
-        <DialogCloseGroup>
+        {/* top right, where the header leaves room (pr-14): DialogCloseGroup's `inset-e-4` isn't a class this app's
+            styles have, which left the button over the start of the title */}
+        <div className="absolute top-4 right-4 z-10">
           <IconButton
             size="sm"
             variant="tertiary"
@@ -81,7 +83,7 @@ export function WorklogReportDetailModal(props: Props) {
             aria-label="Close"
             render={<DialogClose />}
           />
-        </DialogCloseGroup>
+        </div>
         <div className="flex flex-wrap items-start justify-between gap-3 px-5 pt-5 pr-14">
           <div className="flex min-w-0 flex-col gap-1">
             <DialogTitle>
@@ -117,7 +119,7 @@ export function WorklogReportDetailModal(props: Props) {
           </Menu>
         </div>
 
-        <div className="flex max-h-[65vh] min-h-0 flex-col gap-3 overflow-y-auto px-5 py-4">
+        <div className="vertical-scrollbar scrollbar-md flex max-h-[65vh] min-h-0 flex-col gap-3 overflow-y-auto px-5 py-4">
           {!isLoading && detail && total === 0 ? (
             <div className="flex flex-col items-center py-10">
               <EmptyStateCompact
@@ -129,8 +131,8 @@ export function WorklogReportDetailModal(props: Props) {
               />
             </div>
           ) : (
-            <div className="overflow-hidden rounded-lg border-[0.5px] border-subtle">
-              <div className="overflow-x-auto">
+            <div className="vertical-scrollbar horizontal-scrollbar scrollbar-md max-h-[50vh] overflow-auto rounded-lg border-[0.5px] border-subtle">
+              <div>
                 <table className="w-full min-w-[820px] table-fixed text-left">
                   <colgroup>
                     <col className="w-[30%]" />
@@ -139,7 +141,7 @@ export function WorklogReportDetailModal(props: Props) {
                     <col className="w-[16%]" />
                     <col className="w-[10%]" />
                   </colgroup>
-                  <thead className="bg-layer-1">
+                  <thead className="sticky top-0 z-[2] bg-layer-1">
                     <tr className="text-body-xs-medium text-secondary">
                       <th className="px-3 py-2.5 font-medium">Task</th>
                       <th className="px-3 py-2.5 font-medium">Status</th>
@@ -224,7 +226,7 @@ export function WorklogReportDetailModal(props: Props) {
                         })}
                   </tbody>
                   {!!detail?.results.length && (
-                    <tfoot className="bg-layer-1">
+                    <tfoot className="sticky bottom-0 z-[2] bg-layer-1">
                       <tr className="border-t-[0.5px] border-subtle text-body-xs-medium text-primary">
                         <td className="px-3 py-2.5" colSpan={4}>
                           Total time

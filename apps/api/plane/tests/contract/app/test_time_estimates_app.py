@@ -247,3 +247,54 @@ def test_ticket_work_items_are_unreachable(setup):
     url = _url(setup, ticket_issue, ticket_project)
     assert client.patch(url, {"expected_duration": 60}, format="json").status_code == status.HTTP_404_NOT_FOUND
     assert client.get(url).status_code == status.HTTP_404_NOT_FOUND
+
+
+def _batch(setup, who, *issues, raw=None):
+    ids = raw if raw is not None else ",".join(str(issue.id) for issue in issues)
+    return setup["clients"][who].get(f"/api/workspaces/{setup['workspace'].slug}/time-estimates/", {"issues": ids})
+
+
+@pytest.mark.contract
+def test_list_rows_in_one_request(setup):
+    """The rows on screen, across projects, in one request: the same answers as the project listing."""
+    client = setup["clients"]["member"]
+    client.patch(_url(setup), {"expected_duration": 120}, format="json")
+    _log(setup, 45, setup["other"])
+    third = Issue.objects.create(name="Untouched", workspace=setup["workspace"], project=setup["project"])
+    _assign([third], setup["people"].values())
+
+    response = _batch(setup, "member", setup["issue"], setup["other"], third, setup["off_issue"])
+    assert response.status_code == status.HTTP_200_OK
+    rows = response.json()
+    # neither an estimate nor logged time: left out, as in the listing
+    assert set(rows) == {str(setup["issue"].id), str(setup["other"].id)}
+    listing = client.get(_list_url(setup)).json()
+    assert rows == {key: listing[key] for key in rows}
+    # guests read them too; nothing asked, nothing answered
+    assert _batch(setup, "guest", setup["issue"]).json() == {str(setup["issue"].id): listing[str(setup["issue"].id)]}
+    assert _batch(setup, "member").json() == {}
+    assert _batch(setup, "member", raw="not-an-id").json() == {}
+
+
+@pytest.mark.contract
+def test_list_rows_only_what_they_can_reach(setup):
+    client = setup["clients"]["member"]
+    client.patch(_url(setup), {"expected_duration": 120}, format="json")
+    # not in the project
+    assert _batch(setup, "outsider", setup["issue"]).json() == {}
+    # a private work item of someone else's (assigned to the admin alone)
+    hidden = Issue.objects.create(name="Admin's", workspace=setup["workspace"], project=setup["project"])
+    _assign([hidden], [setup["people"]["admin"]])
+    setup["clients"]["admin"].patch(_url(setup, hidden), {"expected_duration": 30}, format="json")
+    assert str(hidden.id) in _batch(setup, "admin", hidden).json()
+    assert _batch(setup, "member", hidden).json() == {}
+    # deleted work items drop out
+    setup["issue"].delete()
+    assert _batch(setup, "member", setup["issue"]).json() == {}
+
+
+@pytest.mark.contract
+def test_list_rows_at_most_200(setup):
+    ids = ",".join(str(uuid4()) for _ in range(201))
+    assert _batch(setup, "member", raw=ids).status_code == status.HTTP_400_BAD_REQUEST
+    assert _batch(setup, "member", raw=ids.rsplit(",", 1)[0]).status_code == status.HTTP_200_OK

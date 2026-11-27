@@ -449,7 +449,8 @@ class AnalyticsReport:
             )
         today = timezone.now().astimezone(self.tz).date()
         rows = []
-        for milestone in milestones.order_by("target_date", "created_at"):
+        # newest first, as the Project Milestones list
+        for milestone in milestones.order_by("-created_at", "title"):
             total, done = milestone.total_items or 0, milestone.completed_items or 0
             is_completed = milestone.status == "Completed" or (total > 0 and done == total)
             rows.append(

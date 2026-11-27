@@ -317,3 +317,62 @@ class TestTimezone:
         body = _timesheet(setup, "a1", tz="Pacific/Honolulu").json()
         assert body["results"][0]["work_date"] == "2026-11-10"
         assert _timesheet(setup, "a1", tz="Pacific/Honolulu", from_date="2026-11-11").json()["total_count"] == 0
+
+
+def _entry_id(setup, who):
+    return str(IssueWorkLog.objects.filter(logged_by=setup["people"][who]).order_by("-started_at").first().id)
+
+
+def _entry(setup, who, entry_id, **params):
+    return setup["clients"][who].get(f"/api/workspaces/{setup['workspace'].slug}/timesheet/{entry_id}/", params)
+
+
+@pytest.mark.contract
+class TestEntryDetail:
+    """Time Sheet › an entry: every detail of one entry, for whoever the list would show it to."""
+
+    def test_my_own_entry_with_every_detail(self, setup):
+        response = _entry(setup, "a1", _entry_id(setup, "a1"))
+        assert response.status_code == status.HTTP_200_OK, response.content
+        entry = response.json()
+        assert entry["timesheet_no"].startswith("TIME-BILLING-")
+        assert (entry["duration"], entry["description"], entry["work_date"]) == (30, "a1 work", "2026-11-11")
+        assert entry["logged_by"]["id"] == _id(setup, "a1")
+        assert entry["issue"]["name"] == setup["issues"]["b_a1"].name
+        assert entry["project"]["identifier"] == setup["issues"]["b_a1"].project.identifier
+        assert entry["started_at"] and entry["ended_at"] and entry["created_at"] and entry["updated_at"]
+        assert entry["state"] is None or {"name", "group", "color"} <= set(entry["state"])
+
+    def test_the_same_people_as_the_list(self, setup):
+        # a senior opens their junior's entry; nobody opens a senior's, a lead's or another team's
+        assert _entry(setup, "a2", _entry_id(setup, "a1")).status_code == status.HTTP_200_OK
+        assert _entry(setup, "pm_a", _entry_id(setup, "a2")).status_code == status.HTTP_200_OK
+        for who, other in (("a1", "a2"), ("a1", "pm_a"), ("a2", "pm_a"), ("a2", "b1"), ("pm_a", "b1"), ("b1", "a1")):
+            # "not found", not "forbidden": the id isn't confirmed to exist
+            assert _entry(setup, who, _entry_id(setup, other)).status_code == status.HTTP_404_NOT_FOUND, (who, other)
+        for other in ("a1", "a2", "b1", "pm_a", "pm_b"):
+            assert _entry(setup, "hr", _entry_id(setup, other)).status_code == status.HTTP_200_OK, other
+            assert _entry(setup, "admin", _entry_id(setup, other)).status_code == status.HTTP_200_OK, other
+
+    def test_unknown_and_deleted(self, setup):
+        assert _entry(setup, "hr", "00000000-0000-0000-0000-000000000000").status_code == status.HTTP_404_NOT_FOUND
+        entry_id = _entry_id(setup, "a1")
+        IssueWorkLog.objects.get(pk=entry_id).delete()
+        assert _entry(setup, "a1", entry_id).status_code == status.HTTP_404_NOT_FOUND
+        # an entry on a deleted project task is gone from the list too
+        entry_id = _entry_id(setup, "b1")
+        IssueWorkLog.objects.get(pk=entry_id).issue.delete()
+        assert _entry(setup, "hr", entry_id).status_code == status.HTTP_404_NOT_FOUND
+
+    def test_the_date_follows_the_browsers_timezone(self, setup):
+        # A1's newest entry starts at 09:00 UTC on Nov 11: still Nov 10 in Honolulu
+        entry_id = _entry_id(setup, "a1")
+        assert _entry(setup, "a1", entry_id, tz="Pacific/Honolulu").json()["work_date"] == "2026-11-10"
+        assert _entry(setup, "a1", entry_id, tz="Asia/Kolkata").json()["work_date"] == "2026-11-11"
+
+    def test_without_role_based_access(self, setup):
+        setup["workspace"].is_rbac_enabled = False
+        setup["workspace"].save(update_fields=["is_rbac_enabled"])
+        assert _entry(setup, "a2", _entry_id(setup, "a2")).status_code == status.HTTP_200_OK
+        assert _entry(setup, "a2", _entry_id(setup, "a1")).status_code == status.HTTP_404_NOT_FOUND
+        assert _entry(setup, "admin", _entry_id(setup, "b1")).status_code == status.HTTP_200_OK

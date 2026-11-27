@@ -23,7 +23,7 @@ import {
 } from "@/components/task-details/form-values";
 import { projectMilestonesKey, workItemMilestoneKey } from "@/components/milestones/helpers";
 import { TASK_DETAIL_FIELDS, taskDetailKey } from "@/components/task-details/helpers";
-import { issueTimeEstimateKey, projectTimeEstimatesKey } from "@/components/worklogs/helpers";
+import { issueTimeEstimateKey, rowTimeEstimateKey } from "@/components/worklogs/helpers";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
 import { useUser } from "@/hooks/store/user/user-user";
@@ -116,7 +116,7 @@ export const IssueModalProvider = observer(function IssueModalProvider(props: TI
     } finally {
       void mutate(taskDetailKey(issueId));
       void mutate(issueTimeEstimateKey(issueId));
-      void mutate(projectTimeEstimatesKey(projectId));
+      void mutate(rowTimeEstimateKey(issueId));
       void mutate(workItemMilestoneKey(issueId));
       void mutate(projectMilestonesKey(projectId));
     }

@@ -180,6 +180,32 @@ class TimesheetEndpoint(BaseAPIView):
         )
 
 
+class TimesheetEntryEndpoint(BaseAPIView):
+    """One time entry, every detail of it (Time Sheet › an entry), with its date in the viewer's timezone (?tz=).
+
+    Only an entry the list would show the viewer (their own, or of someone they may see); any other is "not found",
+    never "forbidden", so nobody learns which entries exist."""
+
+    @allow_permission([ROLE.ADMIN, ROLE.MEMBER], level="WORKSPACE")
+    def get(self, request, slug, pk):
+        scope = report_scope(request.user, slug, request)
+        worklogs = visible_worklogs(request.user, slug, scope) | worklog_queryset(slug).filter(
+            logged_by_id=request.user.id
+        )
+        worklog = (
+            worklogs.filter(pk=pk)
+            .annotate(work_at=Coalesce("started_at", "created_at"))
+            .annotate(work_date=TruncDate("work_at", tzinfo=timesheet_timezone(request)))
+            .select_related("issue__state")
+            .first()
+        )
+        if worklog is None:
+            return Response(
+                {"error": "This time entry doesn't exist or you can't see it."}, status=status.HTTP_404_NOT_FOUND
+            )
+        return Response(serialize_report_worklog(worklog), status=status.HTTP_200_OK)
+
+
 EXPORT_HEADERS = [
     "Timesheet No.",
     "Date Start",
@@ -280,4 +306,4 @@ class TimesheetDownloadEndpoint(BaseAPIView):
         return response
 
 
-__all__ = ["TimesheetDownloadEndpoint", "TimesheetEndpoint"]
+__all__ = ["TimesheetDownloadEndpoint", "TimesheetEndpoint", "TimesheetEntryEndpoint"]

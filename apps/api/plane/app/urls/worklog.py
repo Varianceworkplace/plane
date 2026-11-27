@@ -16,8 +16,12 @@ from plane.app.views.worklog.base import (
     WorkspaceWorkLogTimerStopEndpoint,
 )
 from plane.app.views.worklog.active_projects import MyActiveProjectsEndpoint
-from plane.app.views.worklog.estimate import IssueTimeEstimateEndpoint, ProjectTimeEstimatesEndpoint
-from plane.app.views.worklog.timesheet import TimesheetDownloadEndpoint, TimesheetEndpoint
+from plane.app.views.worklog.estimate import (
+    IssueTimeEstimateEndpoint,
+    ProjectTimeEstimatesEndpoint,
+    WorkspaceTimeEstimatesEndpoint,
+)
+from plane.app.views.worklog.timesheet import TimesheetDownloadEndpoint, TimesheetEndpoint, TimesheetEntryEndpoint
 from plane.app.views.worklog.analytics import WorkLogReportAnalyticsEndpoint, WorkLogReportOptionsEndpoint
 from plane.app.views.worklog.attendance import AttendanceReportDownloadEndpoint, AttendanceReportEndpoint
 from plane.app.views.worklog.report import (
@@ -53,6 +57,12 @@ urlpatterns = [
         ProjectTimeEstimatesEndpoint.as_view(),
         name="project-time-estimates",
     ),
+    # the list rows on screen, across projects, in one request (?issues=<id>,<id>…)
+    path(
+        "workspaces/<str:slug>/time-estimates/",
+        WorkspaceTimeEstimatesEndpoint.as_view(),
+        name="workspace-time-estimates",
+    ),
     path("workspaces/<str:slug>/worklog-timer/", WorkspaceWorkLogTimerEndpoint.as_view(), name="worklog-timer"),
     path(
         "workspaces/<str:slug>/worklog-timer/stop/",
@@ -85,6 +95,8 @@ urlpatterns = [
     path("workspaces/<str:slug>/timesheet/", TimesheetEndpoint.as_view(), name="timesheet"),
     # Export Entry: the rows picked, or every entry the filters show (csv / xlsx)
     path("workspaces/<str:slug>/timesheet/download/", TimesheetDownloadEndpoint.as_view(), name="timesheet-download"),
+    # one entry, every detail of it (an entry the list would show the viewer; any other is 404)
+    path("workspaces/<str:slug>/timesheet/<uuid:pk>/", TimesheetEntryEndpoint.as_view(), name="timesheet-entry"),
     path("workspaces/<str:slug>/worklog-reports/", WorkLogReportEndpoint.as_view(), name="worklog-reports"),
     path(
         "workspaces/<str:slug>/worklog-reports/analytics/",

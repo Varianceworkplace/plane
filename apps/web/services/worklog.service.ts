@@ -89,9 +89,13 @@ export class WorklogService extends APIService {
       });
   }
 
-  /** Work items of the project with an expected time or logged time, keyed by work item id. */
-  async projectTimeEstimates(workspaceSlug: string, projectId: string): Promise<Record<string, TWorkItemTimeEstimate>> {
-    return this.get(`/api/workspaces/${workspaceSlug}/projects/${projectId}/time-estimates/`)
+  /**
+   * The work items asked for (at most 200) that have an expected time or logged time, keyed by work item id; the
+   * others, and any the signed-in person can't see, are left out.
+   */
+  async timeEstimatesFor(workspaceSlug: string, issueIds: string[]): Promise<Record<string, TWorkItemTimeEstimate>> {
+    const params = new URLSearchParams({ issues: issueIds.join(",") });
+    return this.get(`/api/workspaces/${workspaceSlug}/time-estimates/?${params.toString()}`)
       .then((response) => response?.data)
       .catch((error) => {
         throw error?.response?.data;

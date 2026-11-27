@@ -37,7 +37,10 @@ import {
   type TReportExportFormat,
   Section,
   Stat,
+  CHART_BOX_CLASSNAME,
   TABLE_CLASSNAME,
+  TABLE_FOOT,
+  TABLE_HEAD,
   UserCell,
 } from "./report-parts";
 import type { TReportPdfTable } from "./report-pdf";
@@ -81,7 +84,7 @@ function ProjectWiseReport({ summary, filters, onFiltersChange, onSelect }: Repo
     return (
       <>
         <Section title={`Hours by user${project ? ` in ${project.name}` : ""}`} hint="Click a bar to see the worklogs">
-          <div className={cn(TABLE_CLASSNAME, "px-2 pt-4")}>
+          <div className={CHART_BOX_CLASSNAME}>
             <WorklogReportChart
               data={buildUserChartData(summary.users)}
               series={[{ key: "hours", label: "Hours" }]}
@@ -92,45 +95,41 @@ function ProjectWiseReport({ summary, filters, onFiltersChange, onSelect }: Repo
         </Section>
         <Section title="Users">
           <div className={TABLE_CLASSNAME}>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] table-fixed text-left">
-                <thead className="bg-layer-1">
-                  <tr className="text-body-xs-medium text-secondary">
-                    <th className={cn(HEAD_CELL, "w-[40%]")}>User</th>
-                    <th className={cn(HEAD_CELL, "text-right")}>Entries</th>
-                    <th className={cn(HEAD_CELL, "text-right")}>Time</th>
-                    <th className={cn(HEAD_CELL, "text-right")}>Hours</th>
-                    <th className={cn(HEAD_CELL, "text-right")}>Share</th>
+            <table className="w-full min-w-[640px] table-fixed text-left">
+              <thead className={TABLE_HEAD}>
+                <tr className="text-body-xs-medium text-secondary">
+                  <th className={cn(HEAD_CELL, "w-[40%]")}>User</th>
+                  <th className={cn(HEAD_CELL, "text-right")}>Entries</th>
+                  <th className={cn(HEAD_CELL, "text-right")}>Time</th>
+                  <th className={cn(HEAD_CELL, "text-right")}>Hours</th>
+                  <th className={cn(HEAD_CELL, "text-right")}>Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.users.map((user) => (
+                  <tr key={user.id} className={ROW_CLASSNAME} onClick={() => selectUser(user.id)}>
+                    <td className="px-3 py-2.5">
+                      <UserCell user={user} />
+                    </td>
+                    <td className="px-3 py-2.5 text-right">{user.worklog_count}</td>
+                    <td className="px-3 py-2.5 text-right font-medium">{formatWorklogDuration(user.total_duration)}</td>
+                    <td className="px-3 py-2.5 text-right">{minutesToHours(user.total_duration)}</td>
+                    <td className="px-3 py-2.5 text-right text-secondary">
+                      {formatShare(user.total_duration, summary.total_duration)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {summary.users.map((user) => (
-                    <tr key={user.id} className={ROW_CLASSNAME} onClick={() => selectUser(user.id)}>
-                      <td className="px-3 py-2.5">
-                        <UserCell user={user} />
-                      </td>
-                      <td className="px-3 py-2.5 text-right">{user.worklog_count}</td>
-                      <td className="px-3 py-2.5 text-right font-medium">
-                        {formatWorklogDuration(user.total_duration)}
-                      </td>
-                      <td className="px-3 py-2.5 text-right">{minutesToHours(user.total_duration)}</td>
-                      <td className="px-3 py-2.5 text-right text-secondary">
-                        {formatShare(user.total_duration, summary.total_duration)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="bg-layer-1">
-                  <tr className="border-t-[0.5px] border-subtle text-body-xs-medium text-primary">
-                    <td className="px-3 py-2.5">Total</td>
-                    <td className="px-3 py-2.5 text-right">{summary.total_count}</td>
-                    <td className="px-3 py-2.5 text-right">{formatWorklogDuration(summary.total_duration)}</td>
-                    <td className="px-3 py-2.5 text-right">{minutesToHours(summary.total_duration)}</td>
-                    <td className="px-3 py-2.5 text-right">100%</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+                ))}
+              </tbody>
+              <tfoot className={TABLE_FOOT}>
+                <tr className="border-t-[0.5px] border-subtle text-body-xs-medium text-primary">
+                  <td className="px-3 py-2.5">Total</td>
+                  <td className="px-3 py-2.5 text-right">{summary.total_count}</td>
+                  <td className="px-3 py-2.5 text-right">{formatWorklogDuration(summary.total_duration)}</td>
+                  <td className="px-3 py-2.5 text-right">{minutesToHours(summary.total_duration)}</td>
+                  <td className="px-3 py-2.5 text-right">100%</td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </Section>
       </>
@@ -145,7 +144,7 @@ function ProjectWiseReport({ summary, filters, onFiltersChange, onSelect }: Repo
   return (
     <>
       <Section title="Hours by project" hint="Click a bar to see hours by user">
-        <div className={cn(TABLE_CLASSNAME, "px-2 pt-4")}>
+        <div className={CHART_BOX_CLASSNAME}>
           <WorklogReportChart
             data={buildProjectChartData(summary.projects)}
             series={[{ key: "hours", label: "Hours" }]}
@@ -156,46 +155,44 @@ function ProjectWiseReport({ summary, filters, onFiltersChange, onSelect }: Repo
       </Section>
       <Section title="Projects">
         <div className={TABLE_CLASSNAME}>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] table-fixed text-left">
-              <thead className="bg-layer-1">
-                <tr className="text-body-xs-medium text-secondary">
-                  <th className={cn(HEAD_CELL, "w-[40%]")}>Project</th>
-                  <th className={cn(HEAD_CELL, "text-right")}>Users</th>
-                  <th className={cn(HEAD_CELL, "text-right")}>Entries</th>
-                  <th className={cn(HEAD_CELL, "text-right")}>Time</th>
-                  <th className={cn(HEAD_CELL, "text-right")}>Share</th>
+          <table className="w-full min-w-[640px] table-fixed text-left">
+            <thead className={TABLE_HEAD}>
+              <tr className="text-body-xs-medium text-secondary">
+                <th className={cn(HEAD_CELL, "w-[40%]")}>Project</th>
+                <th className={cn(HEAD_CELL, "text-right")}>Users</th>
+                <th className={cn(HEAD_CELL, "text-right")}>Entries</th>
+                <th className={cn(HEAD_CELL, "text-right")}>Time</th>
+                <th className={cn(HEAD_CELL, "text-right")}>Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.projects.map((p) => (
+                <tr key={p.id} className={ROW_CLASSNAME} onClick={() => openProject(p.id)}>
+                  <td className="px-3 py-2.5">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="shrink-0 text-caption-md-regular text-tertiary">{p.identifier}</span>
+                      <span className="truncate font-medium">{p.name}</span>
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-right">{usersPerProject.get(p.id) ?? 0}</td>
+                  <td className="px-3 py-2.5 text-right">{p.worklog_count}</td>
+                  <td className="px-3 py-2.5 text-right font-medium">{formatWorklogDuration(p.total_duration)}</td>
+                  <td className="px-3 py-2.5 text-right text-secondary">
+                    {formatShare(p.total_duration, summary.total_duration)}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {summary.projects.map((p) => (
-                  <tr key={p.id} className={ROW_CLASSNAME} onClick={() => openProject(p.id)}>
-                    <td className="px-3 py-2.5">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="shrink-0 text-caption-md-regular text-tertiary">{p.identifier}</span>
-                        <span className="truncate font-medium">{p.name}</span>
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right">{usersPerProject.get(p.id) ?? 0}</td>
-                    <td className="px-3 py-2.5 text-right">{p.worklog_count}</td>
-                    <td className="px-3 py-2.5 text-right font-medium">{formatWorklogDuration(p.total_duration)}</td>
-                    <td className="px-3 py-2.5 text-right text-secondary">
-                      {formatShare(p.total_duration, summary.total_duration)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-layer-1">
-                <tr className="border-t-[0.5px] border-subtle text-body-xs-medium text-primary">
-                  <td className="px-3 py-2.5">Total</td>
-                  <td className="px-3 py-2.5 text-right">{summary.users.length}</td>
-                  <td className="px-3 py-2.5 text-right">{summary.total_count}</td>
-                  <td className="px-3 py-2.5 text-right">{formatWorklogDuration(summary.total_duration)}</td>
-                  <td className="px-3 py-2.5 text-right">100%</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+              ))}
+            </tbody>
+            <tfoot className={TABLE_FOOT}>
+              <tr className="border-t-[0.5px] border-subtle text-body-xs-medium text-primary">
+                <td className="px-3 py-2.5">Total</td>
+                <td className="px-3 py-2.5 text-right">{summary.users.length}</td>
+                <td className="px-3 py-2.5 text-right">{summary.total_count}</td>
+                <td className="px-3 py-2.5 text-right">{formatWorklogDuration(summary.total_duration)}</td>
+                <td className="px-3 py-2.5 text-right">100%</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </Section>
     </>
@@ -222,7 +219,7 @@ function UserWiseReport({ summary, onSelect }: ReportBodyProps) {
   return (
     <>
       <Section title="Hours by user across projects" hint="Click a bar to see the worklogs">
-        <div className={cn(TABLE_CLASSNAME, "px-2 pt-4")}>
+        <div className={CHART_BOX_CLASSNAME}>
           <WorklogReportChart
             data={buildUserChartData(summary.users)}
             series={series}
@@ -233,75 +230,71 @@ function UserWiseReport({ summary, onSelect }: ReportBodyProps) {
       </Section>
       <Section title="Breakdown" hint="Click a cell to see that user's worklogs in the project">
         <div className={TABLE_CLASSNAME}>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left" style={{ minWidth: 360 + summary.projects.length * 120 }}>
-              <thead className="bg-layer-1">
-                <tr className="text-body-xs-medium text-secondary">
-                  <th className={cn(HEAD_CELL, "sticky left-0 w-[220px] bg-layer-1")}>User</th>
-                  {summary.projects.map((p) => (
-                    <th key={p.id} className={cn(HEAD_CELL, "text-right")} title={p.name}>
-                      <span className="block truncate">{p.name}</span>
-                    </th>
-                  ))}
-                  <th className={cn(HEAD_CELL, "text-right")}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {summary.users.map((user) => {
-                  const perProject = new Map(user.projects.map((p) => [p.id, p.total_duration]));
-                  return (
-                    <tr
-                      key={user.id}
-                      className="border-t-[0.5px] border-subtle text-body-xs-regular text-primary hover:bg-layer-transparent-hover"
-                    >
-                      <td className="sticky left-0 bg-surface-1 px-3 py-2.5">
-                        <button
-                          type="button"
-                          className="w-full text-left hover:underline"
-                          onClick={() => select(user.id)}
-                        >
-                          <UserCell user={user} />
-                        </button>
-                      </td>
-                      {summary.projects.map((p) => {
-                        const minutes = perProject.get(p.id);
-                        return (
-                          <td key={p.id} className="px-3 py-2.5 text-right">
-                            {minutes ? (
-                              <button
-                                type="button"
-                                className="hover:underline"
-                                onClick={() => select(user.id, p.id)}
-                                aria-label={`${getWorklogUserName(user)} in ${p.name}`}
-                              >
-                                {formatWorklogDuration(minutes)}
-                              </button>
-                            ) : (
-                              <span className="text-placeholder">—</span>
-                            )}
-                          </td>
-                        );
-                      })}
-                      <td className="px-3 py-2.5 text-right font-medium">
-                        {formatWorklogDuration(user.total_duration)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot className="bg-layer-1">
-                <tr className="border-t-[0.5px] border-subtle text-body-xs-medium text-primary">
-                  <td className="sticky left-0 bg-layer-1 px-3 py-2.5">Total</td>
-                  {summary.projects.map((p) => (
-                    <td key={p.id} className="px-3 py-2.5 text-right">
-                      {formatWorklogDuration(p.total_duration)}
+          <table className="w-full text-left" style={{ minWidth: 360 + summary.projects.length * 120 }}>
+            <thead className={TABLE_HEAD}>
+              <tr className="text-body-xs-medium text-secondary">
+                <th className={cn(HEAD_CELL, "sticky left-0 z-[1] w-[220px] bg-layer-1")}>User</th>
+                {summary.projects.map((p) => (
+                  <th key={p.id} className={cn(HEAD_CELL, "text-right")} title={p.name}>
+                    <span className="block truncate">{p.name}</span>
+                  </th>
+                ))}
+                <th className={cn(HEAD_CELL, "text-right")}>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.users.map((user) => {
+                const perProject = new Map(user.projects.map((p) => [p.id, p.total_duration]));
+                return (
+                  <tr
+                    key={user.id}
+                    className="border-t-[0.5px] border-subtle text-body-xs-regular text-primary hover:bg-layer-transparent-hover"
+                  >
+                    <td className="sticky left-0 z-[1] bg-surface-1 px-3 py-2.5">
+                      <button
+                        type="button"
+                        className="w-full text-left hover:underline"
+                        onClick={() => select(user.id)}
+                      >
+                        <UserCell user={user} />
+                      </button>
                     </td>
-                  ))}
-                  <td className="px-3 py-2.5 text-right">{formatWorklogDuration(summary.total_duration)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+                    {summary.projects.map((p) => {
+                      const minutes = perProject.get(p.id);
+                      return (
+                        <td key={p.id} className="px-3 py-2.5 text-right">
+                          {minutes ? (
+                            <button
+                              type="button"
+                              className="hover:underline"
+                              onClick={() => select(user.id, p.id)}
+                              aria-label={`${getWorklogUserName(user)} in ${p.name}`}
+                            >
+                              {formatWorklogDuration(minutes)}
+                            </button>
+                          ) : (
+                            <span className="text-placeholder">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                    <td className="px-3 py-2.5 text-right font-medium">{formatWorklogDuration(user.total_duration)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot className={TABLE_FOOT}>
+              <tr className="border-t-[0.5px] border-subtle text-body-xs-medium text-primary">
+                <td className="sticky left-0 bg-layer-1 px-3 py-2.5">Total</td>
+                {summary.projects.map((p) => (
+                  <td key={p.id} className="px-3 py-2.5 text-right">
+                    {formatWorklogDuration(p.total_duration)}
+                  </td>
+                ))}
+                <td className="px-3 py-2.5 text-right">{formatWorklogDuration(summary.total_duration)}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </Section>
     </>

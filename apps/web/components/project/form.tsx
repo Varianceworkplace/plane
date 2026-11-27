@@ -34,6 +34,7 @@ import { usePlatformOS } from "@/hooks/use-platform-os";
 import { ProjectService } from "@/services/project";
 // local imports
 import { ProjectNetworkIcon } from "./project-network-icon";
+import { useProjectNameTaken } from "./use-project-name-taken";
 
 export interface IProjectDetailsForm {
   project: IProject;
@@ -63,12 +64,16 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
     reset,
     formState: { errors },
     getValues,
+    trigger,
   } = useForm<IProject>({
     defaultValues: {
       ...project,
       workspace: (project.workspace as IWorkspace).id,
     },
   });
+  // project names are unique whatever their case; the project's own name, unchanged, is always fine
+  const isNameTaken = useProjectNameTaken();
+  const nameInUse = (name: string) => name !== project.name && isNameTaken(name, project.id);
   // derived values
   const currentNetwork = NETWORK_CHOICES.find((n) => n.key === project?.network);
   const coverImage = watch("cover_image_url");
@@ -100,6 +105,7 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
           title: t("toast.success"),
           message: t("project_settings.general.toast.success"),
         });
+        return undefined;
       })
       .catch((err) => {
         try {
@@ -112,6 +118,8 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
 
           if (nameError || identifierError || nameSpecialCharError) {
             if (nameError) {
+              // under the name too: the name may be a project's they can't see, which the form couldn't know
+              setError("name", { type: "server", message: t("project_name_already_taken") });
               setToast({
                 type: "error",
                 title: t("toast.error"),
@@ -195,6 +203,7 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
         .then(async (res) => {
           if (res.exists) setError("identifier", { message: t("common.identifier_already_exists") });
           else await handleUpdateChange(payload);
+          return undefined;
         });
     else await handleUpdateChange(payload);
     setTimeout(() => {
@@ -286,6 +295,7 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
                 value: 255,
                 message: "Project name should be less than 255 characters",
               },
+              validate: (value) => !nameInUse(value) || t("project_name_already_taken"),
             }}
             render={({ field: { value, onChange, ref } }) => (
               <Field name="name" invalid={Boolean(errors.name)}>
@@ -297,7 +307,11 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
                     type="text"
                     ref={ref}
                     value={value}
-                    onChange={onChange}
+                    onChange={(e) => {
+                      onChange(e);
+                      // a name in use shows "already exists" as it's typed (and clears once changed)
+                      if (nameInUse(e.target.value) || errors.name) void trigger("name");
+                    }}
                     placeholder={t("common.project_name")}
                     disabled={!isAdmin}
                   />
@@ -438,8 +452,8 @@ export function ProjectDetailsForm(props: IProjectDetailsForm) {
                 <>
                   <TimezoneSelect
                     value={value}
-                    onChange={(value: string) => {
-                      onChange(value);
+                    onChange={(timezone: string) => {
+                      onChange(timezone);
                     }}
                     error={Boolean(errors.timezone)}
                     buttonClassName="!border-subtle !shadow-none font-medium rounded-md"

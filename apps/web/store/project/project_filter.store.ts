@@ -124,7 +124,8 @@ export class ProjectFilterStore implements IProjectFilterStore {
     const displayFilters = this.getDisplayFiltersByWorkspaceSlug(workspaceSlug);
     runInAction(() => {
       this.displayFilters[workspaceSlug] = {
-        order_by: displayFilters?.order_by || "created_at",
+        // newest first, as every list in Workplace
+        order_by: displayFilters?.order_by || "-created_at",
       };
       this.filters[workspaceSlug] = this.filters[workspaceSlug] ?? {};
     });

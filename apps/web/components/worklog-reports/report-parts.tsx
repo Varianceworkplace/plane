@@ -15,7 +15,18 @@ import { getWorklogUserName } from "@/components/worklogs/helpers";
 import type { TWorklogUser } from "@/components/worklogs/types";
 
 // wide tables scroll sideways on narrow screens instead of being cut off
-export const TABLE_CLASSNAME = "overflow-x-auto rounded-lg border-[0.5px] border-subtle";
+/**
+ * A report table's box. The app hides scrollbars unless an element asks for them, so these show both; the box is at
+ * most 70% of the screen tall, so its sideways scrollbar is always in reach (not below hundreds of rows), and the
+ * header row (TABLE_HEAD) and total row (TABLE_FOOT) stay in view while the rows scroll.
+ */
+export const TABLE_CLASSNAME =
+  "vertical-scrollbar horizontal-scrollbar scrollbar-md max-h-[70vh] overflow-auto rounded-lg border-[0.5px] border-subtle";
+export const TABLE_HEAD = "sticky top-0 z-[2] bg-layer-1";
+export const TABLE_FOOT = "sticky bottom-0 z-[2] bg-layer-1";
+/** A chart's box: with many projects or people the chart is wider than the page and scrolls sideways (visibly). */
+export const CHART_BOX_CLASSNAME =
+  "horizontal-scrollbar scrollbar-md overflow-y-hidden rounded-lg border-[0.5px] border-subtle px-2 pt-4 pb-1";
 export const HEAD_CELL = "px-3 py-2.5 font-medium";
 export const ROW_CLASSNAME =
   "cursor-pointer border-t-[0.5px] border-subtle text-body-xs-regular text-primary hover:bg-layer-transparent-hover";

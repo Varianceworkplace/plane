@@ -104,8 +104,9 @@ def serialize_milestone(milestone):
 
 
 def sorted_milestones(queryset):
-    # earliest target date first; milestones without a date last
-    return queryset.order_by(F("target_date").asc(nulls_last=True), "created_at")
+    # newest first (the latest milestone added at the top), as every list in Workplace; the title settles ties
+    # (imported milestones can share a creation time)
+    return queryset.order_by("-created_at", "title")
 
 
 def serialize_work_item(issue, identifier):
@@ -333,7 +334,8 @@ def linked_work_items(milestone):
         )
         .select_related("state")
         .prefetch_related("assignees")
-        .order_by("sequence_id")
+        # newest first
+        .order_by("-created_at", "-sequence_id")
     )
 
 

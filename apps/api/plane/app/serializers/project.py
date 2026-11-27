@@ -25,6 +25,7 @@ from plane.db.models import (
 from plane.utils.content_validator import (
     validate_html_content,
 )
+from plane.utils.project_names import project_name_taken
 
 
 class ProjectSerializer(BaseSerializer):
@@ -43,12 +44,10 @@ class ProjectSerializer(BaseSerializer):
         if re.match(Project.FORBIDDEN_NAME_CHARS_PATTERN, name):
             raise serializers.ValidationError(detail="PROJECT_NAME_CANNOT_CONTAIN_SPECIAL_CHARACTERS")
 
-        project = Project.objects.filter(name=name, workspace_id=workspace_id)
-
-        if project_id:
-            project = project.exclude(id=project_id)
-
-        if project.exists():
+        # unique whatever the case (plane.utils.project_names); saving a project under its own unchanged name is fine,
+        # even where an older project's name differs from it only in case
+        unchanged = self.instance is not None and name == self.instance.name
+        if not unchanged and project_name_taken(workspace_id, name, exclude_project_id=project_id):
             raise serializers.ValidationError(
                 detail="PROJECT_NAME_ALREADY_EXIST",
             )

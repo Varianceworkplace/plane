@@ -24,7 +24,6 @@ import { useMember } from "@/hooks/store/use-member";
 import { useProjectState } from "@/hooks/store/use-project-state";
 import { SubIssueDisplayFilters } from "./display-filters";
 import { SubIssueFilters } from "./filters";
-import { SubIssuesActionButton } from "./quick-action-button";
 
 type TSubWorkItemTitleActionsProps = {
   disabled: boolean;
@@ -34,7 +33,7 @@ type TSubWorkItemTitleActionsProps = {
 };
 
 export const SubWorkItemTitleActions = observer(function SubWorkItemTitleActions(props: TSubWorkItemTitleActionsProps) {
-  const { disabled, issueServiceType = EIssueServiceType.ISSUES, parentId, projectId } = props;
+  const { issueServiceType = EIssueServiceType.ISSUES, parentId, projectId } = props;
 
   // store hooks
   const {
@@ -87,13 +86,15 @@ export const SubWorkItemTitleActions = observer(function SubWorkItemTitleActions
   );
 
   return (
-    // prevent click everywhere
+    // keeps clicks and keys on the filters from toggling the section they sit in
     <div
+      role="presentation"
       className="flex items-center gap-2"
       onClick={(e) => {
         e.stopPropagation();
         e.preventDefault();
       }}
+      onKeyDown={(e) => e.stopPropagation()}
     >
       <SubIssueDisplayFilters
         isEpic={issueServiceType === EIssueServiceType.EPICS}
@@ -110,9 +111,6 @@ export const SubWorkItemTitleActions = observer(function SubWorkItemTitleActions
         states={projectStates}
         availableFilters={SUB_WORK_ITEM_AVAILABLE_FILTERS_FOR_WORK_ITEM_PAGE}
       />
-      {!disabled && (
-        <SubIssuesActionButton issueId={parentId} disabled={disabled} issueServiceType={issueServiceType} />
-      )}
     </div>
   );
 });

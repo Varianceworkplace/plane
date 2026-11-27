@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { observer } from "mobx-react";
 import Link from "next/link";
+import { useSearchParams } from "react-router";
 import useSWR from "swr";
 // plane imports
 import { Avatar } from "@makeplane/propel/components/avatar";
@@ -37,9 +38,11 @@ import type { TWorklogUser } from "@/components/worklogs/types";
 // hooks
 import { useProject } from "@/hooks/store/use-project";
 import { useUser } from "@/hooks/store/user";
+import { useAppRouter } from "@/hooks/use-app-router";
 // services
 import { TimesheetService } from "@/services/timesheet.service";
 // local imports
+import { rememberTimesheetListQuery, timesheetEntryHref } from "./list-location";
 import type { TTimesheetQuery } from "./types";
 
 const timesheetService = new TimesheetService();
@@ -48,13 +51,30 @@ const EVERYONE = "all";
 
 type TPersonOption = { id: string; label: string; user?: TWorklogUser };
 
-/** The end time, with its date when the work ran into another day. */
-const formatEnd = (startedAt: string | null, endedAt: string | null) => {
-  if (!endedAt) return "—";
-  const time = renderFormattedTime(endedAt, "12-hour");
-  const endDay = renderFormattedDate(endedAt, "dd-MM-yyyy");
-  return startedAt && renderFormattedDate(startedAt, "dd-MM-yyyy") !== endDay ? `${endDay} ${time}` : time;
+// the list's filters and page live in the address (?person=&project=&from_date=&to_date=&search=&page=), so
+// going back from an entry returns to the same list
+const QUERY_KEYS = ["person", "project", "from_date", "to_date", "search"] as const;
+
+const readQuery = (params: URLSearchParams): TTimesheetQuery => {
+  const query: TTimesheetQuery = { page: Math.max(1, Number(params.get("page")) || 1) };
+  QUERY_KEYS.forEach((key) => {
+    const value = params.get(key);
+    if (value) query[key] = value;
+  });
+  return query;
 };
+
+const writeQuery = (query: TTimesheetQuery) => {
+  const params = new URLSearchParams();
+  QUERY_KEYS.forEach((key) => {
+    const value = query[key];
+    if (value) params.set(key, value);
+  });
+  if (query.page && query.page > 1) params.set("page", String(query.page));
+  return params;
+};
+
+const DATE = "dd-MM-yyyy";
 
 const personName = (user: TWorklogUser) =>
   `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim() || user.display_name;
@@ -68,8 +88,10 @@ export const TimesheetRoot = observer(function TimesheetRoot(props: { workspaceS
   const { workspaceSlug } = props;
   const { data: currentUser } = useUser();
   const { workspaceProjectIds, getProjectById } = useProject();
-  const [query, setQuery] = useState<TTimesheetQuery>({ page: 1 });
-  const [search, setSearch] = useState("");
+  const router = useAppRouter();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = useMemo(() => readQuery(searchParams), [searchParams]);
+  const [search, setSearch] = useState(query.search ?? "");
   // the rows picked on this page, for Export Entry (none picked: every entry the filters show)
   const [selected, setSelected] = useState<string[]>([]);
 
@@ -81,7 +103,16 @@ export const TimesheetRoot = observer(function TimesheetRoot(props: { workspaceS
     { revalidateOnFocus: false, keepPreviousData: true }
   );
 
-  const update = (patch: TTimesheetQuery) => setQuery((previous) => ({ ...previous, ...patch, page: patch.page ?? 1 }));
+  // a filter change replaces the address rather than adding a step to the browser's history
+  const setQuery = (next: TTimesheetQuery) => setSearchParams(writeQuery(next), { replace: true });
+  const update = (patch: TTimesheetQuery) => setQuery({ ...query, ...patch, page: patch.page ?? 1 });
+  const listQuery = searchParams.toString();
+  useEffect(() => rememberTimesheetListQuery(listQuery), [listQuery]);
+  const openEntry = (entryId: string, newTab: boolean) => {
+    const href = timesheetEntryHref(workspaceSlug, entryId);
+    if (newTab) window.open(href, "_blank", "noopener");
+    else router.push(href);
+  };
 
   // ------------------------------------------------------------ options
   const personOptions = useMemo<TPersonOption[]>(() => {
@@ -125,8 +156,7 @@ export const TimesheetRoot = observer(function TimesheetRoot(props: { workspaceS
   const hasFilters = !!(query.project || query.from_date || query.to_date || query.search);
   const page = data?.page ?? 1;
   const pages = data ? Math.max(1, Math.ceil(data.total_count / PER_PAGE)) : 1;
-  const showPerson = data?.person === EVERYONE;
-  const columns = showPerson ? 10 : 9;
+  const columns = 7;
   const pageIds = data?.results.map((entry) => entry.id) ?? [];
   const allPicked = pageIds.length > 0 && pageIds.every((id) => selected.includes(id));
   const toggle = (id: string) =>
@@ -211,7 +241,7 @@ export const TimesheetRoot = observer(function TimesheetRoot(props: { workspaceS
             aria-label="Clear filters"
             onClick={() => {
               setSearch("");
-              setQuery((previous) => ({ person: previous.person, page: 1 }));
+              setQuery({ person: query.person, page: 1 });
             }}
           />
         )}
@@ -263,19 +293,17 @@ export const TimesheetRoot = observer(function TimesheetRoot(props: { workspaceS
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border-[0.5px] border-subtle">
-          <table className="w-full min-w-[1000px] table-fixed text-left">
+          {/* Workplace's list columns; a row opens the entry with every detail of it */}
+          <table className="w-full min-w-[760px] table-fixed text-left">
             <colgroup>
               <col className="w-10" />
               {/* "TIME-BILLING-336717" on one line */}
-              <col className={showPerson ? "w-[14%]" : "w-[16%]"} />
-              <col className="w-[9%]" />
-              <col className="w-[8%]" />
-              <col className="w-[8%]" />
-              <col className="w-[7%]" />
-              <col className={showPerson ? "w-[17%]" : "w-[22%]"} />
-              <col className={showPerson ? "w-[11%]" : "w-[12%]"} />
-              {showPerson && <col className="w-[11%]" />}
-              <col className={showPerson ? "w-[15%]" : "w-[18%]"} />
+              <col className="w-[19%]" />
+              <col className="w-[14%]" />
+              <col className="w-[14%]" />
+              <col className="w-[13%]" />
+              <col className="w-[13%]" />
+              <col />
             </colgroup>
             <thead className="bg-layer-1">
               <tr className="text-body-xs-medium text-secondary">
@@ -289,14 +317,11 @@ export const TimesheetRoot = observer(function TimesheetRoot(props: { workspaceS
                   />
                 </th>
                 <th className="px-3 py-2.5 font-medium">Timesheet No.</th>
-                <th className="px-3 py-2.5 font-medium">Date</th>
-                <th className="px-3 py-2.5 font-medium">Start</th>
-                <th className="px-3 py-2.5 font-medium">End</th>
-                <th className="px-3 py-2.5 text-right font-medium">Duration</th>
-                <th className="px-3 py-2.5 font-medium">Project task</th>
-                <th className="px-3 py-2.5 font-medium">Project</th>
-                {showPerson && <th className="px-3 py-2.5 font-medium">Submitted for</th>}
-                <th className="px-3 py-2.5 font-medium">Description</th>
+                <th className="px-3 py-2.5 font-medium">Date start</th>
+                <th className="px-3 py-2.5 font-medium">Date end</th>
+                <th className="px-3 py-2.5 font-medium">Time start</th>
+                <th className="px-3 py-2.5 font-medium">Time end</th>
+                <th className="px-3 py-2.5 font-medium">Submitted for</th>
               </tr>
             </thead>
             <tbody>
@@ -309,45 +334,43 @@ export const TimesheetRoot = observer(function TimesheetRoot(props: { workspaceS
                       </td>
                     </tr>
                   ))
-                : data?.results.map((entry) => (
-                    <tr
-                      key={entry.id}
-                      className="border-t-[0.5px] border-subtle align-top text-body-xs-regular text-primary hover:bg-layer-transparent-hover"
-                    >
-                      <td className="px-3 py-2.5">
-                        <Checkbox
-                          checked={selected.includes(entry.id)}
-                          aria-label={`Select the entry of ${entry.work_date ?? ""} on ${entry.project.identifier}-${entry.issue.sequence_id}`}
-                          onCheckedChange={() => toggle(entry.id)}
-                        />
-                      </td>
-                      <td className="truncate px-3 py-2.5 whitespace-nowrap text-secondary" title={entry.timesheet_no}>
-                        {entry.timesheet_no || "—"}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {entry.work_date ? renderFormattedDate(entry.work_date, "dd-MM-yyyy") : "—"}
-                      </td>
-                      <td className="px-3 py-2.5 text-secondary">
-                        {entry.started_at ? renderFormattedTime(entry.started_at, "12-hour") : "—"}
-                      </td>
-                      <td className="px-3 py-2.5 text-secondary">{formatEnd(entry.started_at, entry.ended_at)}</td>
-                      <td className="px-3 py-2.5 text-right font-medium">{formatWorklogDuration(entry.duration)}</td>
-                      <td className="px-3 py-2.5">
-                        <Link
-                          href={`/${workspaceSlug}/browse/${entry.project.identifier}-${entry.issue.sequence_id}/`}
-                          className="flex min-w-0 items-center gap-2 hover:underline"
-                          title={entry.issue.name}
-                        >
-                          <span className="shrink-0 text-caption-md-regular text-tertiary">
-                            {entry.project.identifier}-{entry.issue.sequence_id}
-                          </span>
-                          <span className="truncate">{entry.issue.name}</span>
-                        </Link>
-                      </td>
-                      <td className="truncate px-3 py-2.5 text-secondary" title={entry.project.name}>
-                        {entry.project.name}
-                      </td>
-                      {showPerson && (
+                : data?.results.map((entry) => {
+                    const dateStart = entry.work_date ? renderFormattedDate(entry.work_date, DATE) : null;
+                    // entries logged without times are on their one day, as in the export
+                    const dateEnd = entry.ended_at ? renderFormattedDate(entry.ended_at, DATE) : dateStart;
+                    return (
+                      // the Timesheet No. link opens the entry from the keyboard; a click anywhere on the row does too
+                      <tr
+                        key={entry.id}
+                        onClick={(e) => openEntry(entry.id, e.metaKey || e.ctrlKey)}
+                        title={`${entry.project.identifier}-${entry.issue.sequence_id} ${entry.issue.name}`}
+                        className="cursor-pointer border-t-[0.5px] border-subtle text-body-xs-regular text-primary hover:bg-layer-transparent-hover"
+                      >
+                        {/* picking a row for Export Entry doesn't open it */}
+                        <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selected.includes(entry.id)}
+                            aria-label={`Select ${entry.timesheet_no || `the entry of ${dateStart ?? ""}`}`}
+                            onCheckedChange={() => toggle(entry.id)}
+                          />
+                        </td>
+                        <td className="truncate px-3 py-2.5 whitespace-nowrap" title={entry.timesheet_no}>
+                          <Link
+                            href={timesheetEntryHref(workspaceSlug, entry.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-accent-primary hover:underline"
+                          >
+                            {entry.timesheet_no || "Open entry"}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2.5">{dateStart ?? "—"}</td>
+                        <td className="px-3 py-2.5">{dateEnd ?? "—"}</td>
+                        <td className="px-3 py-2.5 text-secondary">
+                          {entry.started_at ? renderFormattedTime(entry.started_at, "12-hour") : "—"}
+                        </td>
+                        <td className="px-3 py-2.5 text-secondary">
+                          {entry.ended_at ? renderFormattedTime(entry.ended_at, "12-hour") : "—"}
+                        </td>
                         <td className="px-3 py-2.5">
                           <span className="flex min-w-0 items-center gap-1.5">
                             <Avatar
@@ -359,12 +382,9 @@ export const TimesheetRoot = observer(function TimesheetRoot(props: { workspaceS
                             <span className="truncate">{personName(entry.logged_by)}</span>
                           </span>
                         </td>
-                      )}
-                      <td className="px-3 py-2.5 break-words whitespace-pre-wrap text-secondary">
-                        {entry.description || <span className="text-placeholder">—</span>}
-                      </td>
-                    </tr>
-                  ))}
+                      </tr>
+                    );
+                  })}
             </tbody>
           </table>
         </div>

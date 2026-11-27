@@ -169,7 +169,7 @@
   "failed_to_remove_project_from_favorites": "Couldn't remove the project from favorites. Please try again.",
   "project_created_successfully": "Project created successfully",
   "project_created_successfully_description": "Project created successfully. You can now start adding project tasks to it.",
-  "project_name_already_taken": "The project name is already taken.",
+  "project_name_already_taken": "Project name already exists.",
   "project_name_cannot_contain_special_characters": "The project name cannot contain special characters.",
   "project_identifier_already_taken": "The project identifier is already taken.",
   "project_cover_image_alt": "Project cover image",

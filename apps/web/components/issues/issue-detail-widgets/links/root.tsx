@@ -14,7 +14,6 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 // local imports
 import { IssueLinksCollapsibleContent } from "./content";
 import { IssueLinksCollapsibleTitle } from "./title";
-import { IssueLinksActionButton } from "./quick-action-button";
 
 type Props = {
   workspaceSlug: string;
@@ -36,11 +35,6 @@ export const LinksCollapsible = observer(function LinksCollapsible(props: Props)
       open={isCollapsibleOpen}
       onOpenChange={() => toggleOpenWidget("links")}
       trigger={<IssueLinksCollapsibleTitle issueId={issueId} issueServiceType={issueServiceType} />}
-      trailing={
-        isCollapsibleOpen && !disabled ? (
-          <IssueLinksActionButton issueServiceType={issueServiceType} disabled={disabled} />
-        ) : undefined
-      }
     >
       <IssueLinksCollapsibleContent
         workspaceSlug={workspaceSlug}

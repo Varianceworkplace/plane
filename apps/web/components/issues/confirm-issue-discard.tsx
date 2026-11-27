@@ -4,7 +4,6 @@
  * See the LICENSE file for details.
  */
 
-import { useState } from "react";
 // ui
 import { Button } from "@makeplane/propel/components/button";
 import {
@@ -14,7 +13,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogHeading,
-  DialogInfo,
   DialogMain,
   DialogTitle,
 } from "@makeplane/propel/components/dialog";
@@ -23,27 +21,11 @@ type Props = {
   isOpen: boolean;
   handleClose: () => void;
   onDiscard: () => void;
-  onConfirm: () => Promise<void>;
 };
 
+/** Closing a new project task with something typed in: discard it, or go back to it (Variance keeps no drafts). */
 export function ConfirmIssueDiscard(props: Props) {
-  const { isOpen, handleClose, onDiscard, onConfirm } = props;
-
-  const [isLoading, setIsLoading] = useState(false);
-
-  const onClose = () => {
-    handleClose();
-    setIsLoading(false);
-  };
-
-  const handleDeletion = async () => {
-    setIsLoading(true);
-    try {
-      await onConfirm();
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { isOpen, handleClose, onDiscard } = props;
 
   return (
     <Dialog
@@ -56,26 +38,14 @@ export function ConfirmIssueDiscard(props: Props) {
         <DialogMain>
           <DialogHeader>
             <DialogHeading>
-              <DialogTitle>Save this draft?</DialogTitle>
-              <DialogDescription>
-                You can save this project task to Drafts so you can come back to it later.
-              </DialogDescription>
+              <DialogTitle>Discard this project task?</DialogTitle>
+              <DialogDescription>It isn&apos;t saved yet: what you&apos;ve entered will be lost.</DialogDescription>
             </DialogHeading>
           </DialogHeader>
         </DialogMain>
         <DialogActions>
-          <DialogInfo>
-            <Button variant="secondary" size="sm" stretch="auto" onClick={onDiscard} label="Discard" />
-          </DialogInfo>
-          <Button variant="secondary" size="sm" stretch="auto" onClick={onClose} label="Cancel" />
-          <Button
-            variant="primary"
-            size="sm"
-            stretch="auto"
-            onClick={() => void handleDeletion()}
-            loading={isLoading}
-            label={isLoading ? "Saving" : "Save to Drafts"}
-          />
+          <Button variant="secondary" size="sm" stretch="auto" onClick={handleClose} label="Keep editing" />
+          <Button variant="danger" size="sm" stretch="auto" onClick={onDiscard} label="Discard" />
         </DialogActions>
       </DialogContent>
     </Dialog>

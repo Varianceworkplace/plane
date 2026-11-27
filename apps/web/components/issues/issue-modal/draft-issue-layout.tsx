@@ -7,15 +7,9 @@
 import { useState } from "react";
 import { isEmpty } from "lodash-es";
 import { observer } from "mobx-react";
-import { useParams } from "next/navigation";
 // Plane imports
-import { useTranslation } from "@plane/i18n";
-import { setToast } from "@plane/blocks/toast";
 import type { TIssue } from "@plane/types";
 import { isEmptyHtmlString } from "@plane/utils";
-// hooks
-import { useIssueModal } from "@/hooks/context/use-issue-modal";
-import { useWorkspaceDraftIssues } from "@/hooks/store/workspace-draft";
 // local imports
 import { ConfirmIssueDiscard } from "../confirm-issue-discard";
 import { IssueFormRoot } from "./form";
@@ -27,15 +21,9 @@ export interface DraftIssueProps extends IssueFormProps {
 }
 
 export const DraftIssueLayout = observer(function DraftIssueLayout(props: DraftIssueProps) {
-  const { changesMade, data, onChange, onClose, projectId } = props;
+  const { changesMade, data, onChange, onClose } = props;
   // states
   const [issueDiscardModal, setIssueDiscardModal] = useState(false);
-  // router params
-  const { workspaceSlug } = useParams();
-  // store hooks
-  const { handleCreateUpdatePropertyValues } = useIssueModal();
-  const { createIssue } = useWorkspaceDraftIssues();
-  const { t } = useTranslation();
 
   const sanitizeChanges = (): Partial<TIssue> => {
     const sanitizedChanges = { ...changesMade };
@@ -75,67 +63,18 @@ export const DraftIssueLayout = observer(function DraftIssueLayout(props: DraftI
     }
   };
 
-  const handleCreateDraftIssue = async () => {
-    if (!changesMade || !workspaceSlug || !projectId) return;
-
-    const payload = {
-      ...changesMade,
-      name: changesMade?.name && changesMade?.name?.trim() !== "" ? changesMade.name?.trim() : "Untitled",
-      project_id: projectId,
-    };
-
-    const response = await createIssue(workspaceSlug.toString(), payload)
-      .then((res) => {
-        setToast({
-          type: "success",
-          title: `${t("success")}!`,
-          message: t("workspace_draft_issues.toasts.created.success"),
-        });
-        onChange(null);
-        setIssueDiscardModal(false);
-        onClose();
-        return res;
-      })
-      .catch((_error) => {
-        setToast({
-          type: "error",
-          title: `${t("error")}!`,
-          message: t("workspace_draft_issues.toasts.created.error"),
-        });
-      });
-
-    if (response && handleCreateUpdatePropertyValues) {
-      handleCreateUpdatePropertyValues({
-        issueId: response.id,
-        issueTypeId: response.type_id,
-        projectId,
-        workspaceSlug: workspaceSlug?.toString(),
-        isDraft: true,
-      });
-    }
-  };
-
-  const handleDraftAndClose = () => {
-    const sanitizedChanges = sanitizeChanges();
-    if (!data?.id && !isEmpty(sanitizedChanges)) {
-      handleCreateDraftIssue();
-    }
-    onClose();
-  };
-
   return (
     <>
       <ConfirmIssueDiscard
         isOpen={issueDiscardModal}
         handleClose={() => setIssueDiscardModal(false)}
-        onConfirm={handleCreateDraftIssue}
         onDiscard={() => {
           onChange(null);
           setIssueDiscardModal(false);
           onClose();
         }}
       />
-      <IssueFormRoot {...props} onClose={handleClose} handleDraftAndClose={handleDraftAndClose} />
+      <IssueFormRoot {...props} onClose={handleClose} />
     </>
   );
 });

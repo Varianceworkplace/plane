@@ -13,19 +13,28 @@ import { EmptyStateDetailed } from "@plane/blocks/empty-state";
 import { EIssuesStoreType, EUserProjectRoles } from "@plane/types";
 // hooks
 import { useCommandPalette } from "@/hooks/store/use-command-palette";
+import { useIssues } from "@/hooks/store/use-issues";
 import { useUserPermissions } from "@/hooks/store/user";
 import { useWorkItemFilterInstance } from "@/hooks/store/work-item-filters/use-work-item-filter-instance";
 
 export const ProjectEmptyState = observer(function ProjectEmptyState() {
   // router
-  const { projectId: routerProjectId } = useParams();
+  const { workspaceSlug: routerWorkspaceSlug, projectId: routerProjectId } = useParams();
+  const workspaceSlug = routerWorkspaceSlug ? routerWorkspaceSlug.toString() : undefined;
   const projectId = routerProjectId ? routerProjectId.toString() : undefined;
   // plane imports
   const { t } = useTranslation();
   // store hooks
   const { toggleCreateIssueModal } = useCommandPalette();
   const { allowPermissions, canCreateWorkItem } = useUserPermissions();
+  const {
+    issuesFilter: { searchQuery, updateSearchQuery, dateFilter, updateDateFilter },
+  } = useIssues(EIssuesStoreType.PROJECT);
   // derived values
+  // the header's search box found nothing: say so, and offer to clear it (not to create a first task)
+  const activeSearch = projectId ? (searchQuery[projectId] ?? "") : "";
+  const activeDate = projectId ? dateFilter[projectId] : undefined;
+  const isDateActive = !!(activeDate?.from || activeDate?.to);
   const projectWorkItemFilter = useWorkItemFilterInstance(EIssuesStoreType.PROJECT, projectId);
 
   const canPerformEmptyStateActions =
@@ -34,18 +43,44 @@ export const ProjectEmptyState = observer(function ProjectEmptyState() {
 
   return (
     <div className="relative h-full w-full overflow-y-auto">
-      {projectWorkItemFilter?.hasActiveFilters ? (
+      {activeSearch || isDateActive || projectWorkItemFilter?.hasActiveFilters ? (
         <EmptyStateDetailed
           assetKey="search"
           title={t("common_empty_state.search.title")}
           description={t("common_empty_state.search.description")}
           actions={[
-            {
-              label: t("project_issues.empty_state.issues_empty_filter.secondary_button.text"),
-              onClick: projectWorkItemFilter?.clearFilters,
-              disabled: !canPerformEmptyStateActions || !projectWorkItemFilter,
-              variant: "secondary",
-            },
+            ...(activeSearch
+              ? [
+                  {
+                    label: "Clear search",
+                    onClick: () => {
+                      if (workspaceSlug && projectId) updateSearchQuery(workspaceSlug, projectId, "");
+                    },
+                    variant: "secondary" as const,
+                  },
+                ]
+              : []),
+            ...(isDateActive
+              ? [
+                  {
+                    label: "Clear date filter",
+                    onClick: () => {
+                      if (workspaceSlug && projectId) updateDateFilter(workspaceSlug, projectId, undefined);
+                    },
+                    variant: "secondary" as const,
+                  },
+                ]
+              : []),
+            ...(projectWorkItemFilter?.hasActiveFilters
+              ? [
+                  {
+                    label: t("project_issues.empty_state.issues_empty_filter.secondary_button.text"),
+                    onClick: projectWorkItemFilter?.clearFilters,
+                    disabled: !canPerformEmptyStateActions || !projectWorkItemFilter,
+                    variant: "secondary" as const,
+                  },
+                ]
+              : []),
           ]}
         />
       ) : (

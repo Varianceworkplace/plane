@@ -7,7 +7,7 @@
 import React from "react";
 import { observer } from "mobx-react";
 // plane constants
-import { ISSUE_DISPLAY_PROPERTIES } from "@plane/constants";
+import { ISSUE_DISPLAY_PROPERTIES, UNUSED_DISPLAY_PROPERTIES } from "@plane/constants";
 // plane i18n
 import { useTranslation } from "@plane/i18n";
 // types
@@ -31,7 +31,6 @@ export const FilterDisplayProperties = observer(function FilterDisplayProperties
     handleUpdate,
     cycleViewDisabled = false,
     moduleViewDisabled = false,
-    isEpic = false,
   } = props;
   // hooks
   const { t } = useTranslation();
@@ -42,6 +41,8 @@ export const FilterDisplayProperties = observer(function FilterDisplayProperties
   // Also filter out display properties that should not be rendered
   const filteredDisplayProperties = ISSUE_DISPLAY_PROPERTIES.filter((property) => {
     if (!displayPropertiesToRender.includes(property.key)) return false;
+    // details Workplace doesn't use can't be switched on
+    if (UNUSED_DISPLAY_PROPERTIES.includes(property.key)) return false;
     switch (property.key) {
       case "cycle":
         return !cycleViewDisabled;
@@ -50,12 +51,8 @@ export const FilterDisplayProperties = observer(function FilterDisplayProperties
       default:
         return true;
     }
-  }).map((property) => {
-    if (isEpic && property.key === "sub_issue_count") {
-      return { ...property, titleTranslationKey: "issue.display.properties.work_item_count" };
-    }
-    return property;
   });
+  // (epics renamed "sub-work items" to "work items" here; the sub-task count is no longer shown at all)
 
   return (
     <>

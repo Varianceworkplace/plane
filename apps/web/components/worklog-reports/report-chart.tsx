@@ -28,6 +28,11 @@ type Props = {
   onSelect?: (key: string) => void;
 };
 
+/** Up to this many bars share the chart's width; past it each bar gets BAR_SLOT pixels and the chart scrolls sideways
+ * in its box (CHART_BOX_CLASSNAME), rather than 200 projects squeezed into a few pixels each. */
+const FIT_BARS = 12;
+const BAR_SLOT = 80;
+
 /** Hours per row as a bar chart; bars open the drill-down when `onSelect` is set. */
 export function WorklogReportChart(props: Props) {
   const { data, series, xAxisLabel, onSelect } = props;
@@ -57,45 +62,47 @@ export function WorklogReportChart(props: Props) {
   const labels = useMemo(() => Object.fromEntries(series.map((s) => [s.key, s.label])), [series]);
 
   return (
-    <BarChart
-      className="h-[320px] w-full"
-      margin={{ top: 20, right: 16, bottom: 30, left: 10 }}
-      data={data}
-      bars={bars}
-      xAxis={{ key: "name", label: xAxisLabel }}
-      yAxis={{ key: "hours", label: "Hours", allowDecimals: true, dx: -20 }}
-      barSize={data.length > 12 ? 16 : 32}
-      legend={series.length > 1 ? { align: "left", verticalAlign: "bottom", layout: "horizontal" } : undefined}
-      customTooltipContent={({ active, label, payload }) => {
-        const items = ((payload ?? []) as { dataKey?: string; value?: number; color?: string }[]).filter(
-          (item) => item.dataKey && Number(item.value) > 0
-        );
-        if (!active || !items.length) return null;
-        const total = items.reduce((sum, item) => sum + Number(item.value), 0);
-        return (
-          <Card className="flex w-[14rem] flex-col" spacing="sm">
-            <p className="truncate border-b border-subtle pb-2 text-11 font-medium text-primary">{label}</p>
-            {items.map((item) => (
-              <div key={item.dataKey} className="flex items-center justify-between gap-2 text-11">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="size-2 shrink-0 rounded-xs" style={{ backgroundColor: item.color }} />
-                  <span className="truncate text-tertiary">{labels[item.dataKey as string]}</span>
-                </span>
-                <span className="shrink-0 font-medium text-secondary">
-                  {formatWorklogDuration(Number(item.value) * 60)}
-                </span>
-              </div>
-            ))}
-            {items.length > 1 && (
-              <div className="flex items-center justify-between border-t border-subtle pt-2 text-11 font-medium">
-                <span className="text-tertiary">Total</span>
-                <span className="text-primary">{formatWorklogDuration(total * 60)}</span>
-              </div>
-            )}
-            {onSelect && <p className="text-11 text-placeholder">Click to see worklogs</p>}
-          </Card>
-        );
-      }}
-    />
+    <div style={{ minWidth: data.length > FIT_BARS ? data.length * BAR_SLOT : undefined }}>
+      <BarChart
+        className="h-[320px] w-full"
+        margin={{ top: 20, right: 16, bottom: 30, left: 10 }}
+        data={data}
+        bars={bars}
+        xAxis={{ key: "name", label: xAxisLabel }}
+        yAxis={{ key: "hours", label: "Hours", allowDecimals: true, dx: -20 }}
+        barSize={data.length > 12 ? 16 : 32}
+        legend={series.length > 1 ? { align: "left", verticalAlign: "bottom", layout: "horizontal" } : undefined}
+        customTooltipContent={({ active, label, payload }) => {
+          const items = ((payload ?? []) as { dataKey?: string; value?: number; color?: string }[]).filter(
+            (item) => item.dataKey && Number(item.value) > 0
+          );
+          if (!active || !items.length) return null;
+          const total = items.reduce((sum, item) => sum + Number(item.value), 0);
+          return (
+            <Card className="flex w-[14rem] flex-col" spacing="sm">
+              <p className="truncate border-b border-subtle pb-2 text-11 font-medium text-primary">{label}</p>
+              {items.map((item) => (
+                <div key={item.dataKey} className="flex items-center justify-between gap-2 text-11">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="size-2 shrink-0 rounded-xs" style={{ backgroundColor: item.color }} />
+                    <span className="truncate text-tertiary">{labels[item.dataKey as string]}</span>
+                  </span>
+                  <span className="shrink-0 font-medium text-secondary">
+                    {formatWorklogDuration(Number(item.value) * 60)}
+                  </span>
+                </div>
+              ))}
+              {items.length > 1 && (
+                <div className="flex items-center justify-between border-t border-subtle pt-2 text-11 font-medium">
+                  <span className="text-tertiary">Total</span>
+                  <span className="text-primary">{formatWorklogDuration(total * 60)}</span>
+                </div>
+              )}
+              {onSelect && <p className="text-11 text-placeholder">Click to see worklogs</p>}
+            </Card>
+          );
+        }}
+      />
+    </div>
   );
 }

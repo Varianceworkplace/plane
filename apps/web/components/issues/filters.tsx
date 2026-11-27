@@ -135,8 +135,9 @@ export const HeaderFilters = observer(function HeaderFilters(props: Props) {
             aria-label={t("common.analytics")}
             onClick={() => setAnalyticsModal(true)}
           >
-            <span className="hidden @4xl:flex">{t("common.analytics")}</span>
-            <span className="flex @4xl:hidden">
+            {/* an icon until the header is wide: it also carries the search box and the date filter */}
+            <span className="hidden @6xl:flex">{t("common.analytics")}</span>
+            <span className="flex @6xl:hidden">
               <BarOutline className="size-3.5" />
             </span>
           </Button>

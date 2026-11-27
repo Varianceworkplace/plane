@@ -45,7 +45,7 @@ export const useShowSavedTime = (workspaceSlug: string) => {
   const { rootIssueStore } = useIssueDetail();
 
   return (projectId: string, issueId: string, issueStateId?: string) => {
-    void refreshWorkItemTime(mutate, projectId, issueId);
+    void refreshWorkItemTime(mutate, issueId);
     const issue = rootIssueStore.issues.getIssueById(issueId);
     // not loaded on this page: it's fetched fresh when opened
     if (!issueStateId || !issue || issue.state_id === issueStateId) return;
