@@ -11,6 +11,7 @@ import { useParams } from "next/navigation";
 import {
   ClockOutline,
   DeleteOutline,
+  EditOutline,
   HideOutline,
   LinkOutline,
   LockOutline,
@@ -93,6 +94,13 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
   const isArchived = !!project.archived_at;
   // the person's sidebar Projects list: the projects they're in can be shown there or hidden from it
   const canChooseListing = isMemberOfProject && !isArchived;
+  // Edit: for whoever may change the project, by the rule its settings page uses (a project admin; with role-based
+  // access, only when their roles let them edit it); it opens those settings, where all of it is changed
+  const canEdit =
+    !isArchived &&
+    isMemberOfProject &&
+    allowPermissions([EUserPermissions.ADMIN], EUserPermissionsLevel.PROJECT, workspaceSlug?.toString(), project.id);
+  const settingsHref = `/${workspaceSlug}/settings/projects/${project.id}`;
   const isInMyList = project.in_my_list !== false;
   // role-based access: people who can't manage the project ask their PM to let them join
   const needsApproval = !isMemberOfProject && !isArchived && !canOnProject("edit", project.id);
@@ -177,11 +185,18 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
 
   const MENU_ITEMS: TContextMenuItem[] = [
     {
+      key: "edit",
+      action: () => router.push(settingsHref),
+      title: "Edit",
+      icon: EditOutline,
+      shouldRender: canEdit,
+    },
+    {
       key: "settings",
-      action: () => router.push(`/${workspaceSlug}/settings/projects/${project.id}`),
+      action: () => router.push(settingsHref),
       title: "Settings",
       icon: SettingsOutline,
-      shouldRender: !isArchived && (hasAdminRole || hasMemberRole),
+      shouldRender: !isArchived && !canEdit && (hasAdminRole || hasMemberRole),
     },
     {
       key: "show-in-list",
@@ -441,14 +456,31 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
                     />
                   </Tooltip>
                 )}
-                {isMemberOfProject &&
+                {canEdit ? (
+                  <Tooltip label="Change the project's name, details and settings" disabled={isMobile}>
+                    <Button
+                      variant="secondary"
+                      size="xs"
+                      stretch="auto"
+                      label="Edit"
+                      icon={<Icon icon={EditOutline} />}
+                      aria-label={`Edit ${project.name}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        router.push(settingsHref);
+                      }}
+                    />
+                  </Tooltip>
+                ) : (
+                  isMemberOfProject &&
                   (hasAdminRole || hasMemberRole ? (
                     <Link
                       className="flex items-center justify-center rounded-sm p-1 text-placeholder hover:bg-layer-1 hover:text-secondary"
                       onClick={(e) => {
                         e.stopPropagation();
                       }}
-                      href={`/${workspaceSlug}/settings/projects/${project.id}`}
+                      href={settingsHref}
                     >
                       <SettingsOutline className="h-3.5 w-3.5" />
                     </Link>
@@ -457,7 +489,8 @@ export const ProjectCard = observer(function ProjectCard(props: Props) {
                       <TickOutline className="h-3.5 w-3.5" />
                       Joined
                     </span>
-                  ))}
+                  ))
+                )}
                 {!isMemberOfProject && isRequested && (
                   <span className="flex items-center gap-1 text-13 text-placeholder">
                     <ClockOutline className="h-3.5 w-3.5" />

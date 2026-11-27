@@ -23,7 +23,10 @@ export type TTimesheet = {
 };
 
 /** GET timesheet/<id>/: one entry, its date in the browser's timezone. */
-export type TTimesheetEntry = TWorklogReportEntry;
+export type TTimesheetEntry = TWorklogReportEntry & {
+  /** may edit and delete it: their own time, or an admin of the project or the workspace */
+  can_manage?: boolean;
+};
 
 export type TTimesheetQuery = {
   /** a person's id, "all", or empty for the signed-in person */

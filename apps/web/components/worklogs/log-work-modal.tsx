@@ -398,12 +398,13 @@ export function DeleteWorklogModal(props: {
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose(false)}>
       <DialogContent size="sm">
         <div className="px-5 pt-5">
-          <DialogTitle>Delete worklog</DialogTitle>
+          <DialogTitle>Delete time entry{worklog?.timesheet_no ? ` ${worklog.timesheet_no}` : ""}?</DialogTitle>
         </div>
         <DialogMain>
           <p className="px-5 py-4 text-body-sm-regular text-secondary">
-            Are you sure you want to delete this worklog? The logged time will be removed from all reports. This
-            can&apos;t be undone.
+            {worklog ? `${formatWorklogDuration(worklog.duration)} of logged time ` : "The logged time "}
+            will be removed from the project task, the Time Sheet and all reports. The task&apos;s History keeps a note
+            of what was deleted and by whom. This can&apos;t be undone.
           </p>
         </DialogMain>
         <DialogActions>

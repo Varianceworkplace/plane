@@ -320,7 +320,12 @@ const summaryPdfParts = (
           title: getWorklogUserName(user),
           hours: hours(user.projects.find((p) => p.id === project.id)?.total_duration ?? 0),
         }))
-      : summary.projects.map((p) => ({ key: p.id, name: p.identifier, title: p.name, hours: hours(p.total_duration) }));
+      : summary.projects.map((p) => ({
+          key: p.id,
+          name: shortLabel(p.name),
+          title: p.name,
+          hours: hours(p.total_duration),
+        }));
     return {
       chart: {
         key: "hours",

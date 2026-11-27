@@ -293,6 +293,9 @@ USE_I18N = True
 # Timezones
 USE_TZ = True
 TIME_ZONE = "UTC"
+# The time zone a new account starts with (its owner can change it in their profile): Variance works in India.
+# Django's own default for the field is UTC, which showed a new person's times and report days 5.5 hours off.
+DEFAULT_USER_TIMEZONE = os.environ.get("DEFAULT_USER_TIMEZONE", "Asia/Kolkata")
 
 # Default Auto Field
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

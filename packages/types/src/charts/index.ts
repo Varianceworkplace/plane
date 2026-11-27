@@ -43,6 +43,8 @@ export type TAxisChartProps<K extends string, T extends string> = TBaseChartProp
     label?: string;
     strokeColor?: string;
     dy?: number;
+    /** which x labels show: 0 = every one (the default hides labels its own measure says would overlap) */
+    interval?: number | "preserveStart" | "preserveEnd" | "preserveStartEnd" | "equidistantPreserveStart";
   };
   yAxis: {
     allowDecimals?: boolean;

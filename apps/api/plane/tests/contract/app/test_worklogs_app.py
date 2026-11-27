@@ -28,6 +28,7 @@ from rest_framework.test import APIClient
 
 from plane.db.models import (
     Issue,
+    IssueActivity,
     IssueAssignee,
     IssueWorkLog,
     IssueWorkLogTimer,
@@ -734,3 +735,84 @@ def test_migration_numbers_existing_entries_after_the_highest(setup):
     assert IssueWorkLog.objects.get(pk=old["id"]).timesheet_no == "TIME-BILLING-900001"
     assert IssueWorkLog.objects.get(pk=newer["id"]).timesheet_no == "TIME-BILLING-900002"
     assert _log(setup)["timesheet_no"] == "TIME-BILLING-900003"
+
+
+# ---------------------------------------------------------------- deleting: gone everywhere, kept in History
+
+
+def _timesheet_ids(setup, who):
+    response = setup["clients"][who].get(f"/api/workspaces/{setup['workspace'].slug}/timesheet/", {"person": "all"})
+    return [row["id"] for row in response.json()["results"]]
+
+
+def _timesheet_entry(setup, who, worklog_id):
+    return setup["clients"][who].get(f"/api/workspaces/{setup['workspace'].slug}/timesheet/{worklog_id}/")
+
+
+def _report_ids(setup, who):
+    response = setup["clients"][who].get(f"/api/workspaces/{setup['workspace'].slug}/worklog-reports/worklogs/")
+    return [row["id"] for row in response.json()["results"]]
+
+
+@pytest.mark.contract
+def test_a_deleted_entry_leaves_every_list_and_history_keeps_it(setup):
+    worklog = _log(setup)
+    member = setup["clients"]["member"]
+    assert worklog["id"] in _timesheet_ids(setup, "member") and worklog["id"] in _report_ids(setup, "admin")
+
+    assert member.delete(_url(setup, worklog_id=worklog["id"])).status_code == status.HTTP_204_NO_CONTENT
+    # one record: the task's worklogs, the Time Sheet (list and page) and Reports all lose it together
+    assert member.get(_url(setup)).json() == []
+    assert worklog["id"] not in _timesheet_ids(setup, "member")
+    assert _timesheet_entry(setup, "member", worklog["id"]).status_code == status.HTTP_404_NOT_FOUND
+    assert worklog["id"] not in _report_ids(setup, "admin")
+    # only marked deleted, so it can be restored
+    assert IssueWorkLog.all_objects.get(pk=worklog["id"]).deleted_at is not None
+
+    history = IssueActivity.objects.get(issue=setup["issue"], field="worklog")
+    assert (history.verb, history.actor_id, history.old_identifier) == (
+        "deleted",
+        setup["people"]["member"].id,
+        IssueWorkLog.all_objects.get(pk=worklog["id"]).id,
+    )
+    assert history.old_value.startswith(f"{worklog['timesheet_no']} · 1h 30m on ")
+    assert history.old_value.endswith("logged by Hiral Test")
+
+
+@pytest.mark.contract
+def test_an_admin_deleting_someone_elses_entry_is_recorded_as_the_admin(setup):
+    worklog = _log(setup)
+    response = setup["clients"]["admin"].delete(_url(setup, worklog_id=worklog["id"]))
+    assert response.status_code == status.HTTP_204_NO_CONTENT
+    history = IssueActivity.objects.get(issue=setup["issue"], field="worklog")
+    assert history.actor_id == setup["people"]["admin"].id
+    assert history.old_value.endswith("logged by Hiral Test")
+
+
+@pytest.mark.contract
+def test_a_refused_delete_records_nothing(setup):
+    worklog = _log(setup)
+    assert setup["clients"]["other"].delete(_url(setup, worklog_id=worklog["id"])).status_code == 403
+    assert not IssueActivity.objects.filter(issue=setup["issue"], field="worklog").exists()
+
+
+@pytest.mark.contract
+def test_the_time_sheet_page_offers_edit_and_delete_by_the_same_rule(setup):
+    worklog = _log(setup)
+    assert _timesheet_entry(setup, "member", worklog["id"]).json()["can_manage"] is True
+    assert _timesheet_entry(setup, "admin", worklog["id"]).json()["can_manage"] is True
+    # another member doesn't see it at all
+    assert _timesheet_entry(setup, "other", worklog["id"]).status_code == status.HTTP_404_NOT_FOUND
+
+
+@pytest.mark.contract
+def test_history_shows_the_times_as_the_deleting_browser_did(setup):
+    from zoneinfo import ZoneInfo
+
+    worklog = _log(setup)
+    url = _url(setup, worklog_id=worklog["id"])
+    assert setup["clients"]["member"].delete(f"{url}?tz=Asia/Kolkata").status_code == status.HTTP_204_NO_CONTENT
+    entry = IssueWorkLog.all_objects.get(pk=worklog["id"])
+    india = ZoneInfo("Asia/Kolkata")
+    expected = f"{entry.started_at.astimezone(india):%I:%M %p} – {entry.ended_at.astimezone(india):%I:%M %p}"
+    assert expected in IssueActivity.objects.get(issue=setup["issue"], field="worklog").old_value

@@ -45,7 +45,15 @@ from plane.db.models import User, WorkspaceMember
 
 from plane.utils.csv_utils import sanitize_csv_row
 
-from .base import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, _uuid_list, format_duration, serialize_user, worklog_queryset
+from .base import (
+    DEFAULT_PAGE_SIZE,
+    MAX_PAGE_SIZE,
+    _uuid_list,
+    format_duration,
+    is_project_or_workspace_admin,
+    serialize_user,
+    worklog_queryset,
+)
 from .report import (
     MAX_REPORT_DAYS,
     ReportFilterError,
@@ -203,7 +211,12 @@ class TimesheetEntryEndpoint(BaseAPIView):
             return Response(
                 {"error": "This time entry doesn't exist or you can't see it."}, status=status.HTTP_404_NOT_FOUND
             )
-        return Response(serialize_report_worklog(worklog), status=status.HTTP_200_OK)
+        # Edit / Delete on the page: by the rule the task's worklog endpoints apply (their own time, or an admin of
+        # the project or the workspace); those endpoints check it again
+        can_manage = worklog.logged_by_id == request.user.id or is_project_or_workspace_admin(
+            request.user, slug, worklog.project_id
+        )
+        return Response({**serialize_report_worklog(worklog), "can_manage": can_manage}, status=status.HTTP_200_OK)
 
 
 EXPORT_HEADERS = [

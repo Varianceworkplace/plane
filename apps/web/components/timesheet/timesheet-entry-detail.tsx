@@ -4,17 +4,22 @@
  * See the LICENSE file for details.
  */
 
+import { useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import useSWR from "swr";
+import useSWR, { useSWRConfig } from "swr";
 // plane imports
 import { Avatar } from "@makeplane/propel/components/avatar";
 import { Button } from "@makeplane/propel/components/button";
-import { ClockOutline, InfoOutline, TextOutline } from "@makeplane/propel/icons";
+import { Icon } from "@makeplane/propel/components/icon";
+import { ClockOutline, DeleteOutline, EditOutline, InfoOutline, TextOutline } from "@makeplane/propel/icons";
 import { cn, getFileURL, renderFormattedDate, renderFormattedTime } from "@plane/utils";
 // components
-import { formatWorklogDuration } from "@/components/worklogs/helpers";
+import { formatWorklogDuration, refreshWorkItemTime } from "@/components/worklogs/helpers";
+import { DeleteWorklogModal, LogWorkModal } from "@/components/worklogs/log-work-modal";
 import type { TWorklogUser } from "@/components/worklogs/types";
+// hooks
+import { useAppRouter } from "@/hooks/use-app-router";
 // services
 import { TimesheetService } from "@/services/timesheet.service";
 // local imports
@@ -126,8 +131,8 @@ function Section(props: { icon: React.FC<{ className?: string }>; title: string;
   );
 }
 
-function EntryFields(props: { workspaceSlug: string; entry: TTimesheetEntry }) {
-  const { workspaceSlug, entry } = props;
+function EntryFields(props: { workspaceSlug: string; entry: TTimesheetEntry; actions?: ReactNode }) {
+  const { workspaceSlug, entry, actions } = props;
   const taskId = `${entry.project.identifier}-${entry.issue.sequence_id}`;
   const dateStart = entry.work_date ? renderFormattedDate(entry.work_date, DATE) : null;
   // entries logged without times are on their one day, as in the export
@@ -136,11 +141,14 @@ function EntryFields(props: { workspaceSlug: string; entry: TTimesheetEntry }) {
 
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-6 px-page-x py-6">
-      <div className="flex flex-col gap-1">
-        <h2 className="text-h4-medium break-words text-primary">{entry.timesheet_no || "Time entry"}</h2>
-        <p className="text-body-xs-regular text-tertiary">
-          {personName(entry.logged_by)} · {formatWorklogDuration(entry.duration)} on {taskId}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h2 className="text-h4-medium break-words text-primary">{entry.timesheet_no || "Time entry"}</h2>
+          <p className="text-body-xs-regular text-tertiary">
+            {personName(entry.logged_by)} · {formatWorklogDuration(entry.duration)} on {taskId}
+          </p>
+        </div>
+        {actions}
       </div>
 
       <Section icon={ClockOutline} title="Time Sheet Information">
@@ -245,7 +253,17 @@ function EntryFields(props: { workspaceSlug: string; entry: TTimesheetEntry }) {
 /** Time Sheet › an entry: every detail of one time entry, laid out as Workplace's detail view. */
 export function TimesheetEntryDetail(props: { workspaceSlug: string; entryId: string }) {
   const { workspaceSlug, entryId } = props;
-  const { data: entry, error } = useTimesheetEntry(workspaceSlug, entryId);
+  const { data: entry, error, mutate } = useTimesheetEntry(workspaceSlug, entryId);
+  const { mutate: mutateAll } = useSWRConfig();
+  const router = useAppRouter();
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // the Time Sheet lists, and the task's time (its worklogs, totals, list row), which show the same entry
+  const refreshEverywhere = (issueId: string) => {
+    void mutateAll((key) => typeof key === "string" && key.startsWith(`TIMESHEET_${workspaceSlug}_`));
+    void refreshWorkItemTime(mutateAll, issueId);
+  };
 
   if (error)
     return (
@@ -268,9 +286,61 @@ export function TimesheetEntryDetail(props: { workspaceSlug: string; entryId: st
       </div>
     );
 
+  // the same Edit and Delete as the task's Worklogs tab: one record, so the task, the Time Sheet and Reports all follow
+  const actions = entry.can_manage ? (
+    <div className="flex shrink-0 items-center gap-2">
+      <Button
+        stretch="auto"
+        variant="secondary"
+        size="md"
+        label="Edit"
+        icon={<Icon icon={EditOutline} />}
+        onClick={() => setEditing(true)}
+      />
+      <Button
+        stretch="auto"
+        variant="danger-outline"
+        size="md"
+        label="Delete"
+        icon={<Icon icon={DeleteOutline} />}
+        onClick={() => setDeleting(true)}
+      />
+    </div>
+  ) : null;
+
   return (
     <div className="h-full w-full overflow-y-auto">
-      <EntryFields workspaceSlug={workspaceSlug} entry={entry} />
+      <EntryFields workspaceSlug={workspaceSlug} entry={entry} actions={actions} />
+      {entry.can_manage && (
+        <>
+          <LogWorkModal
+            open={editing}
+            workspaceSlug={workspaceSlug}
+            projectId={entry.project.id}
+            issueId={entry.issue.id}
+            worklog={entry}
+            onClose={(saved) => {
+              setEditing(false);
+              if (!saved) return;
+              void mutate();
+              refreshEverywhere(entry.issue.id);
+            }}
+          />
+          <DeleteWorklogModal
+            open={deleting}
+            workspaceSlug={workspaceSlug}
+            projectId={entry.project.id}
+            issueId={entry.issue.id}
+            worklog={entry}
+            onClose={(deleted) => {
+              setDeleting(false);
+              if (!deleted) return;
+              refreshEverywhere(entry.issue.id);
+              router.push(timesheetListHref(workspaceSlug));
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }
