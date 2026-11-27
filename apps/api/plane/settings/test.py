@@ -14,3 +14,6 @@ EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 INSTALLED_APPS.append(  # noqa
     "plane.tests"
 )
+
+# the tests' people start on UTC, as their expected times assume (test_new_account_timezone checks the real default)
+DEFAULT_USER_TIMEZONE = "UTC"

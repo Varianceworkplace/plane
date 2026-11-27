@@ -225,8 +225,9 @@ export const buildUserChartData = (users: TWorklogReportUser[]) =>
 export const buildProjectChartData = (projects: TWorklogReportProject[]) =>
   projects.map((project) => ({
     key: project.id,
-    name: project.identifier,
-    fullName: project.name,
+    // the bar's label: the project's name (its number told people little); wrapped under the bar, whole on hover
+    name: project.name,
+    identifier: project.identifier,
     hours: minutesToHours(project.total_duration),
     minutes: project.total_duration,
   }));

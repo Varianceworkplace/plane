@@ -8,6 +8,7 @@ import string
 import uuid
 
 import pytz
+from django.conf import settings
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, UserManager
 
 # Django imports
@@ -183,6 +184,11 @@ class User(AbstractBaseUser, PermissionsMixin):
 
         if self.is_superuser:
             self.is_staff = True
+
+        # a new account starts on the organisation's time zone (settings.DEFAULT_USER_TIMEZONE, India for Variance)
+        # rather than the field's UTC default, whatever path creates it (sign-up, the admin's add user); bots keep UTC
+        if self._state.adding and self.user_timezone == "UTC" and not self.is_bot:
+            self.user_timezone = getattr(settings, "DEFAULT_USER_TIMEZONE", "UTC")
 
         super(User, self).save(*args, **kwargs)
 

@@ -58,8 +58,11 @@ export class WorklogService extends APIService {
       });
   }
 
+  /** Deletes a time entry; the task's History notes it, its day and times as this browser shows them (?tz). */
   async remove(workspaceSlug: string, projectId: string, issueId: string, worklogId: string): Promise<void> {
-    return this.delete(`${this.issueBase(workspaceSlug, projectId, issueId)}${worklogId}/`)
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const query = timezone ? `?${new URLSearchParams({ tz: timezone }).toString()}` : "";
+    return this.delete(`${this.issueBase(workspaceSlug, projectId, issueId)}${worklogId}/${query}`)
       .then(() => undefined)
       .catch((error) => {
         throw error?.response?.data;

@@ -337,7 +337,10 @@ export const IssueActivity = observer(function IssueActivity(props: TIssueActivi
         worklog={deleteWorklog}
         onClose={(deleted) => {
           setDeleteWorklog(null);
-          if (deleted) void refreshWorkItemTime(mutate, issueId);
+          if (!deleted) return;
+          void refreshWorkItemTime(mutate, issueId);
+          // the deletion's line in History
+          void fetchActivities(workspaceSlug, projectId, issueId);
         }}
       />
     </div>

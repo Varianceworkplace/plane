@@ -18,6 +18,7 @@ Time tracking (worklogs).
 import csv
 import io
 import json
+import time
 import uuid
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -42,6 +43,7 @@ from plane.app.views.base import BaseAPIView
 from plane.db.models import (
     MAX_WORKLOG_DURATION,
     Issue,
+    IssueActivity,
     IssueWorkLog,
     IssueWorkLogTimer,
     Project,
@@ -194,6 +196,45 @@ def is_project_or_workspace_admin(user, slug, project_id):
     )
 
 
+def record_worklog_deletion(user, worklog, timezone_name=None):
+    """A line in the task's History for a deleted time entry: what it was (Timesheet No., time, day, whose) and who
+    deleted it. Its day and times are as the deleting person saw them: their browser's time zone (?tz, as the Time
+    Sheet uses), else their profile's. The entry itself is only marked deleted, so it can be restored."""
+    tz = None
+    for name in (timezone_name, getattr(user, "user_timezone", None), "UTC"):
+        try:
+            tz = ZoneInfo(name) if name else None
+        except (ValueError, KeyError):
+            tz = None
+        if tz:
+            break
+
+    def clock(moment):
+        return moment.astimezone(tz).strftime("%I:%M %p")
+
+    when = (worklog.started_at or worklog.created_at).astimezone(tz).strftime("%d-%m-%Y")
+    if worklog.started_at and worklog.ended_at:
+        when += f", {clock(worklog.started_at)} – {clock(worklog.ended_at)}"
+    owner = worklog.logged_by
+    owner_name = f"{owner.first_name or ''} {owner.last_name or ''}".strip() or owner.display_name
+    IssueActivity.objects.create(
+        issue_id=worklog.issue_id,
+        project_id=worklog.project_id,
+        workspace_id=worklog.workspace_id,
+        actor=user,
+        verb="deleted",
+        field="worklog",
+        old_value=(
+            f"{worklog.timesheet_no or 'Time entry'} · {format_duration(worklog.duration)} on {when}, "
+            f"logged by {owner_name}"
+        ),
+        new_value="",
+        old_identifier=worklog.id,
+        comment="deleted a time entry",
+        epoch=time.time(),
+    )
+
+
 def worklog_queryset(slug):
     return (
         IssueWorkLog.objects.filter(
@@ -272,7 +313,11 @@ class IssueWorkLogDetailEndpoint(BaseAPIView):
         worklog, error = self.get_worklog(request, slug, project_id, issue_id, pk)
         if error:
             return error
-        worklog.delete()
+        # one record behind the task's Worklogs, the Time Sheet and Reports: gone from all of them at once; the task's
+        # History keeps a line saying what it was and who deleted it
+        with transaction.atomic():
+            worklog.delete()
+            record_worklog_deletion(request.user, worklog, (request.GET.get("tz") or "").strip() or None)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
