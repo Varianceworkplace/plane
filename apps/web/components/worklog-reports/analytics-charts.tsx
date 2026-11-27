@@ -19,6 +19,8 @@ import { cn } from "@plane/utils";
 // components
 import { generateExtendedColors } from "@/components/chart/utils";
 import { formatWorklogDuration } from "@/components/worklogs/helpers";
+// local imports
+import { NAMED_BAR_SLOT, NAMED_LABELS_AXIS_DY, NAMED_LABELS_MARGIN_BOTTOM, WrappedXAxisTick } from "./chart-labels";
 
 /** hours: the values are hours (shown as "1h 30m"); count: plain numbers; percent: 0-100 */
 export type TChartValueFormat = "hours" | "count" | "percent";
@@ -127,10 +129,12 @@ export function ReportBarChart(props: {
   format: TChartValueFormat;
   xAxisLabel: string;
   grouped?: boolean;
+  /** the bars are named (projects): full names under them, every bar labelled, the chart scrolling when long */
+  namedRows?: boolean;
   onSelect?: (key: string) => void;
   selectHint?: string;
 }) {
-  const { data, series, format, xAxisLabel, grouped = false, onSelect, selectHint } = props;
+  const { data, series, format, xAxisLabel, grouped = false, namedRows = false, onSelect, selectHint } = props;
   const colors = useSeriesColors(series);
 
   const bars = useMemo<TBarItem<string>[]>(() => {
@@ -153,13 +157,18 @@ export function ReportBarChart(props: {
   const labels = useMemo(() => Object.fromEntries(series.map((s) => [s.key, s.label])), [series]);
   const perRow = grouped ? series.length : 1;
 
-  return (
+  const chart = (
     <BarChart
-      className="h-[280px] w-full"
-      margin={{ top: 16, right: 16, bottom: 30, left: 10 }}
+      className={namedRows ? "h-[310px] w-full" : "h-[280px] w-full"}
+      margin={{ top: 16, right: 16, bottom: namedRows ? NAMED_LABELS_MARGIN_BOTTOM : 30, left: 10 }}
       data={data}
       bars={bars}
-      xAxis={{ key: "name", label: xAxisLabel }}
+      xAxis={
+        namedRows
+          ? { key: "name", label: xAxisLabel, interval: 0, dy: NAMED_LABELS_AXIS_DY }
+          : { key: "name", label: xAxisLabel }
+      }
+      customTicks={namedRows ? { x: WrappedXAxisTick as React.ComponentType<unknown> } : undefined}
       yAxis={{ key: series[0]?.key ?? "value", label: Y_LABEL[format], allowDecimals: format === "hours", dx: -20 }}
       barSize={Math.max(8, Math.round((data.length * perRow > 12 ? 16 : 28) / Math.sqrt(perRow)))}
       legend={series.length > 1 ? { align: "left", verticalAlign: "bottom", layout: "horizontal" } : undefined}
@@ -178,6 +187,14 @@ export function ReportBarChart(props: {
         );
       }}
     />
+  );
+  if (!namedRows) return chart;
+  // named bars keep their room (grouped ones more: several bars each); a long list scrolls sideways, visibly
+  const slot = grouped ? Math.round(NAMED_BAR_SLOT * 1.5) : NAMED_BAR_SLOT;
+  return (
+    <div className="horizontal-scrollbar scrollbar-sm overflow-y-hidden pb-1">
+      <div style={{ minWidth: data.length * slot }}>{chart}</div>
+    </div>
   );
 }
 
@@ -331,6 +348,8 @@ export type TReportChart = {
       format: TChartValueFormat;
       xAxisLabel: string;
       grouped?: boolean;
+      /** the bars are projects: their names, wrapped, every bar labelled */
+      namedRows?: boolean;
       onSelect?: (key: string) => void;
       selectHint?: string;
     }
@@ -349,6 +368,7 @@ function ReportChartBody({ chart }: { chart: TReportChart }) {
           format={chart.format}
           xAxisLabel={chart.xAxisLabel}
           grouped={chart.grouped}
+          namedRows={chart.namedRows}
           onSelect={chart.onSelect}
           selectHint={chart.selectHint}
         />

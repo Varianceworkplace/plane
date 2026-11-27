@@ -87,7 +87,7 @@ const projectHourRows = (analytics: TWorklogAnalytics): TChartRow[] =>
     .slice(0, MAX_ROWS)
     .map((project) => ({
       key: project.id,
-      name: project.identifier || project.name,
+      name: project.name,
       worked: toHours(project.worked_duration),
     }));
 
@@ -238,6 +238,7 @@ export const weeklyCharts = (analytics: TWorklogAnalytics): TReportChart[] => {
       series: [{ key: "worked", label: "Hours" }],
       format: "hours",
       xAxisLabel: "Projects",
+      namedRows: true,
     },
   ];
 };

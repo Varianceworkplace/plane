@@ -146,7 +146,7 @@ export const monthlyCharts = (analytics: TWorklogAnalytics): TReportChart[] => {
     .slice(0, MAX_ROWS)
     .map<TChartRow>((project) => ({
       key: project.id,
-      name: project.identifier || project.name,
+      name: project.name,
       title: project.name,
       progress: Math.round((project.tasks_completed * 100) / project.tasks_total),
     }));
@@ -214,6 +214,7 @@ export const monthlyCharts = (analytics: TWorklogAnalytics): TReportChart[] => {
       series: [{ key: "progress", label: "Completed", color: STATE_GROUPS.completed.color }],
       format: "percent",
       xAxisLabel: "Projects",
+      namedRows: true,
     },
     {
       key: "milestones",
@@ -240,7 +241,7 @@ export const quarterlyCharts = (
     .filter((project) => project.worked_duration > 0)
     .slice(0, MAX_ROWS)
     .map((project) => {
-      const row: TChartRow = { key: project.id, name: project.identifier || project.name, title: project.name };
+      const row: TChartRow = { key: project.id, name: project.name, title: project.name };
       project.series.forEach((bucket, index) => {
         row[`q${index + 1}`] = toHours(bucket.worked_duration);
       });
@@ -284,6 +285,7 @@ export const quarterlyCharts = (
       series: QUARTERS.map((item) => ({ key: `q${item.value}`, label: item.label })),
       format: "hours",
       xAxisLabel: "Projects",
+      namedRows: true,
     },
     {
       key: "productivity",
